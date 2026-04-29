@@ -137,6 +137,13 @@ type MetaMessage struct {
     Text        *MetaTextBody       `json:"text"`
     Type        string              `json:"type"`
     Interactive *MetaInteractive    `json:"interactive"`
+    Image       *MetaImage          `json:"image"`
+}
+
+type MetaImage struct {
+    ID       string `json:"id"`
+    MimeType string `json:"mime_type"`
+    SHA256   string `json:"sha256"`
 }
 
 type MetaTextBody struct {
@@ -221,6 +228,26 @@ func processWebhookPayload(payload MetaWebhookPayload) {
                             }
                         }
                     }
+                case "image":
+                    // Images bypass the text pipeline entirely.
+                    // 1. ACK immediately with a localized "processing" message
+                    // 2. Enqueue Vision AI classification in the worker pool
+                    if msg.Image != nil {
+                        log.Printf("🖼️ [%s] Image received from %s (media_id=%s)", business.Name, msg.From, msg.Image.ID)
+                        normalizedFrom := utils.NormalizePhone(msg.From)
+                        pushName := nameMap[msg.From]
+                        // Capture loop variables for the goroutine
+                        bizCopy := business
+                        msgCopy := msg
+                        go func() {
+                            waitMsg := localizedWaitMessage(&bizCopy)
+                            SendText(bizCopy.WAPhoneNumberID, bizCopy.WAAccessToken, normalizedFrom, waitMsg)
+                            utils.EnqueueWebhook(func() {
+                                HandleImageWebhook(&bizCopy, normalizedFrom, msgCopy.From, msgCopy.Image.ID, pushName)
+                            })
+                        }()
+                    }
+                    continue
                 default:
                     log.Printf("📥 [%s] Unsupported message type=%s from %s — skipping", business.Name, msg.Type, msg.From)
                     continue
