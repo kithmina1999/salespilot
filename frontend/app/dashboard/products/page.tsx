@@ -7,6 +7,7 @@ import {
 import { toast } from 'sonner';
 import { useAppStore } from '@/lib/store';
 import { useLocale } from '@/lib/locale';
+import { useProducts } from '@/hooks/useProducts';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -185,8 +186,9 @@ function SyncSetupDialog({ onClose, onSave }: { onClose: () => void; onSave: (id
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function ProductsPage() {
-  const [products, setProducts]     = useState<Product[]>([]);
-  const [loading,  setLoading]      = useState(true);
+  // SWR-backed data — optimistic toggle & delete built in
+  const { products, isLoading: loading, toggleProductActive, deleteProduct, revalidate } = useProducts();
+
   const [search,   setSearch]       = useState('');
   const [catalogID, setCatalogID]   = useState('');
   const [showSync, setShowSync]     = useState(false);
@@ -210,19 +212,8 @@ export default function ProductsPage() {
   });
 
   useEffect(() => {
-    fetchProducts();
     fetchCatalogID();
   }, []);
-
-  async function fetchProducts() {
-    setLoading(true);
-    const token = localStorage.getItem('token');
-    try {
-      const res = await fetch(`${API_URL}/api/v1/products`, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) { const d = await res.json(); setProducts(d.products || []); }
-    } catch { /* silent */ }
-    setLoading(false);
-  }
 
   async function fetchCatalogID() {
     const token = localStorage.getItem('token');
@@ -269,36 +260,14 @@ export default function ProductsPage() {
       if (res.ok) {
         toast.success(modalMode === 'create' ? 'Product created' : 'Product updated');
         setModalMode(null);
-        fetchProducts();
+        revalidate(); // SWR revalidation replaces manual fetchProducts()
       } else { toast.error('Failed to save product'); }
     } catch { toast.error('Network error'); }
   }
 
-  async function handleToggle(p: Product) {
-    const newStatus = !p.active;
-    setProducts(prev => prev.map(x => x.id === p.id ? { ...x, active: newStatus } : x));
-    const token = localStorage.getItem('token');
-    try {
-      await fetch(`${API_URL}/api/v1/products/${p.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ active: newStatus }),
-      });
-    } catch {
-      toast.error('Failed to toggle status');
-      setProducts(prev => prev.map(x => x.id === p.id ? { ...x, active: p.active } : x));
-    }
-  }
-
-  async function handleDelete(id: number) {
-    if (!confirm('Delete this product?')) return;
-    const token = localStorage.getItem('token');
-    try {
-      await fetch(`${API_URL}/api/v1/products/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-      toast.success('Product deleted');
-      fetchProducts();
-    } catch { toast.error('Failed to delete'); }
-  }
+  // Toggle and delete are now handled by the SWR hook directly
+  const handleToggle = toggleProductActive;
+  const handleDelete = deleteProduct;
 
   const filtered = products.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -565,7 +534,7 @@ export default function ProductsPage() {
       {showSync && (
         <SyncSetupDialog
           onClose={() => setShowSync(false)}
-          onSave={(id) => { setCatalogID(id); fetchProducts(); }}
+          onSave={(id) => { setCatalogID(id); revalidate(); }}
         />
       )}
     </div>

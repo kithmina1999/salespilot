@@ -8,6 +8,7 @@ import { useSearchParams } from 'next/navigation';
 import UpgradeBanner from '@/components/UpgradeBanner';
 import { toast } from 'sonner';
 import { useLocale } from '@/lib/locale';
+import { useRulesPage } from '@/hooks/useRulesPage';
 
 import { Rule, parseResponses } from './types';
 import RuleCard from './components/RuleCard';
@@ -22,33 +23,21 @@ function RulesContent() {
   const seed = searchParams.get('seed');
   const { t } = useLocale();
 
-  // ── Data ──────────────────────────────────────────────────────────────────
-  const [commonRules, setCommonRules]   = useState<Rule[]>([]);
-  const [customRules, setCustomRules]   = useState<Rule[]>([]);
-  const [loading, setLoading]           = useState(true);
-
-  const [stats, setStats] = useState({
-    system_quota_used: 0,
-    ai_quota_used: 0,
-    plan: 'free',
-    rule_generation_count: 0,
-    no_sinhala_coverage: 0,
-    top_unmatched: [] as { message: string; count: number }[],
-  });
-
-  // ── Settings ──────────────────────────────────────────────────────────────
-  const [botLangs, setBotLangs]         = useState<string[]>(['en', 'si']);
-  const [botReplyLang, setBotReplyLang] = useState<string>('si');
-  const [responseLang, setResponseLang] = useState<string>('sinhala_first');
-
-  // Card preview language — driven by botReplyLang, switchable via pills
-  const [cardPreviewLang, setCardPreviewLang] = useState<string>('si');
-  useEffect(() => { setCardPreviewLang(botReplyLang); }, [botReplyLang]);
+  // ── SWR-backed data ───────────────────────────────────────────────────────
+  const {
+    customRules, commonRules, stats,
+    botLangs, botReplyLang, responseLang,
+    isLoading: loading, toggleRuleStatus, deleteRule, revalidate,
+  } = useRulesPage();
 
   // ── UI toggles ────────────────────────────────────────────────────────────
   const [showDefaults, setShowDefaults] = useState(false);
   const [showMissing,  setShowMissing]  = useState(true);
   const [upgradeMessage, setUpgradeMessage] = useState<string | null>(null);
+
+  // Card preview language — driven by botReplyLang
+  const [cardPreviewLang, setCardPreviewLang] = useState<string>('si');
+  useEffect(() => { setCardPreviewLang(botReplyLang); }, [botReplyLang]);
 
   // ── Modal state ───────────────────────────────────────────────────────────
   const [modalMode, setModalMode] = useState<'create' | 'edit_custom' | 'clone_common' | 'generate_ai' | null>(null);
@@ -66,52 +55,8 @@ function RulesContent() {
   const [generating, setGenerating] = useState(false);
   const [drafting,   setDrafting]   = useState(false);
 
-  // ── Data fetching ─────────────────────────────────────────────────────────
-  async function fetchRules() {
-    setLoading(true);
-    const token = localStorage.getItem('token');
-    try {
-      const [rulesRes, statsRes, settingsRes] = await Promise.all([
-        fetch('http://localhost:8080/api/v1/rules',              { headers: { Authorization: `Bearer ${token}` } }),
-        fetch('http://localhost:8080/api/v1/dashboard/stats',    { headers: { Authorization: `Bearer ${token}` } }),
-        fetch('http://localhost:8080/api/v1/settings/business',  { headers: { Authorization: `Bearer ${token}` } }),
-      ]);
-
-      if (rulesRes.ok) {
-        const d = await rulesRes.json();
-        setCommonRules(d.common_rules || []);
-        setCustomRules(d.custom_rules || []);
-      }
-
-      if (statsRes.ok) {
-        const d = await statsRes.json();
-        setStats({
-          system_quota_used:    d.system_quota_used,
-          ai_quota_used:        d.ai_quota_used,
-          plan:                 d.plan,
-          rule_generation_count:d.rule_generation_count,
-          no_sinhala_coverage:  d.no_sinhala_coverage,
-          top_unmatched:        d.top_unmatched || [],
-        });
-      }
-
-      if (settingsRes.ok) {
-        const d = await settingsRes.json();
-        if (d.response_language)   setResponseLang(d.response_language);
-        if (d.bot_reply_language)  setBotReplyLang(d.bot_reply_language);
-        if (d.bot_supported_langs) {
-          const langs = d.bot_supported_langs.split(',').map((s: string) => s.trim()).filter(Boolean);
-          if (langs.length > 0) setBotLangs(langs);
-        }
-      }
-    } catch (err) {
-      console.error(err);
-    }
-    setLoading(false);
-  }
-
+  // Seed from URL — open create modal pre-filled
   useEffect(() => {
-    fetchRules();
     if (seed) {
       setForm(prev => ({ ...prev, keywords: seed || '' }));
       setModalMode('create');
@@ -167,7 +112,7 @@ function RulesContent() {
       if (res.ok) {
         toast.success('Rule saved successfully');
         closeModal();
-        fetchRules();
+        revalidate(); // SWR revalidation replaces manual fetchRules()
       } else {
         toast.error('Failed to save rule');
       }
@@ -193,7 +138,7 @@ function RulesContent() {
         setForm({ keywords: data.keywords, responses: generatedMap, is_active: true });
         setGenerateIntent('');
         setModalMode('create');
-        setStats(prev => ({ ...prev, rule_generation_count: data.generation_count }));
+        revalidate(); // refresh rule_generation_count from server
         toast.success('AI Draft Generated!');
       } else if (res.status === 403 && data.upgrade_required) {
         setUpgradeMessage(data.error || 'AI Rule Generation requires Starter or Pro plan');
@@ -252,40 +197,17 @@ function RulesContent() {
     }
   }
 
+  // Toggle and delete delegated to SWR hook (optimistic + rollback built in)
   async function handleToggleStatus(r: Rule) {
-    if (r.business_id === null) return;
-    const newStatus = !r.is_active;
-    setCustomRules(prev => prev.map(rule => rule.ID === r.ID ? { ...rule, is_active: newStatus } : rule));
-    const token = localStorage.getItem('token');
-    try {
-      await fetch(`http://localhost:8080/api/v1/rules/${r.ID}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ is_active: newStatus }),
-      });
-    } catch {
-      toast.error('Failed to update rule status');
-      setCustomRules(prev => prev.map(rule => rule.ID === r.ID ? { ...rule, is_active: r.is_active } : rule));
-    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await toggleRuleStatus(r as any);
   }
 
   async function handleDelete(id: number) {
-    if (!confirm('Are you sure you want to delete this custom rule?')) return;
-    const token = localStorage.getItem('token');
-    try {
-      const res  = await fetch(`http://localhost:8080/api/v1/rules/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (res.status === 403 && data.upgrade_required) {
-        setUpgradeMessage(data.error || 'This action requires a higher plan');
-      } else {
-        toast.success('Rule deleted');
-        fetchRules();
-      }
-    } catch {
-      toast.error('Failed to delete rule');
+    const ok = await deleteRule(id);
+    if (!ok) {
+      // deleteRule returns false when upgrade_required
+      setUpgradeMessage('This action requires a higher plan');
     }
   }
 
