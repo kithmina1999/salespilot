@@ -36,8 +36,12 @@ func TenantAuth() gin.HandlerFunc {
 			return
 		}
 
-		// Inject business ID into context
+		// Inject business ID and a tenant-scoped DB into context.
+		// The scoped DB bakes in WHERE business_id = ? on every SELECT/UPDATE/DELETE,
+		// making cross-tenant data leakage structurally impossible — same guarantee as AuthRequired.
 		c.Set("business_id", business.ID)
+		scopedDB := database.DB.Where("business_id = ?", business.ID)
+		c.Set("db", scopedDB)
 		c.Next()
 	}
 }

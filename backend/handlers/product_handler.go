@@ -5,15 +5,15 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
+	"gorm.io/gorm"
 )
 
 // ListProducts returns all active products, optionally filtered by category
 func ListProducts(c *gin.Context) {
-	businessID := c.GetUint("business_id")
+	db := c.MustGet("db").(*gorm.DB)
 	var products []models.Product
-	query := database.DB.Where("business_id = ? AND active = ?", businessID, true)
+	query := db.Where("active = ?", true)
 
 	if category := c.Query("category"); category != "" {
 		query = query.Where("category = ?", category)
@@ -29,7 +29,7 @@ func ListProducts(c *gin.Context) {
 
 // GetProduct returns a single product by ID
 func GetProduct(c *gin.Context) {
-	businessID := c.GetUint("business_id")
+	db := c.MustGet("db").(*gorm.DB)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
@@ -37,7 +37,7 @@ func GetProduct(c *gin.Context) {
 	}
 
 	var product models.Product
-	if err := database.DB.Where("business_id = ? AND id = ?", businessID, id).First(&product).Error; err != nil {
+	if err := db.Where("id = ?", id).First(&product).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
 		return
 	}
@@ -47,7 +47,7 @@ func GetProduct(c *gin.Context) {
 
 // SearchProducts searches products by name or description
 func SearchProducts(c *gin.Context) {
-	businessID := c.GetUint("business_id")
+	db := c.MustGet("db").(*gorm.DB)
 	q := c.Query("q")
 	if q == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Search query 'q' is required"})
@@ -56,8 +56,8 @@ func SearchProducts(c *gin.Context) {
 
 	var products []models.Product
 	searchPattern := "%" + q + "%"
-	err := database.DB.Where("business_id = ? AND active = ? AND (name LIKE ? OR description LIKE ? OR category LIKE ?)",
-		businessID, true, searchPattern, searchPattern, searchPattern).Find(&products).Error
+	err := db.Where("active = ? AND (name LIKE ? OR description LIKE ? OR category LIKE ?)",
+		true, searchPattern, searchPattern, searchPattern).Find(&products).Error
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed"})
@@ -69,8 +69,8 @@ func SearchProducts(c *gin.Context) {
 
 // ListCategories returns all unique categories
 func ListCategories(c *gin.Context) {
-	businessID := c.GetUint("business_id")
+	db := c.MustGet("db").(*gorm.DB)
 	var categories []string
-	database.DB.Model(&models.Product{}).Where("business_id = ? AND active = ?", businessID, true).Distinct().Pluck("category", &categories)
+	db.Model(&models.Product{}).Where("active = ?", true).Distinct().Pluck("category", &categories)
 	c.JSON(http.StatusOK, gin.H{"categories": categories})
 }
