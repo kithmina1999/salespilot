@@ -243,7 +243,15 @@ func processWebhookPayload(payload MetaWebhookPayload) {
                 }
 
                 log.Printf("📥 [%s] Incoming from %s: %q", business.Name, incoming.From, incoming.Text)
+
+                // Per-customer mutex: serialize concurrent requests from the same phone.
+                // Rapid button taps (e.g. "M" and "L" size at once) are queued here so
+                // the cart state machine always processes one message at a time per user.
+                // Different customers never block each other (key = businessID:phone).
+                unlock := lockCustomer(business.ID, incoming.From)
                 pipeline.HandleIncomingMessage(&business, incoming)
+                unlock()
+
             }
         }
     }
