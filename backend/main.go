@@ -4,7 +4,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -13,6 +15,7 @@ import (
 	"github.com/kithmina1999/salespilot/handlers"
 	"github.com/kithmina1999/salespilot/middleware"
 	"github.com/kithmina1999/salespilot/services"
+	"github.com/kithmina1999/salespilot/utils"
 	"github.com/kithmina1999/salespilot/whatsapp"
 )
 
@@ -25,6 +28,9 @@ func main() {
 
 	// Init database (PostgreSQL)
 	database.Init(cfg.DatabaseURL)
+
+	// 10 concurrent workers
+	utils.InitWorkerPool(10)
 
 	// Run one-time data migrations (idempotent — safe to run on every deploy)
 	database.MigrateRuleResponses()
@@ -259,7 +265,18 @@ func main() {
 	// Start Background Cron Jobs (e.g., 7-day order follow-ups)
 	services.StartCronJobs()
 
-	log.Printf("🚀 SalesPilot API starting on port %s", cfg.Port)
 	log.Printf("📁 Uploads served at %s/uploads/", cfg.ServerURL)
-	r.Run(":" + cfg.Port)
+
+	go func() {
+		log.Printf("🚀 SalesPilot API starting on port %s", cfg.Port)
+		if err := r.Run(":" + cfg.Port); err != nil {
+			log.Fatalf("❌ Server failed: %v", err)
+		}
+	}()
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Println("🛑 Shutdown signal received — draining worker pool...")
+	utils.DrainAndWait()
+	log.Println("✅ All workers finished — exiting cleanly")
 }

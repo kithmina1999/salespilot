@@ -87,8 +87,9 @@ func HandleWebhook(c *gin.Context) {
     // Immediately ACK to Meta (must respond within 20s or Meta retries)
     c.JSON(http.StatusOK, gin.H{"status": "ok"})
 
-    // Process messages asynchronously
-    go processWebhookPayload(payload)
+   utils.EnqueueWebhook(func() {
+    processWebhookPayload(payload)
+})
 }
 
 // MetaWebhookPayload is the top-level structure Meta sends.
