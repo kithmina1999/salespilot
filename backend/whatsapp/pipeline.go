@@ -353,12 +353,22 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 	// A plan is only active if it hasn't expired yet. An expired Starter plan is treated as Free.
 	planIsActive := business.Plan != models.PlanFree &&
 		(business.PlanExpiresAt == nil || business.PlanExpiresAt.After(time.Now()))
-	hasAIAccess := planIsActive || business.IsInActiveTrial()
+
+	// 3-day grace period: if a paid plan expired within the last 72 hours, keep AI access.
+	// This prevents abrupt degradation due to payment processing delays or card failures.
+	// After 3 days the plan truly lapses and the bot falls back to free-tier behavior.
+	const gracePeriod = 3 * 24 * time.Hour
+	inGracePeriod := !planIsActive &&
+		business.Plan != models.PlanFree &&
+		business.PlanExpiresAt != nil &&
+		time.Since(*business.PlanExpiresAt) <= gracePeriod
+
+	hasAIAccess := planIsActive || business.IsInActiveTrial() || inGracePeriod
 
 	// No AI access → reply with FAQ hint if available, otherwise polite fallback.
 	if !hasAIAccess {
 		if business.Plan != models.PlanFree {
-			log.Printf("⏰ [%s] Plan expired — AI fallback disabled for %s. Treating as Free.", business.Name, from)
+			log.Printf("⏰ [%s] Plan expired (grace period lapsed) — AI fallback disabled for %s. Treating as Free.", business.Name, from)
 		} else {
 			log.Printf("🔒 [%s] Free plan — AI fallback disabled for %s", business.Name, from)
 		}

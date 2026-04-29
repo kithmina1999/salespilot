@@ -72,6 +72,19 @@ func BillingStatus(c *gin.Context) {
 		trialDaysRemaining = &d
 	}
 
+	// Grace period: 3 days after plan expiry — bot still runs but merchant gets a warning banner
+	const gp = 3 * 24 * time.Hour
+	gracePeriodActive := false
+	var graceEndsAt *time.Time
+	if biz.Plan != models.PlanFree && biz.PlanExpiresAt != nil {
+		sinceExpiry := time.Since(*biz.PlanExpiresAt)
+		if sinceExpiry > 0 && sinceExpiry <= gp {
+			gracePeriodActive = true
+			t := biz.PlanExpiresAt.Add(gp)
+			graceEndsAt = &t
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"plan":                  biz.Plan,
 		"billing_cycle":         biz.BillingCycle,
@@ -79,6 +92,8 @@ func BillingStatus(c *gin.Context) {
 		"days_remaining":        daysRemaining,
 		"trial_expires_at":      biz.TrialExpiresAt,
 		"trial_days_remaining":  trialDaysRemaining,
+		"grace_period":          gracePeriodActive,
+		"grace_ends_at":         graceEndsAt,
 		"ai_message_count":      biz.AIMessageCount,
 		"faq_reply_count":       biz.FaqReplyCount,
 		"system_message_count":  biz.SystemMessageCount,
