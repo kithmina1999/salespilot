@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
+	"github.com/kithmina1999/salespilot/utils"
 	"github.com/kithmina1999/salespilot/whatsapp"
 )
 
@@ -117,6 +118,8 @@ func TestMetaConnection(c *gin.Context) {
 	if err := whatsapp.TestCredentials(biz.WAPhoneNumberID, biz.WAAccessToken); err != nil {
 		// Mark as disconnected in DB
 		database.DB.Model(&biz).Update("wa_status", "disconnected")
+		// Alert the team — this tenant's bot is now silent
+		go utils.AlertMetaTokenExpired(biz.Name, biz.WAPhoneNumberID)
 		c.JSON(http.StatusBadGateway, gin.H{
 			"ok":    false,
 			"error": "Credentials are invalid or token has expired: " + err.Error(),

@@ -35,6 +35,7 @@ func EnqueueWebhook(job WebhookJob) {
     case jobQueue <- job:
     default:
         log.Println("⚠️ Worker pool queue full — dropping webhook payload")
+        go AlertWorkerPoolFull() // alert team without blocking the HTTP handler
     }
 }
 
