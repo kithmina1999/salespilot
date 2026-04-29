@@ -1,0 +1,325 @@
+'use client';
+
+import { useState, useRef, useEffect } from 'react';
+import { Upload, Clock, CheckCircle2, AlertCircle, FileImage, ChevronRight, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { useAppStore } from '@/lib/store';
+
+interface PaymentStatus {
+  has_proof: boolean;
+  status: string;
+  billing_cycle: string;
+  amount: number;
+  activation_code: string;
+  admin_note: string;
+  submitted_at: string;
+  reviewed_at: string | null;
+}
+
+type Cycle = 'monthly' | 'annual';
+type PlanKey = 'starter' | 'pro';
+
+interface Props {
+  paymentStatus: PaymentStatus | null;
+  onRefresh: () => void;
+  onActivateTab: () => void;
+  /** Pre-select a plan when navigating from the plan comparison table CTA */
+  initialPlan?: PlanKey;
+}
+
+function formatLKR(n: number) {
+  return `Rs. ${n.toLocaleString('en-LK')}`;
+}
+
+export default function SubscribeTab({ paymentStatus, onRefresh, onActivateTab, initialPlan }: Props) {
+  const pricing = useAppStore((s) => s.pricing);
+
+  const [selectedPlan, setSelectedPlan] = useState<PlanKey>(initialPlan ?? 'starter');
+  const [cycle, setCycle] = useState<Cycle>('monthly');
+
+  // Sync pre-selected plan when parent changes it (e.g. clicking table CTA)
+  useEffect(() => {
+    if (initialPlan) setSelectedPlan(initialPlan);
+  }, [initialPlan]);
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const hasPending = paymentStatus?.status === 'pending';
+  const hasRejected = paymentStatus?.status === 'rejected';
+  const hasApproved = paymentStatus?.status === 'approved';
+
+  // Dynamic prices from backend via store
+  const plans: Record<PlanKey, { label: string; monthly: number; annual: number }> = {
+    starter: {
+      label: 'Starter',
+      monthly: pricing?.starter.monthly ?? 1490,
+      annual: pricing?.starter.annual ?? 14900,
+    },
+    pro: {
+      label: 'Pro',
+      monthly: pricing?.pro.monthly ?? 3490,
+      annual: pricing?.pro.annual ?? 34900,
+    },
+  };
+
+  const currentPlan = plans[selectedPlan];
+  const price = cycle === 'monthly' ? currentPlan.monthly : currentPlan.annual;
+  const monthlyEquiv = cycle === 'annual' ? Math.round(currentPlan.annual / 12) : currentPlan.monthly;
+  const savingsPct = Math.round((1 - currentPlan.annual / (currentPlan.monthly * 12)) * 100);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (!f.type.startsWith('image/')) { toast.error('Only image files are accepted'); return; }
+    if (f.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return; }
+    setFile(f);
+    setPreview(URL.createObjectURL(f));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!file) { toast.error('Please select your payment screenshot'); return; }
+    setUploading(true);
+    const token = localStorage.getItem('token');
+    try {
+      const form = new FormData();
+      form.append('image', file);
+      form.append('billing_cycle', cycle);
+      form.append('plan', selectedPlan);
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/billing/submit-proof`,
+        { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      toast.success("Payment proof submitted! We'll verify and send your code via email soon.");
+      setFile(null); setPreview(null);
+      onRefresh();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+      {/* Status banners */}
+      {hasApproved && (
+        <div className="flex items-center gap-3 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+          <CheckCircle2 size={20} className="shrink-0" />
+          <div className="flex-1">
+            <p className="font-bold">Payment Approved! ✅</p>
+            <p className="text-sm opacity-80">Your activation code has been sent to your email.</p>
+          </div>
+          <button
+            onClick={onActivateTab}
+            className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 text-black font-black text-sm"
+          >
+            Activate <ChevronRight size={14} />
+          </button>
+        </div>
+      )}
+
+      {hasPending && (
+        <div className="flex items-center gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300">
+          <Clock size={20} className="shrink-0 animate-pulse" />
+          <div>
+            <p className="font-bold">Under Review ⏳</p>
+            <p className="text-sm opacity-80">
+              Your <strong>{paymentStatus!.billing_cycle}</strong> payment was submitted on{' '}
+              {new Date(paymentStatus!.submitted_at).toLocaleDateString('en-LK', {
+                day: 'numeric', month: 'short', year: 'numeric',
+              })}. We'll email your activation code once verified.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {hasRejected && (
+        <div className="flex items-center gap-3 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400">
+          <AlertCircle size={20} className="shrink-0" />
+          <div>
+            <p className="font-bold">Payment Could Not Be Verified ❌</p>
+            {paymentStatus?.admin_note && (
+              <p className="text-sm opacity-80 mt-0.5">Reason: <strong>{paymentStatus.admin_note}</strong></p>
+            )}
+            <p className="text-sm opacity-70 mt-0.5">Please resubmit a clearer screenshot below.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Form — hidden while pending/approved */}
+      {!hasPending && !hasApproved && (
+        <form onSubmit={handleSubmit} className="space-y-5">
+
+          {/* How it works */}
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
+            <p className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-4">How to subscribe</p>
+            <ol className="space-y-3">
+              {[
+                { n: '1', t: 'Pick a plan & cycle', d: 'Choose Starter or Pro, and whether to pay monthly or annually.' },
+                { n: '2', t: 'Transfer via bank', d: 'Use your registered WhatsApp number as the payment reference.' },
+                { n: '3', t: 'Upload screenshot', d: 'Take a photo of your bank receipt and upload it below.' },
+                { n: '4', t: 'Get your code by email', d: 'We verify and send your activation code within a few hours.' },
+              ].map(s => (
+                <li key={s.n} className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
+                    {s.n}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-zinc-200">{s.t}</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">{s.d}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          {/* Plan selector (Starter / Pro) */}
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
+            <p className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-4">Choose plan</p>
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              {(Object.keys(plans) as PlanKey[]).map(pk => (
+                <button
+                  key={pk}
+                  type="button"
+                  onClick={() => setSelectedPlan(pk)}
+                  className={`relative p-4 rounded-xl border text-left transition-all ${
+                    selectedPlan === pk
+                      ? 'border-emerald-500 bg-emerald-500/10'
+                      : 'border-zinc-800 bg-black/40 hover:border-zinc-700'
+                  }`}
+                >
+                  {pk === 'starter' && (
+                    <span className={`absolute -top-2.5 left-3 text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${selectedPlan === pk ? 'bg-emerald-500 text-black' : 'bg-zinc-800 text-zinc-500'}`}>
+                      Popular
+                    </span>
+                  )}
+                  <p className="text-sm font-black text-white mt-1">{plans[pk].label}</p>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    From {formatLKR(plans[pk].monthly)}/mo
+                  </p>
+                </button>
+              ))}
+            </div>
+
+            {/* Cycle selector (Monthly / Annual) */}
+            <p className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-3">Billing cycle</p>
+            <div className="grid grid-cols-2 gap-3">
+              {(['monthly', 'annual'] as Cycle[]).map(c => {
+                // Each button shows ITS OWN price, not the selected cycle's price
+                const btnPrice = c === 'monthly' ? currentPlan.monthly : currentPlan.annual;
+                const btnMonthlyEquiv = Math.round(currentPlan.annual / 12);
+
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setCycle(c)}
+                    className={`relative p-4 rounded-xl border text-left transition-all ${
+                      cycle === c
+                        ? 'border-emerald-500 bg-emerald-500/10 shadow-[0_0_20px_rgba(16,185,129,0.08)]'
+                        : 'border-zinc-800 bg-black/40 hover:border-zinc-700'
+                    }`}
+                  >
+                    {c === 'annual' && (
+                      <span className={`absolute -top-3.5 left-3 text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${cycle === c ? 'bg-emerald-500 text-black' : 'bg-zinc-800 text-zinc-500'} whitespace-nowrap`}>
+                        2 months free · {savingsPct}% off
+                      </span>
+                    )}
+                    <p className="text-xs font-bold text-zinc-400 mb-1 capitalize mt-1">{c}</p>
+                    <p className="text-xl font-black text-white">{formatLKR(btnPrice)}</p>
+                    {c === 'annual' && (
+                      <p className="text-[10px] text-zinc-500 mt-0.5">{formatLKR(btnMonthlyEquiv)}/mo</p>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Bank details */}
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 space-y-4">
+            <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Bank Account Details</p>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              {[
+                ['Bank', process.env.NEXT_PUBLIC_BANK_NAME || 'Commercial Bank of Ceylon'],
+                ['Branch', process.env.NEXT_PUBLIC_BANK_BRANCH || 'Colombo Main'],
+                ['Account No', process.env.NEXT_PUBLIC_BANK_ACCOUNT_NO || '—'],
+                ['Account Name', process.env.NEXT_PUBLIC_BANK_ACCOUNT_NAME || 'Byteshift (Pvt) Ltd'],
+              ].map(([label, val]) => (
+                <div key={label}>
+                  <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-wider mb-0.5">{label}</p>
+                  <p className="text-zinc-200 font-mono font-bold">{val}</p>
+                </div>
+              ))}
+            </div>
+            <div className="pt-3 border-t border-zinc-800 text-xs text-zinc-500 space-y-1">
+              <p className='text-white text-lg'><span className="text-emerald-400 text-lg font-bold">Transfer Amount: </span>{formatLKR(price)}/=</p>
+              <p><span className="text-emerald-400 font-bold">Reference: </span>Your WhatsApp number (e.g. 0771234567)</p>
+            </div>
+          </div>
+
+          {/* Screenshot upload */}
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 space-y-4">
+            <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Upload Payment Screenshot</p>
+
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className={`cursor-pointer rounded-xl border-2 border-dashed transition-all ${
+                preview
+                  ? 'border-emerald-500/50 bg-emerald-500/5'
+                  : 'border-zinc-700 hover:border-zinc-600 bg-zinc-950'
+              } flex flex-col items-center justify-center min-h-[150px] p-6`}
+            >
+              {preview ? (
+                <div className="flex flex-col items-center gap-3">
+                  <img src={preview} alt="Preview" className="max-h-40 rounded-lg object-contain shadow-lg" />
+                  <p className="text-xs text-zinc-400 flex items-center gap-1.5"><FileImage size={12} /> {file?.name}</p>
+                  <p className="text-xs text-emerald-400 font-bold">Click to change</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-zinc-800 flex items-center justify-center">
+                    <Upload size={20} className="text-zinc-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-zinc-300">Click to upload screenshot</p>
+                    <p className="text-xs text-zinc-600 mt-1">JPG, PNG — Max 5 MB</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+
+            <button
+              type="submit"
+              disabled={uploading || !file}
+              className="w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-black text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20 disabled:shadow-none"
+            >
+              {uploading
+                ? <><Loader2 size={16} className="animate-spin" /> Submitting...</>
+                : <><Upload size={16} /> Submit Payment Proof</>
+              }
+            </button>
+
+            <p className="text-xs text-zinc-600 text-center">
+              Prefer WhatsApp?{' '}
+              <a
+                href={`https://wa.me/${process.env.NEXT_PUBLIC_SUPPORT_PHONE_NUMBER || '94771234567'}?text=Hi%2C+I%27ve+paid+for+SalesPilot+%F0%9F%99%8F`}
+                target="_blank" rel="noreferrer"
+                className="text-emerald-400 hover:underline"
+              >
+                Send screenshot on WhatsApp →
+              </a>
+            </p>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}

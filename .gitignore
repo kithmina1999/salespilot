@@ -1,0 +1,21 @@
+# Root level ignores
+.DS_Store
+*.log
+*.sqlite
+*.db
+
+# Backend ignores
+backend/.env
+backend/*.exe
+backend/out.*
+backend/whatsapp_sessions.db
+backend/uploads/
+backend/tmp/
+
+# Keep child gitignores working
+frontend/node_modules/
+frontend/.next/
+landing/node_modules/
+landing/.next/
+salespilot-admin-main/node_modules/
+salespilot-admin-main/.next/

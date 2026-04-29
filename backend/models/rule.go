@@ -1,0 +1,76 @@
+package models
+
+import (
+	"encoding/json"
+	"strings"
+
+	"gorm.io/gorm"
+)
+
+// Rule defines automated FAQ responses.
+// If BusinessID is NULL, the rule is global (SaaS-wide).
+// If BusinessID is set, it belongs to a specific tenant.
+type Rule struct {
+	gorm.Model
+	BusinessID *uint  `json:"business_id" gorm:"index"`
+	Keywords   string `json:"keywords" gorm:"type:text"` // comma-separated keywords
+
+	// New: extensible per-language response map, e.g. {"en": "...", "si": "...", "ta": "..."}
+	Responses string `json:"responses" gorm:"type:text;default:'{}'"`
+
+	// Deprecated (kept for migration window — will be dropped in v2.1)
+	Response        string `json:"response,omitempty"`
+	SinhalaResponse string `json:"sinhala_response,omitempty" gorm:"type:text"`
+
+	IsActive        bool   `json:"is_active" gorm:"default:true"`
+	UsageCount      uint   `json:"usage_count" gorm:"default:0"`
+	// Tier 1: Hard silent drop — no reply sent, no token consumed, no log created
+	IsDropRule      bool   `json:"is_drop_rule" gorm:"default:false"`
+	// Tier 2: Context bridge — check last bot message; re-prompt if it was a question, else silent drop
+	IsContextBridge bool   `json:"is_context_bridge" gorm:"default:false"`
+	Embedding       []byte `json:"-" gorm:"type:bytea"` // JSON-encoded float64 vector, not exposed in API
+}
+
+// GetResponse returns the best available response text for the given ISO 639-1 language code.
+// Priority: exact lang match → "en" fallback → first non-empty value → legacy Response field.
+func (r *Rule) GetResponse(langCode string) string {
+	if r.Responses != "" && r.Responses != "{}" {
+		var m map[string]string
+		if err := json.Unmarshal([]byte(r.Responses), &m); err == nil {
+			// 1. Exact match
+			if v, ok := m[strings.TrimSpace(langCode)]; ok && v != "" {
+				return v
+			}
+			// 2. English fallback
+			if v, ok := m["en"]; ok && v != "" {
+				return v
+			}
+			// 3. First non-empty
+			for _, v := range m {
+				if v != "" {
+					return v
+				}
+			}
+		}
+	}
+	// 4. Legacy fallback (migration window)
+	if langCode == "si" && r.SinhalaResponse != "" {
+		return r.SinhalaResponse
+	}
+	return r.Response
+}
+
+// SetResponse updates the Responses JSON map for a given language code.
+func (r *Rule) SetResponse(langCode, text string) {
+	var m map[string]string
+	if r.Responses != "" {
+		json.Unmarshal([]byte(r.Responses), &m) //nolint:errcheck
+	}
+	if m == nil {
+		m = map[string]string{}
+	}
+	m[langCode] = text
+	b, _ := json.Marshal(m)
+	r.Responses = string(b)
+}
+

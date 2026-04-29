@@ -1,0 +1,588 @@
+'use client';
+import { useState, useEffect, Suspense } from 'react';
+import {
+  Plus, Search, BookOpen, Cpu, BarChart3, AlertTriangle,
+  Sparkles, ShieldAlert, Edit2, Lock as LockIcon,
+} from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import UpgradeBanner from '@/components/UpgradeBanner';
+import { toast } from 'sonner';
+import { useLocale } from '@/lib/locale';
+
+import { Rule, parseResponses } from './types';
+import RuleCard from './components/RuleCard';
+import { RuleModal, AIGenerateModal } from './components/RuleModal';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main content (wrapped in Suspense for useSearchParams)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function RulesContent() {
+  const searchParams = useSearchParams();
+  const seed = searchParams.get('seed');
+  const { t } = useLocale();
+
+  // ── Data ──────────────────────────────────────────────────────────────────
+  const [commonRules, setCommonRules]   = useState<Rule[]>([]);
+  const [customRules, setCustomRules]   = useState<Rule[]>([]);
+  const [loading, setLoading]           = useState(true);
+
+  const [stats, setStats] = useState({
+    system_quota_used: 0,
+    ai_quota_used: 0,
+    plan: 'free',
+    rule_generation_count: 0,
+    no_sinhala_coverage: 0,
+    top_unmatched: [] as { message: string; count: number }[],
+  });
+
+  // ── Settings ──────────────────────────────────────────────────────────────
+  const [botLangs, setBotLangs]         = useState<string[]>(['en', 'si']);
+  const [botReplyLang, setBotReplyLang] = useState<string>('si');
+  const [responseLang, setResponseLang] = useState<string>('sinhala_first');
+
+  // Card preview language — driven by botReplyLang, switchable via pills
+  const [cardPreviewLang, setCardPreviewLang] = useState<string>('si');
+  useEffect(() => { setCardPreviewLang(botReplyLang); }, [botReplyLang]);
+
+  // ── UI toggles ────────────────────────────────────────────────────────────
+  const [showDefaults, setShowDefaults] = useState(false);
+  const [showMissing,  setShowMissing]  = useState(true);
+  const [upgradeMessage, setUpgradeMessage] = useState<string | null>(null);
+
+  // ── Modal state ───────────────────────────────────────────────────────────
+  const [modalMode, setModalMode] = useState<'create' | 'edit_custom' | 'clone_common' | 'generate_ai' | null>(null);
+  const [editTargetId, setEditTargetId] = useState<number | null>(null);
+
+  const [form, setForm] = useState({
+    keywords: '',
+    responses: {} as Record<string, string>,
+    is_active: true,
+  });
+
+  const [seedOriginalLine,  setSeedOriginalLine]  = useState('');
+  const [generalizedIntent, setGeneralizedIntent] = useState('');
+  const [generateIntent,    setGenerateIntent]    = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [drafting,   setDrafting]   = useState(false);
+
+  // ── Data fetching ─────────────────────────────────────────────────────────
+  async function fetchRules() {
+    setLoading(true);
+    const token = localStorage.getItem('token');
+    try {
+      const [rulesRes, statsRes, settingsRes] = await Promise.all([
+        fetch('http://localhost:8080/api/v1/rules',              { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('http://localhost:8080/api/v1/dashboard/stats',    { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('http://localhost:8080/api/v1/settings/business',  { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+
+      if (rulesRes.ok) {
+        const d = await rulesRes.json();
+        setCommonRules(d.common_rules || []);
+        setCustomRules(d.custom_rules || []);
+      }
+
+      if (statsRes.ok) {
+        const d = await statsRes.json();
+        setStats({
+          system_quota_used:    d.system_quota_used,
+          ai_quota_used:        d.ai_quota_used,
+          plan:                 d.plan,
+          rule_generation_count:d.rule_generation_count,
+          no_sinhala_coverage:  d.no_sinhala_coverage,
+          top_unmatched:        d.top_unmatched || [],
+        });
+      }
+
+      if (settingsRes.ok) {
+        const d = await settingsRes.json();
+        if (d.response_language)   setResponseLang(d.response_language);
+        if (d.bot_reply_language)  setBotReplyLang(d.bot_reply_language);
+        if (d.bot_supported_langs) {
+          const langs = d.bot_supported_langs.split(',').map((s: string) => s.trim()).filter(Boolean);
+          if (langs.length > 0) setBotLangs(langs);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    fetchRules();
+    if (seed) {
+      setForm(prev => ({ ...prev, keywords: seed || '' }));
+      setModalMode('create');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seed]);
+
+  // ── Modal helpers ─────────────────────────────────────────────────────────
+  function openCreateModal() {
+    setEditTargetId(null);
+    setForm({ keywords: '', responses: {}, is_active: true });
+    setSeedOriginalLine('');
+    setGeneralizedIntent('');
+    setModalMode('create');
+  }
+
+  function openEditModal(r: Rule, isCommon: boolean) {
+    setEditTargetId(r.ID);
+    const responses = parseResponses(r.responses, r.response, r.sinhala_response);
+    setForm({ keywords: r.keywords, responses, is_active: r.is_active });
+    setSeedOriginalLine('');
+    setGeneralizedIntent('');
+    setModalMode(isCommon ? 'clone_common' : 'edit_custom');
+  }
+
+  function closeModal() {
+    setModalMode(null);
+    setSeedOriginalLine('');
+    setGeneralizedIntent('');
+  }
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+    const isPost = modalMode === 'create' || modalMode === 'clone_common';
+    const url    = isPost ? 'http://localhost:8080/api/v1/rules' : `http://localhost:8080/api/v1/rules/${editTargetId}`;
+    const method = isPost ? 'POST' : 'PUT';
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          keywords: form.keywords,
+          responses: form.responses,
+          response: form.responses['en'] || '',
+          sinhala_response: form.responses['si'] || '',
+          is_active: form.is_active,
+          ...(seedOriginalLine ? { resolved_message: seedOriginalLine } : {}),
+        }),
+      });
+      if (res.ok) {
+        toast.success('Rule saved successfully');
+        closeModal();
+        fetchRules();
+      } else {
+        toast.error('Failed to save rule');
+      }
+    } catch (err) { console.error(err); }
+  }
+
+  async function handleGenerateRule(e: React.FormEvent) {
+    e.preventDefault();
+    if (!generateIntent) return;
+    setGenerating(true);
+    const token = localStorage.getItem('token');
+    try {
+      const res  = await fetch('http://localhost:8080/api/v1/rules/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ intent: generateIntent }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const generatedMap: Record<string, string> = data.responses || {};
+        if (!generatedMap['en'] && data.response)          generatedMap['en'] = data.response;
+        if (!generatedMap['si'] && data.sinhala_response) generatedMap['si'] = data.sinhala_response;
+        setForm({ keywords: data.keywords, responses: generatedMap, is_active: true });
+        setGenerateIntent('');
+        setModalMode('create');
+        setStats(prev => ({ ...prev, rule_generation_count: data.generation_count }));
+        toast.success('AI Draft Generated!');
+      } else if (res.status === 403 && data.upgrade_required) {
+        setUpgradeMessage(data.error || 'AI Rule Generation requires Starter or Pro plan');
+        closeModal();
+      } else if (res.status === 429) {
+        toast.error(`${data.error} (retry in ${data.retry_after_seconds}s)`);
+      } else {
+        toast.error(data.error || 'Failed to generate rule');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Error connecting to AI service');
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function handleAutoDraft() {
+    const isInboxMode  = !!seedOriginalLine;
+    const messageToSend = isInboxMode ? seedOriginalLine : form.keywords;
+    if (!messageToSend.trim()) {
+      toast.error(isInboxMode ? 'No customer message to generalize.' : 'Please add Trigger Keywords first.');
+      return;
+    }
+    setDrafting(true);
+    const token = localStorage.getItem('token');
+    try {
+      const res  = await fetch('http://localhost:8080/api/v1/faqs/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ message: messageToSend, from_inbox: isInboxMode }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const incoming: Record<string, string> = data.responses || {};
+        if (!incoming['en'] && data.response)          incoming['en'] = data.response;
+        if (!incoming['si'] && data.sinhala_response) incoming['si'] = data.sinhala_response;
+        if (isInboxMode && data.keywords) {
+          setForm(prev => ({ ...prev, keywords: data.keywords || prev.keywords, responses: { ...prev.responses, ...incoming } }));
+          if (data.generalized_intent) setGeneralizedIntent(data.generalized_intent);
+          toast.success('✨ Intent generalized and rule drafted!');
+        } else {
+          setForm(prev => ({ ...prev, responses: { ...prev.responses, ...incoming } }));
+          toast.success('Responses drafted!');
+        }
+      } else if (res.status === 403) {
+        const data = await res.json();
+        setUpgradeMessage(data.error || 'AI Draft requires Starter or Pro plan');
+      } else {
+        toast.error('Failed to draft answer with AI');
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDrafting(false);
+    }
+  }
+
+  async function handleToggleStatus(r: Rule) {
+    if (r.business_id === null) return;
+    const newStatus = !r.is_active;
+    setCustomRules(prev => prev.map(rule => rule.ID === r.ID ? { ...rule, is_active: newStatus } : rule));
+    const token = localStorage.getItem('token');
+    try {
+      await fetch(`http://localhost:8080/api/v1/rules/${r.ID}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ is_active: newStatus }),
+      });
+    } catch {
+      toast.error('Failed to update rule status');
+      setCustomRules(prev => prev.map(rule => rule.ID === r.ID ? { ...rule, is_active: r.is_active } : rule));
+    }
+  }
+
+  async function handleDelete(id: number) {
+    if (!confirm('Are you sure you want to delete this custom rule?')) return;
+    const token = localStorage.getItem('token');
+    try {
+      const res  = await fetch(`http://localhost:8080/api/v1/rules/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.status === 403 && data.upgrade_required) {
+        setUpgradeMessage(data.error || 'This action requires a higher plan');
+      } else {
+        toast.success('Rule deleted');
+        fetchRules();
+      }
+    } catch {
+      toast.error('Failed to delete rule');
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────
+  return (
+    <div className="max-w-6xl mx-auto pb-12">
+
+      {/* Upgrade banner */}
+      {upgradeMessage && (
+        <div className="mb-6">
+          <UpgradeBanner message={upgradeMessage} onDismiss={() => setUpgradeMessage(null)} />
+        </div>
+      )}
+
+      {/* ── Page header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl font-semibold">{t('rules.title')}</h1>
+          <p className="text-sm mt-1 text-zinc-400">{t('rules.subtitle')}</p>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+          {/* AI Generate button */}
+          {stats.plan === 'free' ? (
+            <button
+              disabled
+              title="Upgrade to Starter or Pro to use AI Rule Generation"
+              className="flex items-center gap-2 px-4 py-2.5 sm:py-2 rounded-lg text-sm font-bold bg-amber-500/10 text-amber-500/50 border border-amber-500/20 cursor-not-allowed flex-1 sm:flex-none justify-center"
+              style={{ minHeight: '44px' }}
+            >
+              <LockIcon size={16} /> Generate with AI ✨
+            </button>
+          ) : stats.plan === 'starter' && stats.rule_generation_count >= 30 ? (
+            <button
+              disabled
+              title="Monthly limit reached. Upgrade to Pro for unlimited generation."
+              className="flex items-center gap-2 px-4 py-2.5 sm:py-2 rounded-lg text-sm font-bold bg-amber-500/10 text-amber-500/50 border border-amber-500/20 cursor-not-allowed flex-1 sm:flex-none justify-center"
+              style={{ minHeight: '44px' }}
+            >
+              <LockIcon size={16} /> Limit Reached
+            </button>
+          ) : (
+            <button
+              onClick={() => { setGenerateIntent(''); setModalMode('generate_ai'); }}
+              className="flex items-center gap-2 px-4 py-2.5 sm:py-2 rounded-lg text-sm font-bold bg-linear-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-black shadow-lg shadow-amber-500/20 transition-transform hover:scale-105 flex-1 sm:flex-none justify-center"
+              style={{ minHeight: '44px' }}
+            >
+              <Sparkles size={16} /> Generate with AI
+            </button>
+          )}
+          <button
+            onClick={openCreateModal}
+            className="flex items-center gap-2 px-4 py-2.5 sm:py-2 rounded-lg text-sm font-bold bg-white hover:bg-zinc-200 text-black shadow-lg transition-transform hover:scale-105 flex-1 sm:flex-none justify-center"
+            style={{ minHeight: '44px' }}
+          >
+            <Plus size={16} /> {t('rules.add_rule')}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Stats row ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5 flex flex-col justify-center">
+          <span className="text-zinc-400 text-xs font-bold mb-1">Total FAQs</span>
+          <span className="text-2xl font-black text-white">{customRules.length}</span>
+        </div>
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5 flex flex-col justify-center">
+          <span className="text-zinc-400 text-xs font-bold mb-1">Total Hits</span>
+          <span className="text-2xl font-black text-white">
+            {customRules.reduce((sum, r) => sum + (r.usage_count || 0), 0)}
+          </span>
+        </div>
+        <div className="rounded-2xl border bg-green-500/10 border-green-500/20 p-5 flex flex-col justify-center relative overflow-hidden">
+          <span className="text-green-400 text-xs font-bold mb-1">FAQ Contribution</span>
+          <span className="text-2xl font-black text-white relative z-10">
+            {stats.system_quota_used + stats.ai_quota_used === 0
+              ? '0%'
+              : Math.round((stats.system_quota_used / (stats.system_quota_used + stats.ai_quota_used)) * 100) + '%'}
+          </span>
+          <span className="text-[10px] text-green-500/60 mt-1 relative z-10">Queries handled without AI</span>
+          <Cpu className="absolute -right-4 -bottom-4 w-20 h-20 text-green-500/5 rotate-12" />
+        </div>
+        <div className={`rounded-2xl border p-5 flex flex-col justify-center ${stats.no_sinhala_coverage > 0 ? 'bg-amber-500/10 border-amber-500/20' : 'bg-zinc-900/50 border-zinc-800'}`}>
+          <span className={`${stats.no_sinhala_coverage > 0 ? 'text-amber-400' : 'text-zinc-400'} text-xs font-bold mb-1 flex items-center gap-1.5`}>
+            {stats.no_sinhala_coverage > 0 ? <AlertTriangle size={12} /> : null}
+            No Sinhala Coverage
+          </span>
+          <span className="text-2xl font-black text-white">{stats.no_sinhala_coverage}</span>
+          <span className={`text-[10px] mt-1 ${stats.no_sinhala_coverage > 0 ? 'text-amber-500/60' : 'text-zinc-500'}`}>
+            {stats.no_sinhala_coverage > 0 ? 'Update these for better bot UX' : 'All good!'}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-10">
+
+        {/* ── Missing Knowledge Inbox ── */}
+        {stats.top_unmatched?.length > 0 && (
+          <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 relative pt-2">
+            <div
+              className={`flex items-center justify-between cursor-pointer p-4 rounded-xl border transition-colors ${showMissing ? 'bg-amber-500/10 border-amber-500/20' : 'bg-transparent border-zinc-800 hover:bg-amber-500/5 hover:border-amber-500/20'}`}
+              onClick={() => setShowMissing(!showMissing)}
+            >
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <ShieldAlert size={18} className="text-amber-500" />
+                  <h2 className="text-lg font-bold text-amber-500">Missing Knowledge Inbox</h2>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-[10px] font-black text-amber-400 ml-2 tracking-wide uppercase">
+                    {stats.top_unmatched.length} Fails
+                  </span>
+                </div>
+                <p className="text-sm text-zinc-400">
+                  Your bot failed to answer these questions recently. Convert them to rules to guarantee 24/7 resolution.
+                </p>
+              </div>
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 transition-transform duration-300 shrink-0" style={{ rotate: showMissing ? '180deg' : '0deg' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+              </div>
+            </div>
+
+            {showMissing && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto max-h-[280px] pr-2 custom-scrollbar">
+                {stats.top_unmatched.map((um, idx) => (
+                  <div key={idx} className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-5 flex flex-col justify-between shadow-lg relative group">
+                    <div className="absolute top-0 right-0 bg-amber-500/20 text-amber-400 text-[10px] font-black px-3 py-1.5 rounded-bl-xl flex items-center gap-1 shadow-sm">
+                      {um.count} fails
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-amber-500 mb-2 truncate pr-16">Unanswered Query</h4>
+                      <p className="text-sm text-zinc-200 leading-relaxed italic line-clamp-3">&quot;{um.message}&quot;</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setForm({ keywords: '', responses: {}, is_active: true });
+                        setEditTargetId(null);
+                        setSeedOriginalLine(um.message);
+                        setGeneralizedIntent('');
+                        setModalMode('create');
+                      }}
+                      className="mt-6 w-full py-2 bg-amber-500 hover:bg-amber-400 text-black text-[13px] font-black rounded-xl transition-colors flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(245,158,11,0.2)]"
+                    >
+                      <Plus size={14} /> Convert to FAQ
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Custom Rules ── */}
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Cpu size={18} className="text-white" />
+            <h2 className="text-lg font-medium">Your Custom Rules</h2>
+          </div>
+          <p className="text-sm text-gray-400 mb-2">
+            Rules strictly applied to your bot. These override System Defaults if keywords match.
+          </p>
+
+          {loading ? (
+            <div className="p-8 text-center text-sm border rounded-xl border-zinc-800 text-zinc-400">{t('common.loading')}…</div>
+          ) : customRules.length === 0 ? (
+            <div className="p-10 border border-dashed rounded-xl flex flex-col items-center justify-center text-center border-zinc-800 bg-zinc-900/20">
+              <BookOpen size={32} className="mb-3 opacity-20" />
+              <p className="text-sm">{t('rules.no_rules')}</p>
+              <button onClick={openCreateModal} className="mt-2 text-xs text-blue-400 hover:text-blue-300 transition-colors">
+                {t('rules.no_rules_hint')}
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {customRules.map(r => (
+                <RuleCard
+                  key={r.ID}
+                  rule={r}
+                  overridesCommon={commonRules.some(cr => cr.keywords === r.keywords)}
+                  botLangs={botLangs}
+                  cardPreviewLang={cardPreviewLang}
+                  onPreviewLangChange={setCardPreviewLang}
+                  onEdit={() => openEditModal(r, false)}
+                  onDelete={() => handleDelete(r.ID)}
+                  onToggleStatus={() => handleToggleStatus(r)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <hr className="border-t border-dashed opacity-50 my-2 border-zinc-800" />
+
+        {/* ── System Defaults ── */}
+        <div className="flex flex-col gap-4">
+          <div
+            className={`flex items-center justify-between cursor-pointer p-4 rounded-xl border transition-colors ${showDefaults ? 'bg-zinc-900/50 border-zinc-800' : 'bg-transparent border-zinc-800 hover:bg-zinc-900/30'}`}
+            onClick={() => setShowDefaults(!showDefaults)}
+          >
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <ShieldAlert size={18} className="text-gray-400" />
+                <h2 className="text-lg font-medium text-gray-300">System Defaults</h2>
+                <span className="px-2 py-0.5 rounded-full bg-white/10 text-xs text-gray-400 ml-2">{commonRules.length}</span>
+              </div>
+              <p className="text-sm text-gray-500">
+                Global rules provided by the platform. You can override these to create your own isolated response.
+              </p>
+            </div>
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-white/5 text-gray-400 transition-transform duration-300" style={{ rotate: showDefaults ? '180deg' : '0deg' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+            </div>
+          </div>
+
+          {showDefaults && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-4 duration-300 mt-2">
+              {loading ? (
+                <div className="p-8 text-center text-sm border rounded-xl opacity-50 col-span-full border-zinc-800">Loading...</div>
+              ) : commonRules.length === 0 ? (
+                <div className="p-10 border border-dashed rounded-xl flex items-center justify-center opacity-50 col-span-full border-zinc-800">
+                  <p className="text-sm">No global rules configured.</p>
+                </div>
+              ) : commonRules.map(r => {
+                const isOverridden = customRules.some(cr => cr.keywords === r.keywords);
+                return (
+                  <div key={r.ID} className={`p-5 border rounded-2xl flex flex-col transition-all border-zinc-800 bg-zinc-900/50 shadow-sm ${isOverridden ? 'opacity-30 grayscale' : 'opacity-80 hover:opacity-100 hover:border-zinc-700'}`}>
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex flex-wrap gap-1.5 max-w-[70%]">
+                        {r.keywords.split(',').map((kw, i) => (
+                          <span key={i} className="px-2 py-0.5 rounded-full text-[11px] border bg-transparent text-gray-400 border-zinc-800">
+                            {kw.trim()}
+                          </span>
+                        ))}
+                      </div>
+                      {!isOverridden ? (
+                        <button
+                          onClick={() => openEditModal(r, true)}
+                          className="flex items-center gap-1.5 text-[11px] text-white border px-2 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors border-zinc-700"
+                        >
+                          <Edit2 size={12} /> Override
+                        </button>
+                      ) : (
+                        <span className="text-[10px] uppercase font-bold text-gray-500">Overridden</span>
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-400 leading-relaxed bg-black/20 p-3 rounded-lg border border-transparent mt-2 whitespace-pre-wrap">
+                      {responseLang !== 'english_first' && r.sinhala_response ? r.sinhala_response : r.response}
+                      {responseLang !== 'english_first' && r.sinhala_response && (
+                        <span className="ml-2 text-[10px] text-green-400 font-bold align-middle">සිංහල</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Modals ── */}
+      {(modalMode === 'create' || modalMode === 'edit_custom' || modalMode === 'clone_common') && (
+        <RuleModal
+          mode={modalMode}
+          form={form}
+          setForm={setForm}
+          botLangs={botLangs}
+          seedOriginalLine={seedOriginalLine}
+          generalizedIntent={generalizedIntent}
+          drafting={drafting}
+          onSubmit={handleSubmit}
+          onClose={closeModal}
+          onAutoDraft={handleAutoDraft}
+          t={t}
+        />
+      )}
+
+      {modalMode === 'generate_ai' && (
+        <AIGenerateModal
+          plan={stats.plan}
+          ruleGenerationCount={stats.rule_generation_count}
+          generating={generating}
+          generateIntent={generateIntent}
+          setGenerateIntent={setGenerateIntent}
+          onSubmit={handleGenerateRule}
+          onClose={closeModal}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Page export (Suspense boundary for useSearchParams)
+// ─────────────────────────────────────────────────────────────────────────────
+export default function RulesPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-zinc-400">Loading Rules Engine...</div>}>
+      <RulesContent />
+    </Suspense>
+  );
+}

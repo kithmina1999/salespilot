@@ -1,0 +1,149 @@
+'use client';
+import { useState, useEffect } from 'react';
+import { UserCog, Shield, ShieldCheck, Bell, History, AlertTriangle, Settings, Globe } from 'lucide-react';
+import GeneralTab from './_components/GeneralTab';
+import SecurityTab from './_components/SecurityTab';
+import BlockedNumbersTab from './_components/BlockedNumbersTab';
+import AuditLogTab from './_components/AuditLogTab';
+import ReportsTab from './_components/ReportsTab';
+import DangerZoneTab from './_components/DangerZoneTab';
+import LanguageTab from './_components/LanguageTab';
+import { useLocale } from '@/lib/locale';
+
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+
+export type BusinessSettings = {
+  name: string;
+  bot_name: string;
+  greeting_message: string;
+  operating_hours: string;
+  delivery_policy: string;
+  response_language: string;
+  // New multi-language fields
+  bot_reply_language: string;
+  bot_supported_langs: string;
+};
+
+export type BillingStatus = {
+  plan: string;
+  days_remaining: number | null;
+  trial_days_remaining: number | null;
+  plan_expires_at: string | null;
+};
+
+const TABS = [
+  { id: 'general',     label: 'General',         icon: UserCog,     color: 'text-emerald-400' },
+  { id: 'language',    label: 'Language',         icon: Globe,       color: 'text-blue-400'    },
+  { id: 'security',    label: 'Security',         icon: Shield,      color: 'text-blue-400'    },
+  { id: 'blacklist',   label: 'Blocked Numbers',  icon: ShieldCheck, color: 'text-red-400'     },
+  { id: 'audit',       label: 'Audit Log',        icon: History,     color: 'text-purple-400'  },
+  { id: 'reports',     label: 'Reports',          icon: Bell,        color: 'text-amber-400'   },
+  { id: 'danger',      label: 'Danger Zone',      icon: AlertTriangle, color: 'text-red-500'   },
+];
+export default function SettingsPage() {
+  const [activeTab, setActiveTab] = useState('general');
+  const { t } = useLocale();
+
+  const TABS = [
+    { id: 'general',   label: t('settings.general'),  icon: UserCog,       color: 'text-emerald-400' },
+    { id: 'language',  label: t('settings.language'),  icon: Globe,         color: 'text-blue-400'    },
+    { id: 'security',  label: t('settings.security'),  icon: Shield,        color: 'text-blue-400'    },
+    { id: 'blacklist', label: 'Blocked Numbers',        icon: ShieldCheck,   color: 'text-red-400'     },
+    { id: 'audit',     label: t('nav.reports'),         icon: History,       color: 'text-purple-400'  },
+    { id: 'reports',   label: t('nav.reports'),         icon: Bell,          color: 'text-amber-400'   },
+    { id: 'danger',    label: 'Danger Zone',            icon: AlertTriangle, color: 'text-red-500'     },
+  ];
+
+  const [settings, setSettings] = useState<BusinessSettings>({
+    name: '', bot_name: '', greeting_message: '',
+    operating_hours: '', delivery_policy: '',
+    response_language: 'sinhala_first',
+    bot_reply_language: 'en',
+    bot_supported_langs: 'en,si',
+  });
+  const [billing, setBilling] = useState<BillingStatus | null>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const headers = { Authorization: `Bearer ${token}` };
+
+    fetch(`${API_URL}/api/v1/settings/business`, { headers })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setSettings(d); })
+      .catch(() => {});
+
+    fetch(`${API_URL}/api/v1/billing/status`, { headers })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setBilling(d); })
+      .catch(() => {});
+  }, []);
+
+  return (
+    <div className="max-w-5xl mx-auto pb-20">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight mb-1 text-zinc-100 flex items-center gap-3">
+          <Settings size={28} className="text-zinc-500" />
+          {t('settings.title')}
+        </h1>
+        <p className="text-sm text-zinc-400">{t('settings.general')} — {t('settings.security').toLowerCase()}, {t('settings.language').toLowerCase()}.</p>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-6">
+        {/* ── Vertical Tab Nav ── */}
+        <nav className="md:w-52 shrink-0">
+          {/* Mobile: horizontal scroll */}
+          <div className="flex md:hidden gap-1 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden">
+            {TABS.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
+                  activeTab === tab.id
+                    ? 'bg-zinc-800 text-white'
+                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'
+                }`}
+              >
+                <tab.icon size={14} className={activeTab === tab.id ? tab.color : ''} />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Desktop: vertical list */}
+          <div className="hidden md:flex flex-col gap-0.5">
+            {TABS.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-all ${
+                  activeTab === tab.id
+                    ? 'bg-zinc-800/80 text-white shadow-sm'
+                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/50'
+                } ${tab.id === 'danger' ? 'mt-4 border-t border-zinc-800 pt-4' : ''}`}
+              >
+                <tab.icon
+                  size={15}
+                  className={`shrink-0 transition-colors ${activeTab === tab.id ? tab.color : 'text-zinc-600 group-hover:text-zinc-400'}`}
+                />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </nav>
+
+        {/* ── Tab Content ── */}
+        <div className="flex-1 min-w-0 animate-in fade-in slide-in-from-bottom-1 duration-200" key={activeTab}>
+          {activeTab === 'general'   && <GeneralTab settings={settings} setSettings={setSettings} billing={billing} />}
+          {activeTab === 'language'  && <LanguageTab settings={settings} />}
+          {activeTab === 'security'  && <SecurityTab />}
+          {activeTab === 'blacklist' && <BlockedNumbersTab />}
+          {activeTab === 'audit'     && <AuditLogTab />}
+          {activeTab === 'reports'   && <ReportsTab />}
+          {activeTab === 'danger'    && <DangerZoneTab />}
+        </div>
+      </div>
+    </div>
+  );
+}

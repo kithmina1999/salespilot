@@ -1,0 +1,6 @@
+# StyleBot - OpenClaw Sale Agent
+
+/data/
+/uploads/
+.env
+*.db
