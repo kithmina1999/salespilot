@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -101,9 +102,10 @@ func (p *Pipeline) handleContextBridge(business *models.Business, from, fromRaw 
 }
 
 type IncomingMessage struct {
-	From     string // normalized E.164 phone (e.g. "94771234567")
-	Text     string // message body
-	PushName string // display name from WhatsApp profile
+	From      string // normalized E.164 phone (e.g. "94771234567")
+	Text      string // message body
+	PushName  string // display name from WhatsApp profile
+	Timestamp string // Unix timestamp string from Meta webhook
 }
 
 func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg IncomingMessage) {
@@ -372,6 +374,27 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 	database.DB.Model(business).Update("ai_message_count", business.AIMessageCount+1)
 	business.AIMessageCount++
 
+	// ── Staleness detection ────────────────────────────────────────────────────
+	// A message is "stale" if it was delayed 5–60 min (e.g. server briefly down).
+	// - Skip the AI usage counter (delay was our fault, not customer's quota)
+	// - Inject an apology directive into Gemini so the bot acknowledges the delay
+	// Messages >60 min are already hard-dropped in webhook.go's stale filter.
+	isStale := false
+	const staleWindow = 60 * time.Minute
+	if msg.Timestamp != "" {
+		if ts, err := strconv.ParseInt(msg.Timestamp, 10, 64); err == nil {
+			msgAge := time.Since(time.Unix(ts, 0))
+			if msgAge > 5*time.Minute && msgAge <= staleWindow {
+				isStale = true
+				log.Printf("⏰ [%s] Stale message from %s (age=%v) — apology mode, skipping AI counter",
+					business.Name, from, msgAge.Round(time.Second))
+				// Undo the AI count increment above
+				database.DB.Model(business).Update("ai_message_count", business.AIMessageCount-1)
+				business.AIMessageCount--
+			}
+		}
+	}
+
 	// Use the stored per-business AI limit (set at activation; promo users get 2000, standard 1000)
 	maxAI := business.AIMessageLimit
 	if business.Plan == models.PlanPro {
@@ -396,7 +419,7 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 		}
 	}
 
-	p.callGemini(business, from, fromRaw, text, faqHint)
+	p.callGemini(business, from, fromRaw, text, faqHint, isStale)
 
 }
 
@@ -719,7 +742,7 @@ func semanticMatch(businessID uint, msg string) (*models.Rule, string) {
 	return nil, ""
 }
 
-func (p *Pipeline) callGemini(business *models.Business, phone string, fromPhone string, text string, faqHint string) {
+func (p *Pipeline) callGemini(business *models.Business, phone string, fromPhone string, text string, faqHint string, isStale bool) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey
 
@@ -832,6 +855,13 @@ RESPONSE STYLE (follow strictly):
 	}
 	if business.DeliveryPolicy != "" {
 		tenantContext += fmt.Sprintf("Delivery Policy: %s\n", business.DeliveryPolicy)
+	}
+
+	// ── Stale message: apologise for the delay ───────────────────────────────
+	if isStale {
+		tenantContext += "\nIMPORTANT: This customer's message was delayed due to a brief server issue. " +
+			"Begin your reply with a brief, warm apology for the late response (one short sentence only) " +
+			"before answering their question. Keep it natural — not overly formal.\n"
 	}
 
 	// ── Prompt Injection Shield ───────────────────────────────────────────────

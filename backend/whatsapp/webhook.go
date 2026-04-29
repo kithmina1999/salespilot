@@ -9,6 +9,7 @@ import (
     "log"
     "net/http"
     "os"
+    "strconv"
     "strings"
     "sync"
     "time"
@@ -229,6 +230,21 @@ func processWebhookPayload(payload MetaWebhookPayload) {
                     continue
                 }
 
+                // ── Stale message filter ────────────────────────────────────
+                // Meta retries failed deliveries for up to 72 hours. Messages
+                // older than 5 minutes are almost certainly queued retries from
+                // a previous connectivity issue — drop them silently so the bot
+                // doesn't replay old conversations.
+                const staleThreshold = 5 * time.Minute
+                if ts, err := strconv.ParseInt(msg.Timestamp, 10, 64); err == nil {
+                    msgTime := time.Unix(ts, 0)
+                    if time.Since(msgTime) > staleThreshold {
+                        log.Printf("⏱️ [Webhook] Stale message from %s (age=%v) — dropping",
+                            msg.From, time.Since(msgTime).Round(time.Second))
+                        continue
+                    }
+                }
+
                 // Dedup guard: Meta retries the same payload when delivery is
                 // uncertain. Drop duplicates within the 5-minute window.
                 if isAlreadyProcessed(msg.ID) {
@@ -237,9 +253,10 @@ func processWebhookPayload(payload MetaWebhookPayload) {
                 }
 
                 incoming := IncomingMessage{
-                    From:     utils.NormalizePhone(msg.From),
-                    Text:     text,
-                    PushName: nameMap[msg.From],
+                    From:      utils.NormalizePhone(msg.From),
+                    Text:      text,
+                    PushName:  nameMap[msg.From],
+                    Timestamp: msg.Timestamp,
                 }
 
                 log.Printf("📥 [%s] Incoming from %s: %q", business.Name, incoming.From, incoming.Text)
