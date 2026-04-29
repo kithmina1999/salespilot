@@ -8,18 +8,15 @@ import (
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
 	"github.com/kithmina1999/salespilot/utils"
+	"gorm.io/gorm"
 )
 
 // GetBlacklist returns all blocked numbers for the tenant
 func GetBlacklist(c *gin.Context) {
-	businessID, exists := c.Get("business_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
+	db := c.MustGet("db").(*gorm.DB)
 
 	var blocked []models.BlacklistedNumber
-	if err := database.DB.Where("business_id = ?", businessID).Order("blocked_at desc").Find(&blocked).Error; err != nil {
+	if err := db.Order("blocked_at desc").Find(&blocked).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch blacklist"})
 		return
 	}
@@ -68,16 +65,12 @@ func AddToBlacklist(c *gin.Context) {
 
 // RemoveFromBlacklist unblocks a number
 func RemoveFromBlacklist(c *gin.Context) {
-	businessID, exists := c.Get("business_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
-
+	businessID := c.GetUint("business_id")
+	db := c.MustGet("db").(*gorm.DB)
 	id := c.Param("id")
 
 	var block models.BlacklistedNumber
-	if err := database.DB.Where("id = ? AND business_id = ?", id, businessID).First(&block).Error; err != nil {
+	if err := db.Where("id = ?", id).First(&block).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Blacklist entry not found"})
 		return
 	}
@@ -88,8 +81,8 @@ func RemoveFromBlacklist(c *gin.Context) {
 	}
 
 	// Audit Log
-	bizName, bizPlan := GetBusinessContext(businessID.(uint))
-	LogActivity(businessID.(uint), "user", businessID.(uint), "phone_unblacklisted", "blacklist", block.Phone, nil, c.ClientIP(), "medium", bizName, bizPlan)
+	bizName, bizPlan := GetBusinessContext(businessID)
+	LogActivity(businessID, "user", businessID, "phone_unblacklisted", "blacklist", block.Phone, nil, c.ClientIP(), "medium", bizName, bizPlan)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Number unblocked successfully"})
 }

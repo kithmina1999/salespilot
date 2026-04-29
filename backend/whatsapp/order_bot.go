@@ -31,6 +31,8 @@ import (
 
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 
@@ -492,31 +494,71 @@ func handlePendingConfirm(cart *models.Cart, business *models.Business, phone, f
 // ─── Order Finalization ─────────────────────────────────────────────────────────
 
 func finalizeOrder(cart *models.Cart, business *models.Business, phone, fromRaw string) {
-	var maxNum struct{ Max uint }
-	database.DB.Model(&models.Order{}).
-		Select("COALESCE(MAX(business_order_num), 0) as max").
-		Where("business_id = ?", business.ID).Scan(&maxNum)
-	orderNum := maxNum.Max + 1
+	var order models.Order
+	var orderNum uint
+	var customerName string
 
-	var customer models.Customer
-	database.DB.Where("business_id = ? AND phone = ?", business.ID, phone).First(&customer)
+	// Wrap everything in a single DB transaction:
+	// 1. Atomically grab the next order number (no gap in sequence)
+	// 2. Lock & decrement stock for each cart item (SELECT FOR UPDATE prevents overselling)
+	// 3. Create the order record
+	// All three steps succeed together or roll back together.
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		// Step 1: get next order number atomically
+		var maxNum struct{ Max uint }
+		if err := tx.Model(&models.Order{}).
+			Select("COALESCE(MAX(business_order_num), 0) as max").
+			Where("business_id = ?", business.ID).
+			Scan(&maxNum).Error; err != nil {
+			return fmt.Errorf("order number query: %w", err)
+		}
+		orderNum = maxNum.Max + 1
 
-	order := models.Order{
-		BusinessOrderNum: orderNum,
-		BusinessID:       business.ID,
-		CartID:           cart.ID,
-		CustomerPhone:    phone,
-		CustomerName:     customer.Name,
-		Items:            cart.Items,
-		TotalPrice:       cart.TotalPrice,
-		Status:           models.OrderStatusNew,
-		Address:          cart.Address,
-		Notes:            cart.Notes,
-		PaymentMethod:    "cod",
-		PaymentStatus:    "pending",
-	}
-	if err := database.DB.Create(&order).Error; err != nil {
-		log.Printf("❌ [OrderBot] Failed to create order for %s: %v", phone, err)
+		// Step 2: lock each product row and decrement stock
+		items := loadCartItems(cart.Items)
+		for _, item := range items {
+			var product models.Product
+			if err := tx.
+				Clauses(clause.Locking{Strength: "UPDATE"}).
+				First(&product, item.ProductID).Error; err != nil {
+				return fmt.Errorf("product %d not found: %w", item.ProductID, err)
+			}
+			// Only decrement if stock is tracked (> 0)
+			if product.Stock > 0 {
+				newStock := product.Stock - item.Qty
+				if newStock < 0 {
+					newStock = 0
+				}
+				if err := tx.Model(&product).UpdateColumn("stock", newStock).Error; err != nil {
+					return fmt.Errorf("stock decrement for product %d: %w", item.ProductID, err)
+				}
+			}
+		}
+
+		// Step 3: load customer name and create the order
+		var customer models.Customer
+		tx.Where("business_id = ? AND phone = ?", business.ID, phone).First(&customer)
+		customerName = customer.Name
+
+		order = models.Order{
+			BusinessOrderNum: orderNum,
+			BusinessID:       business.ID,
+			CartID:           cart.ID,
+			CustomerPhone:    phone,
+			CustomerName:     customerName,
+			Items:            cart.Items,
+			TotalPrice:       cart.TotalPrice,
+			Status:           models.OrderStatusNew,
+			Address:          cart.Address,
+			Notes:            cart.Notes,
+			PaymentMethod:    "cod",
+			PaymentStatus:    "pending",
+		}
+		return tx.Create(&order).Error
+	})
+
+	if err != nil {
+		log.Printf("❌ [OrderBot] Transaction failed for %s: %v", phone, err)
 		botSendText(business, fromRaw,
 			"Sorry, there was an error placing your order. Please try again!")
 		return
@@ -531,7 +573,7 @@ func finalizeOrder(cart *models.Cart, business *models.Business, phone, fromRaw 
 	)
 	botSendText(business, fromRaw, receipt)
 
-	go notifyTenantNewOrder(business, &order, customer.Name)
+	go notifyTenantNewOrder(business, &order, customerName)
 	log.Printf("✅ [OrderBot] Order #%d created for %s (biz=%d)", orderNum, phone, business.ID)
 }
 

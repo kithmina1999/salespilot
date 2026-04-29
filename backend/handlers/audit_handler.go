@@ -82,13 +82,10 @@ func GetBusinessContext(businessID uint) (name, plan string) {
 
 // GetAuditLogs returns the 100 most recent events for the authenticated tenant.
 func GetAuditLogs(c *gin.Context) {
-	businessID, _ := c.Get("business_id")
+	db := c.MustGet("db").(*gorm.DB)
 
 	var logs []models.AuditLog
-	if err := database.DB.Where("business_id = ?", businessID).
-		Order("created_at DESC").
-		Limit(100).
-		Find(&logs).Error; err != nil {
+	if err := db.Order("created_at DESC").Limit(100).Find(&logs).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch audit logs"})
 		return
 	}
@@ -98,12 +95,10 @@ func GetAuditLogs(c *gin.Context) {
 
 // DownloadAuditLogs exports all audit logs for the tenant as a CSV file.
 func DownloadAuditLogs(c *gin.Context) {
-	businessID, _ := c.Get("business_id")
+	db := c.MustGet("db").(*gorm.DB)
 
 	var logs []models.AuditLog
-	if err := database.DB.Where("business_id = ?", businessID).
-		Order("created_at DESC").
-		Find(&logs).Error; err != nil {
+	if err := db.Order("created_at DESC").Find(&logs).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch audit logs"})
 		return
 	}

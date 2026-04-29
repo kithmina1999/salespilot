@@ -8,6 +8,7 @@ import (
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
 	"github.com/kithmina1999/salespilot/whatsapp"
+	"gorm.io/gorm"
 )
 
 // ListChats returns a unique list of phone numbers that have conversed with the bot, including the latest message and status.
@@ -61,28 +62,28 @@ func ListChats(c *gin.Context) {
 
 // GetChatProfile returns the full chat log, the customer profile, and the order history for a single phone number.
 func GetChatProfile(c *gin.Context) {
-	businessID := c.GetUint("business_id")
+	db := c.MustGet("db").(*gorm.DB)
 	phone := c.Param("phone")
 
 	// 1. Get all messages
 	var messages []models.Message
-	if err := database.DB.Where("business_id = ? AND phone = ?", businessID, phone).Order("created_at ASC").Find(&messages).Error; err != nil {
+	if err := db.Where("phone = ?", phone).Order("created_at ASC").Find(&messages).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch messages"})
 		return
 	}
 
 	// 2. Auto-mark all unread user messages as read (merchant opened the chat)
-	database.DB.Model(&models.Message{}).
-		Where("business_id = ? AND phone = ? AND role = 'user' AND is_read = false", businessID, phone).
+	db.Model(&models.Message{}).
+		Where("phone = ? AND role = 'user' AND is_read = false", phone).
 		Update("is_read", true)
 
 	// 3. Get customer profile (might be empty if they never placed an order or we never upserted them)
 	var customer models.Customer
-	database.DB.Where("business_id = ? AND phone = ?", businessID, phone).First(&customer)
+	db.Where("phone = ?", phone).First(&customer)
 
 	// 4. Get order history
 	var orders []models.Order
-	database.DB.Where("business_id = ? AND customer_phone = ?", businessID, phone).Order("created_at DESC").Find(&orders)
+	db.Where("customer_phone = ?", phone).Order("created_at DESC").Find(&orders)
 
 	// Build the response payload
 	c.JSON(http.StatusOK, gin.H{
@@ -201,7 +202,8 @@ func SendManualReply(c *gin.Context) {
 
 	// 2. Format Phone Number
 	var customer models.Customer
-	database.DB.Where("business_id = ? AND phone = ?", businessID, phone).First(&customer)
+	scoped := c.MustGet("db").(*gorm.DB)
+	scoped.Where("phone = ?", phone).First(&customer)
 
 	cleanPhone := strings.TrimPrefix(phone, "+")
 
@@ -224,17 +226,18 @@ func SendManualReply(c *gin.Context) {
 	database.DB.Create(&dbMsg)
 
 	// 5. Clear Unmatched Badges & update previous messages
-	database.DB.Model(&models.Message{}).
-		Where("business_id = ? AND phone = ? AND is_unmatched = true", businessID, phone).
+	db := c.MustGet("db").(*gorm.DB)
+	db.Model(&models.Message{}).
+		Where("phone = ? AND is_unmatched = true", phone).
 		Update("is_unmatched", false)
 
-	database.DB.Model(&models.Message{}).
-		Where("business_id = ? AND phone = ? AND status = 'needs_attention'", businessID, phone).
+	db.Model(&models.Message{}).
+		Where("phone = ? AND status = 'needs_attention'", phone).
 		Update("status", "resolved")
 
 	// Resolve any pending unmatched messages in the fallback queue
-	database.DB.Model(&models.UnmatchedMessage{}).
-		Where("business_id = ? AND phone = ? AND status = ?", businessID, phone, "pending").
+	db.Model(&models.UnmatchedMessage{}).
+		Where("phone = ? AND status = ?", phone, "pending").
 		Update("status", "resolved")
 
 	c.JSON(http.StatusOK, gin.H{

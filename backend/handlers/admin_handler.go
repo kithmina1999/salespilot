@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
+	"gorm.io/gorm"
 
 	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
@@ -30,10 +31,10 @@ type AdminCreateProductRequest struct {
 
 // AdminListProducts returns all products for the dashboard, including drafts
 func AdminListProducts(c *gin.Context) {
-	businessID := c.GetUint("business_id")
+	db := c.MustGet("db").(*gorm.DB)
 	var products []models.Product
 
-	if err := database.DB.Where("business_id = ?", businessID).Find(&products).Error; err != nil {
+	if err := db.Find(&products).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch products"})
 		return
 	}
@@ -44,6 +45,7 @@ func AdminListProducts(c *gin.Context) {
 // AdminCreateProduct creates a new product
 func AdminCreateProduct(c *gin.Context) {
 	businessID := c.GetUint("business_id")
+	db := c.MustGet("db").(*gorm.DB)
 	var req AdminCreateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Name and price are required: " + err.Error()})
@@ -58,7 +60,7 @@ func AdminCreateProduct(c *gin.Context) {
 	}
 
 	var productCount int64
-	database.DB.Model(&models.Product{}).Where("business_id = ?", businessID).Count(&productCount)
+	db.Model(&models.Product{}).Count(&productCount)
 
 	if biz.Plan == models.PlanFree && productCount >= 10 {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Free Plan limit reached (Max 10 Products). Please upgrade to Starter or Pro."})
@@ -99,6 +101,7 @@ func AdminCreateProduct(c *gin.Context) {
 // AdminUpdateProduct updates an existing product
 func AdminUpdateProduct(c *gin.Context) {
 	businessID := c.GetUint("business_id")
+	db := c.MustGet("db").(*gorm.DB)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
@@ -106,7 +109,7 @@ func AdminUpdateProduct(c *gin.Context) {
 	}
 
 	var product models.Product
-	if err := database.DB.Where("business_id = ? AND id = ?", businessID, id).First(&product).Error; err != nil {
+	if err := db.Where("id = ?", id).First(&product).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
 		return
 	}
@@ -117,12 +120,12 @@ func AdminUpdateProduct(c *gin.Context) {
 		return
 	}
 
-	if err := database.DB.Model(&product).Updates(updates).Error; err != nil {
+	if err := db.Model(&product).Updates(updates).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product"})
 		return
 	}
 
-	database.DB.First(&product, id)
+	db.Where("id = ?", id).First(&product)
 
 	bizName, bizPlan := GetBusinessContext(businessID)
 	LogActivity(businessID, "user", c.GetUint("user_id"), "product_updated", "product", strconv.FormatUint(uint64(product.ID), 10), map[string]interface{}{
@@ -134,7 +137,7 @@ func AdminUpdateProduct(c *gin.Context) {
 
 // AdminUpdateStock updates the stock of a product
 func AdminUpdateStock(c *gin.Context) {
-	businessID := c.GetUint("business_id")
+	db := c.MustGet("db").(*gorm.DB)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
@@ -149,7 +152,7 @@ func AdminUpdateStock(c *gin.Context) {
 		return
 	}
 
-	result := database.DB.Model(&models.Product{}).Where("business_id = ? AND id = ?", businessID, id).Update("stock", req.Stock)
+	result := db.Model(&models.Product{}).Where("id = ?", id).Update("stock", req.Stock)
 	if result.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
 		return
@@ -161,13 +164,14 @@ func AdminUpdateStock(c *gin.Context) {
 // AdminDeleteProduct soft-deletes a product (sets active to false)
 func AdminDeleteProduct(c *gin.Context) {
 	businessID := c.GetUint("business_id")
+	db := c.MustGet("db").(*gorm.DB)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
 		return
 	}
 
-	result := database.DB.Model(&models.Product{}).Where("business_id = ? AND id = ?", businessID, id).Update("active", false)
+	result := db.Model(&models.Product{}).Where("id = ?", id).Update("active", false)
 	if result.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
 		return
@@ -214,8 +218,9 @@ func AdminUploadImage(serverURL string) gin.HandlerFunc {
 		}
 
 		// Check product exists
+		scoped := c.MustGet("db").(*gorm.DB)
 		var product models.Product
-		if err := database.DB.Where("business_id = ? AND id = ?", businessID, id).First(&product).Error; err != nil {
+		if err := scoped.Where("id = ?", id).First(&product).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
 			return
 		}

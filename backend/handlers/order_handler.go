@@ -10,6 +10,7 @@ import (
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
 	"github.com/kithmina1999/salespilot/whatsapp"
+	"gorm.io/gorm"
 )
 
 type CreateOrderRequest struct {
@@ -60,22 +61,18 @@ func CreateOrder(c *gin.Context) {
 // ListOrders returns orders filtered by status and/or date range.
 // Supports: ?status=X  ?date=YYYY-MM-DD  ?from=YYYY-MM-DD&to=YYYY-MM-DD
 func ListOrders(c *gin.Context) {
-	businessID := c.GetUint("business_id")
+	db := c.MustGet("db").(*gorm.DB)
 	var orders []models.Order
-	query := database.DB.Where("business_id = ?", businessID).Order("created_at DESC")
+	query := db.Order("created_at DESC")
 
 	if status := c.Query("status"); status != "" {
 		query = query.Where("status = ?", status)
 	}
-
-	// Single-day shortcut (legacy)
 	if date := c.Query("date"); date != "" {
 		if parsedDate, err := time.Parse("2006-01-02", date); err == nil {
 			query = query.Where("created_at >= ? AND created_at < ?", parsedDate, parsedDate.AddDate(0, 0, 1))
 		}
 	}
-
-	// Date range (preferred) — ?from=YYYY-MM-DD&to=YYYY-MM-DD
 	if from := c.Query("from"); from != "" {
 		if parsedFrom, err := time.Parse("2006-01-02", from); err == nil {
 			query = query.Where("created_at >= ?", parsedFrom)
@@ -83,7 +80,7 @@ func ListOrders(c *gin.Context) {
 	}
 	if to := c.Query("to"); to != "" {
 		if parsedTo, err := time.Parse("2006-01-02", to); err == nil {
-			query = query.Where("created_at < ?", parsedTo.AddDate(0, 0, 1)) // inclusive end
+			query = query.Where("created_at < ?", parsedTo.AddDate(0, 0, 1))
 		}
 	}
 
@@ -114,13 +111,12 @@ func GetOrdersByCustomer(c *gin.Context) {
 //   enabled=true  → reset late_alert_sent to false  (cron will send alert if overdue)
 //   enabled=false → set  late_alert_sent to true   (suppress future alerts for this order)
 func ToggleLateAlert(c *gin.Context) {
-	businessID := c.GetUint("business_id")
+	db := c.MustGet("db").(*gorm.DB)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid order ID"})
 		return
 	}
-
 	var req struct {
 		Enabled bool `json:"enabled"`
 	}
@@ -128,18 +124,13 @@ func ToggleLateAlert(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
-
 	var order models.Order
-	if err := database.DB.Where("business_id = ? AND id = ?", businessID, id).First(&order).Error; err != nil {
+	if err := db.Where("id = ?", id).First(&order).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
 		return
 	}
-
-	// enabled=true  → late_alert_sent=false  (allow the cron to fire)
-	// enabled=false → late_alert_sent=true   (suppress the cron)
-	database.DB.Model(&order).Update("late_alert_sent", !req.Enabled)
-
-	database.DB.First(&order, id)
+	db.Model(&order).Update("late_alert_sent", !req.Enabled)
+	db.Where("id = ?", id).First(&order)
 	c.JSON(http.StatusOK, gin.H{
 		"message":         "Late delivery alert updated",
 		"late_alert_sent": order.LateAlertSent,
@@ -179,7 +170,8 @@ func UpdateOrderStatus(c *gin.Context) {
 	}
 
 	var order models.Order
-	if err := database.DB.Where("business_id = ? AND id = ?", businessID, id).First(&order).Error; err != nil {
+	db := c.MustGet("db").(*gorm.DB)
+	if err := db.Where("id = ?", id).First(&order).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
 		return
 	}
@@ -197,7 +189,7 @@ func UpdateOrderStatus(c *gin.Context) {
 	if req.PaymentStatus != "" {
 		updates["payment_status"] = req.PaymentStatus
 	}
-	database.DB.Model(&order).Updates(updates)
+	db.Model(&order).Updates(updates)
 
 	// Fetch business for WhatsApp notifications
 	var business models.Business
@@ -236,6 +228,6 @@ func UpdateOrderStatus(c *gin.Context) {
 		"old_status": oldStatus, "new_status": req.Status,
 	}, c.ClientIP(), "low", business.Name, business.Plan)
 
-	database.DB.First(&order, id)
+	db.Where("id = ?", id).First(&order)
 	c.JSON(http.StatusOK, gin.H{"message": "Order updated ✅", "order": order})
 }

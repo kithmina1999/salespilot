@@ -19,7 +19,7 @@ import (
 
 // ListRules fetches all Global (Common) rules and all Custom rules for the tenant
 func ListRules(c *gin.Context) {
-	businessID := c.GetUint("business_id")
+	db := c.MustGet("db").(*gorm.DB)
 
 	var commonRules []models.Rule
 	var customRules []models.Rule
@@ -31,7 +31,7 @@ func ListRules(c *gin.Context) {
 	}
 
 	// Fetch Custom Rules for this tenant
-	if err := database.DB.Where("business_id = ?", businessID).Find(&customRules).Error; err != nil {
+	if err := db.Find(&customRules).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch custom rules"})
 		return
 	}
@@ -74,7 +74,8 @@ func CreateRule(c *gin.Context) {
 	}
 
 	var ruleCount int64
-	database.DB.Model(&models.Rule{}).Where("business_id = ?", businessID).Count(&ruleCount)
+	db := c.MustGet("db").(*gorm.DB)
+	db.Model(&models.Rule{}).Count(&ruleCount)
 
 	if biz.Plan == models.PlanFree && !biz.IsInActiveTrial() && ruleCount >= 5 {
 		c.JSON(http.StatusForbidden, gin.H{
@@ -142,7 +143,8 @@ func UpdateRule(c *gin.Context) {
 	}
 
 	var rule models.Rule
-	if err := database.DB.Where("business_id = ? AND id = ?", businessID, id).First(&rule).Error; err != nil {
+	db := c.MustGet("db").(*gorm.DB)
+	if err := db.Where("id = ?", id).First(&rule).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Rule not found or you don't have permission to edit global rules"})
 		return
 	}
@@ -209,7 +211,8 @@ func DeleteRule(c *gin.Context) {
 
 	// Note: GORM uses soft delete by default if the model has DeletedAt (gorm.Model has it).
 	// Ensure it belongs to the tenant
-	result := database.DB.Where("business_id = ? AND id = ?", businessID, id).Delete(&models.Rule{})
+	db := c.MustGet("db").(*gorm.DB)
+	result := db.Where("id = ?", id).Delete(&models.Rule{})
 	if result.Error != nil || result.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Rule not found or you don't have permission"})
 		return

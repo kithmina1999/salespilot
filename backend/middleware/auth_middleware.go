@@ -84,6 +84,10 @@ func AuthRequired() gin.HandlerFunc {
 			}
 		}
 
+		// Inject a tenant-scoped DB — structurally prevents cross-tenant queries
+		scopedDB := database.DB.Where("business_id = ?", claims.BusinessID)
+		c.Set("db", scopedDB)
+
 		// Inject claims into context
 		c.Set("user_id", claims.UserID)
 		c.Set("business_id", claims.BusinessID)
