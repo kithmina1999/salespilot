@@ -23,6 +23,10 @@ type SettingsUpdateRequest struct {
 	BotSupportedLangs string `json:"bot_supported_langs"`  // comma-separated ISO codes
 	// Deprecated — kept for existing frontend compatibility
 	ResponseLanguage  string `json:"response_language"`
+	// Payment configuration (Slice 1)
+	AllowCOD      *bool  `json:"allow_cod"`      // pointer so false is distinguishable from omitted
+	AllowTransfer *bool  `json:"allow_transfer"` // pointer so false is distinguishable from omitted
+	BankDetails   string `json:"bank_details"`
 }
 
 // GetBusinessSettings returns the current business branding and rules
@@ -57,6 +61,10 @@ func GetBusinessSettings(c *gin.Context) {
 		"bot_supported_langs":  biz.BotSupportedLangs,
 		// Deprecated — still returned for legacy frontend
 		"response_language":    biz.ResponseLanguage,
+		// Payment configuration
+		"allow_cod":            biz.AllowCOD,
+		"allow_transfer":       biz.AllowTransfer,
+		"bank_details":         biz.BankDetails,
 	})
 }
 
@@ -103,6 +111,15 @@ func UpdateBusinessSettings(c *gin.Context) {
 			biz.BotReplyLanguage = "en"
 		}
 	}
+
+	// Payment configuration — use pointer fields so explicit false is honoured
+	if req.AllowCOD != nil {
+		biz.AllowCOD = *req.AllowCOD
+	}
+	if req.AllowTransfer != nil {
+		biz.AllowTransfer = *req.AllowTransfer
+	}
+	biz.BankDetails = req.BankDetails
 
 	if err := database.DB.Save(&biz).Error; err != nil {
 		log.Printf("❌ Failed to update settings for business %d: %v", biz.ID, err)
