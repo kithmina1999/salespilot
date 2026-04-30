@@ -177,6 +177,8 @@ func advanceCart(cart *models.Cart, business *models.Business, phone, fromRaw, m
 		handlePendingAddress(cart, business, phone, fromRaw, msg)
 	case models.CartStatePendingNotes:
 		handlePendingNotes(cart, business, fromRaw, msg)
+	case models.CartStatePendingPaymentMethod:
+		handlePendingPaymentMethod(cart, business, phone, fromRaw, msg)
 	case models.CartStatePendingConfirm:
 		handlePendingConfirm(cart, business, phone, fromRaw, msg)
 	}
@@ -471,11 +473,57 @@ func handlePendingNotes(cart *models.Cart, business *models.Business, fromRaw, m
 	if msg != "skip_notes" {
 		notes = strings.TrimSpace(msg)
 	}
-	updateCart(cart, map[string]interface{}{
-		"state": models.CartStatePendingConfirm,
-		"notes": notes,
-	})
-	showOrderSummary(business, cart, fromRaw, notes)
+
+	// If bank transfer is enabled, we must ask the customer which method they want.
+	// If only COD is enabled, we skip the payment selection step and auto-select COD.
+	if business.AllowTransfer {
+		updateCart(cart, map[string]interface{}{
+			"state": models.CartStatePendingPaymentMethod,
+			"notes": notes,
+		})
+		askPaymentMethod(business, cart, fromRaw)
+	} else {
+		updateCart(cart, map[string]interface{}{
+			"state":          models.CartStatePendingConfirm,
+			"notes":          notes,
+			"payment_method": "cod",
+		})
+		showOrderSummary(business, cart, fromRaw, notes)
+	}
+}
+
+func askPaymentMethod(business *models.Business, cart *models.Cart, fromRaw string) {
+	var buttons []Button
+	if business.AllowCOD {
+		buttons = append(buttons, Button{ID: "pay:cod", Title: "💵 Cash on Delivery"})
+	}
+	buttons = append(buttons, Button{ID: "pay:bank_transfer", Title: "🏦 Bank Transfer"})
+	
+	botSendButtons(business, fromRaw, "How would you like to pay?", buttons)
+}
+
+func handlePendingPaymentMethod(cart *models.Cart, business *models.Business, phone, fromRaw, msg string) {
+	switch msg {
+	case "pay:cod":
+		updateCart(cart, map[string]interface{}{
+			"state":          models.CartStatePendingConfirm,
+			"payment_method": "cod",
+		})
+		showOrderSummary(business, cart, fromRaw, cart.Notes)
+	case "pay:bank_transfer":
+		updateCart(cart, map[string]interface{}{
+			"state":          models.CartStatePendingConfirm,
+			"payment_method": "bank_transfer",
+		})
+		if business.BankDetails != "" {
+			warning := "\n\n⚠️ *Note:* Unpaid orders are automatically cancelled after 72 hours."
+			botSendText(business, fromRaw, "🏦 *Bank Details:*\n\n"+business.BankDetails+warning)
+		}
+		showOrderSummary(business, cart, fromRaw, cart.Notes)
+	default:
+		// Unknown response, re-ask
+		askPaymentMethod(business, cart, fromRaw)
+	}
 }
 
 func handlePendingConfirm(cart *models.Cart, business *models.Business, phone, fromRaw, msg string) {
@@ -551,7 +599,7 @@ func finalizeOrder(cart *models.Cart, business *models.Business, phone, fromRaw 
 			Status:           models.OrderStatusNew,
 			Address:          cart.Address,
 			Notes:            cart.Notes,
-			PaymentMethod:    "cod",
+			PaymentMethod:    cart.PaymentMethod,
 			PaymentStatus:    "pending",
 		}
 		return tx.Create(&order).Error
@@ -567,9 +615,13 @@ func finalizeOrder(cart *models.Cart, business *models.Business, phone, fromRaw 
 	updateCart(cart, map[string]interface{}{"state": models.CartStatePlaced, "expires_at": time.Now()})
 
 	items := loadCartItems(cart.Items)
+	paymentText := "COD"
+	if cart.PaymentMethod == "bank_transfer" {
+		paymentText = "Bank Transfer"
+	}
 	receipt := fmt.Sprintf(
-		"🎉 *Order #%d Confirmed!*\n\n%s\n\n📍 Delivery to: %s\n💰 Total: Rs.%.0f (COD)\n\nWe'll contact you soon to confirm dispatch. Thank you! 🙏",
-		orderNum, buildItemsText(items), cart.Address, cart.TotalPrice,
+		"🎉 *Order #%d Confirmed!*\n\n%s\n\n📍 Delivery to: %s\n💰 Total: Rs.%.0f (%s)\n\nWe'll contact you soon to confirm dispatch. Thank you! 🙏",
+		orderNum, buildItemsText(items), cart.Address, cart.TotalPrice, paymentText,
 	)
 	botSendText(business, fromRaw, receipt)
 
@@ -697,9 +749,13 @@ func showOrderSummary(business *models.Business, cart *models.Cart, fromRaw, not
 	if notes != "" {
 		notesLine = "\n📝 Notes: " + notes
 	}
+	paymentText := "COD"
+	if cart.PaymentMethod == "bank_transfer" {
+		paymentText = "Bank Transfer"
+	}
 	body := fmt.Sprintf(
-		"📋 *Order Summary*\n\n%s\n\n📍 Delivery: %s%s\n💰 Total: *Rs. %.0f* (COD)\n\nConfirm your order:",
-		buildItemsText(items), cart.Address, notesLine, cart.TotalPrice,
+		"📋 *Order Summary*\n\n%s\n\n📍 Delivery: %s%s\n💰 Total: *Rs. %.0f* (%s)\n\nConfirm your order:",
+		buildItemsText(items), cart.Address, notesLine, cart.TotalPrice, paymentText,
 	)
 	botSendButtons(business, fromRaw, body,
 		[]Button{{ID: "confirm_order", Title: "✅ Confirm Order"}, {ID: "cancel_order", Title: "❌ Cancel"}},
@@ -720,9 +776,13 @@ func notifyTenantNewOrder(business *models.Business, order *models.Order, custom
 	if name == "" {
 		name = order.CustomerPhone
 	}
+	paymentText := "COD"
+	if order.PaymentMethod == "bank_transfer" {
+		paymentText = "Bank Transfer"
+	}
 	msg := fmt.Sprintf(
-		"🛒 *New Order #%d!*\n\nCustomer: %s (%s)\nTotal: Rs. %.0f (COD)\n\nOpen your dashboard to confirm.",
-		order.BusinessOrderNum, name, order.CustomerPhone, order.TotalPrice,
+		"🛒 *New Order #%d!*\n\nCustomer: %s (%s)\nTotal: Rs. %.0f (%s)\n\nOpen your dashboard to confirm.",
+		order.BusinessOrderNum, name, order.CustomerPhone, order.TotalPrice, paymentText,
 	)
 	botSendText(business, reportPhone, msg)
 }

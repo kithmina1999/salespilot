@@ -19,3 +19,5 @@ landing/node_modules/
 landing/.next/
 salespilot-admin-main/node_modules/
 salespilot-admin-main/.next/
+
+.agent

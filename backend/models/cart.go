@@ -4,16 +4,17 @@ import "time"
 
 // Cart states — the customer's order session progress
 const (
-	CartStateBrowsing       = "browsing"        // initial: showing product list
-	CartStateItemSelected   = "item_selected"   // product chosen, showing details
-	CartStatePendingSize    = "pending_size"     // awaiting size/variant selection
-	CartStatePendingQty     = "pending_qty"      // awaiting quantity
-	CartStateAddMore        = "add_more"         // item added, offer to add more or checkout
-	CartStatePendingAddress = "pending_address"  // awaiting delivery address
-	CartStatePendingNotes   = "pending_notes"    // awaiting optional order note
-	CartStatePendingConfirm = "pending_confirm"  // showing summary, awaiting CONFIRM
-	CartStatePlaced         = "placed"           // order created in DB
-	CartStateAbandoned      = "abandoned"        // expired / customer left
+	CartStateBrowsing             = "browsing"               // initial: showing product list
+	CartStateItemSelected         = "item_selected"          // product chosen, showing details
+	CartStatePendingSize          = "pending_size"            // awaiting size/variant selection
+	CartStatePendingQty           = "pending_qty"             // awaiting quantity
+	CartStateAddMore              = "add_more"                // item added, offer to add more or checkout
+	CartStatePendingAddress       = "pending_address"         // awaiting delivery address
+	CartStatePendingNotes         = "pending_notes"           // awaiting optional order note
+	CartStatePendingPaymentMethod = "pending_payment_method"  // awaiting payment method selection
+	CartStatePendingConfirm       = "pending_confirm"         // showing summary, awaiting CONFIRM
+	CartStatePlaced               = "placed"                  // order created in DB
+	CartStateAbandoned            = "abandoned"               // expired / customer left
 )
 
 // Cart holds an in-progress order session for one customer.

@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { UserCog, Shield, ShieldCheck, Bell, History, AlertTriangle, Settings, Globe } from 'lucide-react';
+import { UserCog, Shield, ShieldCheck, Bell, History, AlertTriangle, Settings, Globe, Banknote } from 'lucide-react';
 import GeneralTab from './_components/GeneralTab';
 import SecurityTab from './_components/SecurityTab';
 import BlockedNumbersTab from './_components/BlockedNumbersTab';
@@ -8,6 +8,7 @@ import AuditLogTab from './_components/AuditLogTab';
 import ReportsTab from './_components/ReportsTab';
 import DangerZoneTab from './_components/DangerZoneTab';
 import LanguageTab from './_components/LanguageTab';
+import PaymentsTab from './_components/PaymentsTab';
 import { useLocale } from '@/lib/locale';
 
 
@@ -48,6 +49,7 @@ export default function SettingsPage() {
   const TABS = [
     { id: 'general',   label: t('settings.general'),  icon: UserCog,       color: 'text-emerald-400' },
     { id: 'language',  label: t('settings.language'),  icon: Globe,         color: 'text-blue-400'    },
+    { id: 'payments',  label: 'Payments',               icon: Banknote,      color: 'text-emerald-400' },
     { id: 'security',  label: t('settings.security'),  icon: Shield,        color: 'text-blue-400'    },
     { id: 'blacklist', label: 'Blocked Numbers',        icon: ShieldCheck,   color: 'text-red-400'     },
     { id: 'audit',     label: t('nav.reports'),         icon: History,       color: 'text-purple-400'  },
@@ -137,6 +139,7 @@ export default function SettingsPage() {
         <div className="flex-1 min-w-0 animate-in fade-in slide-in-from-bottom-1 duration-200" key={activeTab}>
           {activeTab === 'general'   && <GeneralTab settings={settings} setSettings={setSettings} billing={billing} />}
           {activeTab === 'language'  && <LanguageTab settings={settings} />}
+          {activeTab === 'payments'  && <PaymentsTab />}
           {activeTab === 'security'  && <SecurityTab />}
           {activeTab === 'blacklist' && <BlockedNumbersTab />}
           {activeTab === 'audit'     && <AuditLogTab />}

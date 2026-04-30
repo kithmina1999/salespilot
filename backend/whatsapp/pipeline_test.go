@@ -1,4 +1,9 @@
-﻿package whatsapp
+package whatsapp
+
+// pipeline_test.go — FAQ matching tests.
+//
+// Uses real PostgreSQL (loaded from ../.env) — same as production.
+// Run: go test -v ./whatsapp -run TestMatchFAQ
 
 import (
 	"log"
@@ -6,34 +11,83 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/glebarez/sqlite"
+	"github.com/joho/godotenv"
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
+// pipelineTestBiz is the seeded business for all whatsapp package tests.
+var pipelineTestBiz models.Business
+
 func TestMain(m *testing.M) {
-	var err error
-	database.DB, err = gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		log.Fatalf("failed to connect database: %v", err)
+	if err := godotenv.Load("../.env"); err != nil {
+		log.Println("⚠️  No .env found, relying on environment variables")
 	}
-	database.DB.AutoMigrate(&models.Business{}, &models.Rule{}, &models.UnmatchedMessage{})
 
-	biz := models.Business{Name: "TestBiz"}
-	database.DB.Create(&biz)
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		log.Fatal("DATABASE_URL not set — cannot run whatsapp package tests")
+	}
 
-	database.DB.Create(&models.Rule{
-		BusinessID: &biz.ID, Keywords: "price,cost,how much",
+	var err error
+	database.DB, err = gorm.Open(postgres.New(postgres.Config{
+		DSN:                  dsn,
+		PreferSimpleProtocol: true,
+	}), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
+	if err != nil {
+		log.Fatalf("failed to connect to test DB: %v", err)
+	}
+
+	// Migrate all models used by whatsapp package tests
+	if err := database.DB.AutoMigrate(
+		&models.Business{},
+		&models.Rule{},
+		&models.UnmatchedMessage{},
+		&models.Cart{},
+		&models.Order{},
+		&models.Customer{},
+		&models.Message{},
+		&models.Product{},
+		&models.SavedAddress{},
+	); err != nil {
+		log.Fatalf("AutoMigrate failed: %v", err)
+	}
+
+	// Seed isolated test business (upsert by APIKey to survive reruns)
+	pipelineTestBiz = models.Business{
+		Name:   "__test_whatsapp_pipeline__",
+		Phone:  "00000099001",
+		APIKey: "test-whatsapp-pipeline-key",
+		Plan:   models.PlanFree,
+	}
+	database.DB.Where("api_key = ?", pipelineTestBiz.APIKey).FirstOrCreate(&pipelineTestBiz)
+
+	// Seed FAQ rules for matchFAQ tests
+	database.DB.Where("business_id = ? AND keywords LIKE ?", pipelineTestBiz.ID, "%price%").FirstOrCreate(&models.Rule{
+		BusinessID: &pipelineTestBiz.ID, Keywords: "price,cost,how much",
 		Response: "Shirts start at Rs. 2500", IsActive: true,
 	})
-	database.DB.Create(&models.Rule{
-		BusinessID: &biz.ID, Keywords: "delivery,ship,courier",
+	database.DB.Where("business_id = ? AND keywords LIKE ?", pipelineTestBiz.ID, "%delivery%").FirstOrCreate(&models.Rule{
+		BusinessID: &pipelineTestBiz.ID, Keywords: "delivery,ship,courier",
 		Response: "Delivery is Rs. 350 island-wide", IsActive: true,
 	})
 
 	Cache.LoadRules()
-	os.Exit(m.Run())
+
+	code := m.Run()
+
+	// Cleanup test data
+	database.DB.Unscoped().Where("business_id = ?", pipelineTestBiz.ID).Delete(&models.Rule{})
+	database.DB.Unscoped().Where("business_id = ?", pipelineTestBiz.ID).Delete(&models.Cart{})
+	database.DB.Unscoped().Where("business_id = ?", pipelineTestBiz.ID).Delete(&models.Order{})
+	database.DB.Unscoped().Delete(&models.Business{}, pipelineTestBiz.ID)
+
+	os.Exit(code)
 }
 
 func respPrefix(r *models.Rule, n int) string {
@@ -48,9 +102,6 @@ func respPrefix(r *models.Rule, n int) string {
 }
 
 func TestMatchFAQ(t *testing.T) {
-	var biz models.Business
-	database.DB.First(&biz)
-
 	tests := []struct {
 		name     string
 		input    string
@@ -59,7 +110,6 @@ func TestMatchFAQ(t *testing.T) {
 		{"Singlish price", "shirt eke gana kiyada", "Shirts start at Rs. 2500"},
 		{"Singlish mila", "mila kiyanna", "Shirts start at Rs. 2500"},
 		{"Standard cost", "what is the cost?", "Shirts start at Rs. 2500"},
-		// Sinhala script: mila (price) in Sinhala
 		{"Sinhala script price", "shirt eke \u0db8\u0dd2\u0dbd", "Shirts start at Rs. 2500"},
 		{"Typo delivery", "can you do deliery?", "Delivery is Rs. 350 island-wide"},
 		{"Typo courier", "do you do that couirir thing?", "Delivery is Rs. 350 island-wide"},
@@ -69,7 +119,7 @@ func TestMatchFAQ(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rule, _ := matchFAQ(biz.ID, tt.input)
+			rule, _ := matchFAQ(pipelineTestBiz.ID, tt.input)
 			if tt.expected == "" {
 				if rule != nil {
 					t.Errorf("Expected no match, got: %s", rule.Response)
@@ -86,11 +136,8 @@ func TestMatchFAQ(t *testing.T) {
 }
 
 func TestMatchFAQ_CombinationKeywords(t *testing.T) {
-	var biz models.Business
-	database.DB.First(&biz)
-
 	comboRule := models.Rule{
-		BusinessID: &biz.ID,
+		BusinessID: &pipelineTestBiz.ID,
 		Keywords:   "delivery+price",
 		Response:   "Free delivery over Rs.5000",
 		IsActive:   true,
@@ -102,7 +149,7 @@ func TestMatchFAQ_CombinationKeywords(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       string
-		wantContain string // substring expected in response
+		wantContain string
 	}{
 		{"Both keywords: combo fires", "delivery price kiyada", "Free delivery"},
 		{"Only delivery: single rule fires", "delivery details kiyanna", "Delivery is Rs."},
@@ -112,7 +159,7 @@ func TestMatchFAQ_CombinationKeywords(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rule, _ := matchFAQ(biz.ID, tt.input)
+			rule, _ := matchFAQ(pipelineTestBiz.ID, tt.input)
 			if rule == nil {
 				t.Errorf("Expected a match for '%s', got nil", tt.input)
 				return

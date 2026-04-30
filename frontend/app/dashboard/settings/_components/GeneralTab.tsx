@@ -135,18 +135,6 @@ export default function GeneralTab({ settings, setSettings, billing }: Props) {
             </p>
           </div>
 
-          <div className="pt-2 border-t border-zinc-800/50">
-            <label className={labelCls}>Bot Response Language</label>
-            <select
-              value={settings.response_language}
-              onChange={e => update('response_language', e.target.value)}
-              className={inputCls}
-            >
-              <option value="sinhala_first">🇱🇰 Sinhala First — reply in Sinhala when customer messages in Sinhala/Singlish</option>
-              <option value="english_first">🌐 English First — always reply in English</option>
-            </select>
-          </div>
-
           <div className="flex justify-end pt-2">
             <button
               onClick={save}
