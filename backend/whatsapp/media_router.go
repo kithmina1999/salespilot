@@ -263,52 +263,71 @@ func handleProductImageInquiry(business *models.Business, fromNormalized, fromRa
 }
 
 // handlePaymentProofImage:
-// - Does NOT auto-update the order payment status (payment acceptance is a human decision)
-// - Logs the proof to chat history (flagged as unmatched so it shows a dashboard badge)
-// - Notifies the tenant merchant via WhatsApp so a human agent can review and act
+// 1. Finds the customer's most recent pending bank-transfer order
+// 2. Creates an OrderPaymentProof record (status: pending) linked to that order
+// 3. Updates Order.PaymentStatus to "awaiting_verification"
+// 4. ACKs the customer and alerts the merchant
 func handlePaymentProofImage(business *models.Business, fromNormalized, fromRaw, description string) {
 	log.Printf("💳 [MediaRouter] Payment proof from %s — %s", fromNormalized, description)
 
-	// Find the most recent active unpaid order for this customer (for context in notification)
+	// Find the most recent pending bank-transfer order for this customer
 	var pendingOrder models.Order
 	hasUnpaidOrder := database.DB.Where(
-		"business_id = ? AND customer_phone = ? AND payment_status = ? AND status IN ?",
-		business.ID, fromNormalized, "pending", []string{models.OrderStatusNew, models.OrderStatusConfirmed},
+		"business_id = ? AND customer_phone = ? AND payment_method = ? AND payment_status = ? AND status IN ?",
+		business.ID, fromNormalized, "bank_transfer", "pending",
+		[]string{models.OrderStatusNew, models.OrderStatusConfirmed},
 	).Order("created_at desc").First(&pendingOrder).Error == nil
 
 	if !hasUnpaidOrder {
-		// Customer submitted a proof but we can't find an unpaid order for them
 		botSendText(business, fromRaw,
 			"Thanks for sharing! We couldn't find an active order pending payment for your number. "+
 				"If you've already placed an order and made a transfer, please contact us directly. 🙏")
-		// Still log it so the merchant can investigate via the chat view
 		database.DB.Create(&models.Message{
 			BusinessID:  business.ID,
 			Phone:       fromNormalized,
 			Role:        "user",
 			Content:     fmt.Sprintf("[Payment proof (no matching order found): %s]", description),
-			IsUnmatched: true, // surfaces a badge in the dashboard
+			IsUnmatched: true,
 		})
 		return
 	}
 
-	// Log proof to chat history — flagged so it shows as "needs attention" in the dashboard
+	// Create the OrderPaymentProof record
+	proof := models.OrderPaymentProof{
+		BusinessID:    business.ID,
+		OrderID:       pendingOrder.ID,
+		CustomerPhone: fromNormalized,
+		Amount:        pendingOrder.TotalPrice,
+		Description:   description,
+		Status:        "pending",
+	}
+	if err := database.DB.Create(&proof).Error; err != nil {
+		log.Printf("❌ [MediaRouter] Failed to create OrderPaymentProof: %v", err)
+	}
+
+	// Update order payment status to awaiting_verification
+	if err := database.DB.Model(&pendingOrder).
+		UpdateColumn("payment_status", "awaiting_verification").Error; err != nil {
+		log.Printf("❌ [MediaRouter] Failed to update order payment status: %v", err)
+	}
+
+	// Log proof to chat history
 	proofNote := fmt.Sprintf("[Payment proof for Order #%d: %s]", pendingOrder.BusinessOrderNum, description)
 	database.DB.Create(&models.Message{
 		BusinessID:  business.ID,
 		Phone:       fromNormalized,
 		Role:        "user",
 		Content:     proofNote,
-		IsUnmatched: true, // merchant must act on this
+		IsUnmatched: true,
 	})
 
-	// ACK the customer — tell them a human will review (no promise of auto-approval)
+	// ACK the customer
 	botSendText(business, fromRaw, fmt.Sprintf(
 		"✅ *Payment proof received for Order #%d!*\n"+
-			"Our team will review and confirm your payment manually. We'll update you shortly. 🙏",
+			"Our team will review and confirm your payment. We'll update you shortly. 🙏",
 		pendingOrder.BusinessOrderNum))
 
-	// Notify the tenant merchant via WhatsApp so they can act immediately
+	// Notify the merchant
 	reportPhone := business.ReportPhone
 	if reportPhone == "" {
 		reportPhone = business.Phone
@@ -316,9 +335,9 @@ func handlePaymentProofImage(business *models.Business, fromNormalized, fromRaw,
 	if reportPhone != "" {
 		alert := fmt.Sprintf(
 			"💳 *Payment Proof Received!*\n\n"+
-				"Order: #%d\nCustomer: %s\nAmount pending: Rs.%.0f\n\n"+
+				"Order: #%d\nCustomer: %s\nAmount: Rs.%.0f\n\n"+
 				"What was sent: %s\n\n"+
-				"Open your dashboard to review and mark the payment as accepted or rejected.",
+				"Open your dashboard to approve or reject this payment.",
 			pendingOrder.BusinessOrderNum,
 			pendingOrder.CustomerPhone,
 			pendingOrder.TotalPrice,
@@ -327,7 +346,8 @@ func handlePaymentProofImage(business *models.Business, fromNormalized, fromRaw,
 		SendText(business.WAPhoneNumberID, business.WAAccessToken, reportPhone, alert)
 	}
 
-	log.Printf("✅ [MediaRouter] Payment proof for Order #%d logged and merchant notified", pendingOrder.BusinessOrderNum)
+	log.Printf("✅ [MediaRouter] Payment proof #%d for Order #%d — status set to awaiting_verification",
+		proof.ID, pendingOrder.BusinessOrderNum)
 }
 
 

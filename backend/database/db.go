@@ -67,6 +67,7 @@ func Init(dsn string) {
 		&models.SavedAddress{},              // Customer saved delivery addresses
 		&models.PasswordChangeToken{},       // Authenticated email-OTP password change flow
 		&models.UserSession{},               // Login session tracking (active sessions + login history)
+		&models.OrderPaymentProof{},         // Customer bank-transfer receipt submissions (Slice 3)
 	)
 	if err != nil {
 		log.Fatalf("❌ Failed to migrate database: %v", err)
