@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 )
 
@@ -118,6 +119,13 @@ func sendInteractive(phoneNumberID, accessToken string, payload map[string]inter
 	if err != nil {
 		return fmt.Errorf("commerce: marshal payload: %w", err)
 	}
+
+	// DEBUG: print token prefix + phone number ID so we can verify DB has the right token
+	tokenPreview := accessToken
+	if len(tokenPreview) > 25 {
+		tokenPreview = tokenPreview[:25] + "..."
+	}
+	log.Printf("🔑 [sendInteractive] phoneNumberID=%s token=%s", phoneNumberID, tokenPreview)
 
 	url := fmt.Sprintf("%s/%s/messages", waAPIBase, phoneNumberID)
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))

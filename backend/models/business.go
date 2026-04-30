@@ -54,7 +54,7 @@ type Business struct {
 	Name           string     `json:"name" gorm:"not null"`
 	Phone          string     `json:"phone" gorm:"uniqueIndex"`
 	APIKey          string     `json:"api_key" gorm:"uniqueIndex;not null"`
-	WAPhoneNumberID string     `json:"wa_phone_number_id" gorm:"index"`  // set when tenant connects Meta account
+	WAPhoneNumberID string     `json:"wa_phone_number_id" gorm:"uniqueIndex:idx_wa_phone_unique,where:wa_phone_number_id != ''"`  // set when tenant connects Meta account
 	WABAID          string     `json:"waba_id"`                              // set when tenant connects Meta account
 	WAAccessToken   string     `json:"wa_access_token"`                      // set when tenant connects Meta account
 	BotName         string     `json:"bot_name" gorm:"default:'AI Assistant'"`
@@ -96,6 +96,15 @@ type Business struct {
 
 	// Deprecated: kept for migration window, migrated to BotReplyLanguage on first save
 	ResponseLanguage string `json:"response_language,omitempty" gorm:"default:'sinhala_first'"`
+
+	// ── Payment Configuration ─────────────────────────────────────────────────
+	// AllowCOD: enables Cash on Delivery as a checkout option (default: true)
+	AllowCOD bool `json:"allow_cod" gorm:"default:true"`
+	// AllowTransfer: enables Bank Transfer as a checkout option (default: false, merchant opt-in)
+	AllowTransfer bool `json:"allow_transfer" gorm:"default:false"`
+	// BankDetails: free-form text the merchant provides so the bot can show it to customers
+	// e.g. "Bank: Sampath Bank\nAccount No: 123456\nName: Acme Shop Pvt Ltd"
+	BankDetails string `json:"bank_details" gorm:"type:text"`
 
 	// Monthly Intelligence Report
 	MonthlyReportEnabled bool   `json:"monthly_report_enabled" gorm:"default:true"`
