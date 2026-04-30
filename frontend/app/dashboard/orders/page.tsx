@@ -1,9 +1,11 @@
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import useSWR, { mutate as globalMutate } from 'swr';
 import {
   ShoppingBag, Search, TrendingUp, Package, Clock,
   XCircle, Truck, MapPin, StickyNote, Phone, User, Hash,
   CreditCard, AlertTriangle, ChevronRight, X, Loader2,
+  CheckCircle2, BanknoteIcon, Eye, ThumbsUp, ThumbsDown,
 } from 'lucide-react';
 import { useLocale } from '@/lib/locale';
 
@@ -22,6 +24,7 @@ interface CartItem {
 interface Order {
   id: number;
   order_num: number;
+  business_order_num: number;
   business_id: number;
   customer_phone: string;
   customer_name: string;
@@ -37,6 +40,19 @@ interface Order {
   late_alert_sent: boolean;
   created_at: string;
   updated_at: string;
+}
+
+interface OrderPaymentProof {
+  id: number;
+  order_id: number;
+  customer_phone: string;
+  amount: number;
+  description: string;
+  screenshot_url: string;
+  status: 'pending' | 'approved' | 'rejected';
+  merchant_note: string;
+  reviewed_at: string | null;
+  created_at: string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -60,6 +76,18 @@ const COL_STYLE: Record<string, { header: string; card: string; badge: string; d
 const API = 'http://localhost:8080/api/v1';
 const token = () => localStorage.getItem('token') || '';
 const headers = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` });
+
+// SWR fetcher
+const fetcher = (url: string) => fetch(url, { headers: headers() }).then(r => r.json());
+
+// Payment status badge config
+function paymentBadgeConfig(method: string, status: string) {
+  if (method !== 'bank_transfer') return null; // COD has no badge
+  if (status === 'awaiting_verification') return { label: 'Review', icon: Eye, cls: 'bg-orange-500/20 text-orange-400 border-orange-500/40 animate-pulse' };
+  if (status === 'approved')              return { label: 'Paid',   icon: CheckCircle2, cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' };
+  if (status === 'rejected')              return { label: 'Rejected', icon: XCircle,   cls: 'bg-red-500/15 text-red-400 border-red-500/30' };
+  return { label: 'Transfer', icon: BanknoteIcon, cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30' };
+}
 const fmt = (iso: string) => new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 const parseItems = (json: string): CartItem[] => { try { return JSON.parse(json) || []; } catch { return []; } };
 const fmtMoney = (n: number) => `Rs.${Number(n).toLocaleString()}`;
@@ -144,7 +172,173 @@ function ConfirmDialog({ order, targetStatus, onConfirm, onCancel, loading }: Co
 
 // ─── Order Detail Modal ────────────────────────────────────────────────────────
 
-function OrderModal({ order, onClose }: { order: Order; onClose: () => void }) {
+// ─── Proof Review Section (SWR-powered) ──────────────────────────────────────
+
+function ProofReviewSection({ order, onActionComplete }: { order: Order; onActionComplete: () => void }) {
+  const { data, isLoading, mutate } = useSWR<{ proofs: OrderPaymentProof[] }>(
+    `${API}/orders/${order.id}/proofs`,
+    fetcher,
+    { refreshInterval: 0, revalidateOnFocus: true }
+  );
+  const [rejectNote, setRejectNote] = useState('');
+  const [showRejectInput, setShowRejectInput] = useState(false);
+  const [acting, setActing] = useState<'approve' | 'reject' | null>(null);
+
+  const proofs = data?.proofs ?? [];
+  const pendingProof = proofs.find(p => p.status === 'pending');
+  const latestProof = proofs[0];
+
+  if (isLoading) return (
+    <div className="flex items-center gap-2 py-3 text-zinc-600 text-xs">
+      <Loader2 size={13} className="animate-spin" /> Loading payment proof…
+    </div>
+  );
+
+  if (proofs.length === 0) return (
+    <div className="rounded-xl border border-dashed border-zinc-700 p-4 text-center">
+      <BanknoteIcon size={18} className="text-zinc-700 mx-auto mb-2" />
+      <p className="text-xs text-zinc-600">No payment proof submitted yet.</p>
+      <p className="text-[10px] text-zinc-700 mt-0.5">Customer will send a bank transfer screenshot via WhatsApp.</p>
+    </div>
+  );
+
+  const handleApprove = async () => {
+    setActing('approve');
+    await fetch(`${API}/orders/proofs/${pendingProof!.id}/approve`, { method: 'POST', headers: headers() });
+    await mutate();
+    onActionComplete();
+    setActing(null);
+  };
+
+  const handleReject = async () => {
+    setActing('reject');
+    await fetch(`${API}/orders/proofs/${pendingProof!.id}/reject`, {
+      method: 'POST', headers: headers(),
+      body: JSON.stringify({ note: rejectNote }),
+    });
+    await mutate();
+    onActionComplete();
+    setActing(null);
+    setShowRejectInput(false);
+    setRejectNote('');
+  };
+
+  return (
+    <div className="space-y-3">
+      {proofs.map(proof => (
+        <div key={proof.id} className={`rounded-xl border p-4 space-y-3 ${
+          proof.status === 'pending'  ? 'border-orange-500/30 bg-orange-500/5' :
+          proof.status === 'approved' ? 'border-emerald-500/30 bg-emerald-500/5' :
+          'border-red-500/30 bg-red-500/5'
+        }`}>
+          {/* Status header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              {proof.status === 'pending'  && <Eye size={13} className="text-orange-400" />}
+              {proof.status === 'approved' && <CheckCircle2 size={13} className="text-emerald-400" />}
+              {proof.status === 'rejected' && <XCircle size={13} className="text-red-400" />}
+              <span className={`text-xs font-bold ${
+                proof.status === 'pending' ? 'text-orange-400' :
+                proof.status === 'approved' ? 'text-emerald-400' : 'text-red-400'
+              }`}>
+                {proof.status === 'pending' ? 'Awaiting Review' :
+                 proof.status === 'approved' ? 'Payment Approved' : 'Payment Rejected'}
+              </span>
+            </div>
+            <span className="text-[10px] text-zinc-600">
+              {new Date(proof.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+
+          {/* Gemini description */}
+          {proof.description && (
+            <div className="rounded-lg bg-black/20 border border-zinc-800 p-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-600 mb-1">AI Analysis</p>
+              <p className="text-xs text-zinc-300 leading-relaxed">{proof.description}</p>
+            </div>
+          )}
+
+          {/* Screenshot if available */}
+          {proof.screenshot_url && (
+            <a href={proof.screenshot_url} target="_blank" rel="noopener noreferrer"
+               className="flex items-center gap-2 text-xs text-blue-400 hover:text-blue-300 transition-colors">
+              <Eye size={12} /> View Screenshot
+            </a>
+          )}
+
+          {/* Amount */}
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-zinc-500">Expected Amount</span>
+            <span className="font-bold text-zinc-200">Rs. {Number(proof.amount).toLocaleString()}</span>
+          </div>
+
+          {/* Rejection note */}
+          {proof.status === 'rejected' && proof.merchant_note && (
+            <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-2">
+              <p className="text-[10px] font-bold text-red-400 mb-0.5">Rejection Reason</p>
+              <p className="text-xs text-zinc-400">{proof.merchant_note}</p>
+            </div>
+          )}
+
+          {/* Approve / Reject buttons — only for pending */}
+          {proof.status === 'pending' && (
+            <div className="space-y-2 pt-1">
+              {!showRejectInput ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleApprove}
+                    disabled={acting !== null}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/30 disabled:opacity-50 transition-all"
+                  >
+                    {acting === 'approve' ? <Loader2 size={12} className="animate-spin" /> : <ThumbsUp size={12} />}
+                    Approve Payment
+                  </button>
+                  <button
+                    onClick={() => setShowRejectInput(true)}
+                    disabled={acting !== null}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 disabled:opacity-50 transition-all"
+                  >
+                    <ThumbsDown size={12} /> Reject
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <textarea
+                    value={rejectNote}
+                    onChange={e => setRejectNote(e.target.value)}
+                    placeholder="Rejection reason (shown to customer)…"
+                    rows={2}
+                    className="w-full px-3 py-2 rounded-xl text-xs bg-zinc-900 border border-red-500/30 text-zinc-200 placeholder-zinc-600 outline-none focus:border-red-500/60 resize-none transition-colors"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleReject}
+                      disabled={acting !== null}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/40 hover:bg-red-500/30 disabled:opacity-50 transition-all"
+                    >
+                      {acting === 'reject' ? <Loader2 size={12} className="animate-spin" /> : <ThumbsDown size={12} />}
+                      Confirm Reject
+                    </button>
+                    <button
+                      onClick={() => { setShowRejectInput(false); setRejectNote(''); }}
+                      className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-500 bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Order Detail Modal ────────────────────────────────────────────────────────
+
+function OrderModal({ order, onClose, onProofAction }: { order: Order; onClose: () => void; onProofAction: () => void }) {
   const items = parseItems(order.items);
   const col = COLUMNS.find(c => c.key === order.status);
   const style = COL_STYLE[order.status];
@@ -238,20 +432,34 @@ function OrderModal({ order, onClose }: { order: Order; onClose: () => void }) {
               <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1">Payment Method</p>
               <p className="text-sm text-zinc-300 font-semibold flex items-center gap-1.5">
                 <CreditCard size={13} className="text-zinc-500" />
-                {order.payment_method?.toUpperCase() || 'COD'}
+                {order.payment_method === 'bank_transfer' ? '🏦 Bank Transfer' : '💵 Cash on Delivery'}
               </p>
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1">Payment Status</p>
               <span className={`text-xs font-bold px-2 py-0.5 rounded-md border ${
-                order.payment_status === 'paid'
-                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                  : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                order.payment_status === 'approved'             ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' :
+                order.payment_status === 'awaiting_verification'? 'bg-orange-500/15 text-orange-400 border-orange-500/30' :
+                order.payment_status === 'rejected'             ? 'bg-red-500/15 text-red-400 border-red-500/30' :
+                                                                  'bg-amber-500/15 text-amber-400 border-amber-500/30'
               }`}>
-                {order.payment_status || 'Pending'}
+                {order.payment_status === 'awaiting_verification' ? '🔍 Awaiting Review' :
+                 order.payment_status === 'approved'              ? '✅ Paid' :
+                 order.payment_status === 'rejected'              ? '❌ Rejected' :
+                 order.payment_method === 'cod'                   ? 'COD' : 'Pending'}
               </span>
             </div>
           </div>
+
+          {/* Bank Transfer Proof Review — only for bank_transfer orders */}
+          {order.payment_method === 'bank_transfer' && (
+            <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-4">
+              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3 flex items-center gap-1.5">
+                <BanknoteIcon size={10} /> Payment Proof
+              </p>
+              <ProofReviewSection order={order} onActionComplete={onProofAction} />
+            </div>
+          )}
 
           {/* Tracking */}
           {order.tracking_number && (
@@ -343,7 +551,6 @@ function OrderModal({ order, onClose }: { order: Order; onClose: () => void }) {
   );
 }
 
-
 // ─── Order Card ────────────────────────────────────────────────────────────────
 
 interface CardProps {
@@ -406,7 +613,20 @@ function OrderCard({ order, onDragStart, onClick }: CardProps) {
       {/* Footer */}
       <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-800/60">
         <span className="text-sm font-black text-emerald-400">{fmtMoney(order.total_price)}</span>
-        <span className="text-[10px] text-zinc-600">{fmt(order.created_at)}</span>
+        <div className="flex items-center gap-2">
+          {/* Payment badge — only for bank transfers */}
+          {(() => {
+            const badge = paymentBadgeConfig(order.payment_method, order.payment_status);
+            if (!badge) return <span className="text-[10px] text-zinc-600">{fmt(order.created_at)}</span>;
+            const BadgeIcon = badge.icon;
+            return (
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${badge.cls}`}>
+                <BadgeIcon size={9} />{badge.label}
+              </span>
+            );
+          })()}
+          <span className="text-[10px] text-zinc-600">{fmt(order.created_at)}</span>
+        </div>
       </div>
     </div>
   );
@@ -528,6 +748,11 @@ export default function OrdersPage() {
   const [dateRange, setDateRange] = useState<DateRange>('week');
   const { t } = useLocale();
 
+  // Count orders needing proof review (derived, no extra fetch)
+  const pendingReviewCount = orders.filter(
+    o => o.payment_method === 'bank_transfer' && o.payment_status === 'awaiting_verification'
+  ).length;
+
   // Translated column labels (inside component so they re-render on locale change)
   const COL_LABELS: Record<string, string> = {
     new:       t('orders.pending'),
@@ -543,6 +768,9 @@ export default function OrdersPage() {
     { key: 'month' as DateRange, label: t('dashboard.this_month') },
     { key: 'all'   as DateRange, label: t('orders.all_time') },
   ];
+
+  // After proof approve/reject: refresh orders list so card badges update
+  const handleProofAction = useCallback(() => { fetchOrders(); }, []);
 
   // Drag state
   const dragging = useRef<Order | null>(null);
@@ -631,6 +859,11 @@ export default function OrdersPage() {
           <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-3">
             <ShoppingBag size={24} className="text-emerald-400" />
             {t('orders.title')}
+            {pendingReviewCount > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-orange-500/20 text-orange-400 border border-orange-500/40 animate-pulse">
+                <Eye size={11} /> {pendingReviewCount} Awaiting Review
+              </span>
+            )}
           </h1>
           <p className="text-sm text-zinc-500 mt-1">
             {t('orders.drag_hint')}
@@ -737,7 +970,11 @@ export default function OrdersPage() {
 
       {/* Order detail modal */}
       {detail && (
-        <OrderModal order={detail} onClose={() => setDetail(null)} />
+        <OrderModal
+          order={detail}
+          onClose={() => setDetail(null)}
+          onProofAction={() => { handleProofAction(); setDetail(null); }}
+        />
       )}
     </div>
   );

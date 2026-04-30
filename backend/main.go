@@ -189,6 +189,11 @@ func main() {
 		dash.GET("/orders", handlers.ListOrders)
 		dash.PATCH("/orders/:id/status", handlers.UpdateOrderStatus)
 		dash.PATCH("/orders/:id/late-alert", handlers.ToggleLateAlert)
+		// Slice 4: Payment proof review
+		dash.GET("/orders/proofs", handlers.ListOrderProofs)
+		dash.GET("/orders/:id/proofs", handlers.GetOrderProofs)
+		dash.POST("/orders/proofs/:id/approve", handlers.ApproveOrderProof)
+		dash.POST("/orders/proofs/:id/reject", handlers.RejectOrderProof)
 
 		// Dashboard Finance Analytics
 		dash.GET("/finance/stats", handlers.FinanceStats)
