@@ -695,23 +695,75 @@ func isSinglish(msg string) bool {
 }
 
 // isLikelyGibberish returns true if the (already-normalized, ASCII-only lowercased) string
-// has no vowels and is longer than 2 characters — a strong signal of random keyboard mashing.
-// It safely passes:
-//   - Singlish/Sinhala romanized words (they always contain vowels: "koheda", "ganna")
-//   - English words (always contain vowels)
-//   - Very short single letters or codes like "a", "ok" (handled by Context Bridge rules)
-//   - Sinhala Unicode (NormalizeMessage converts it to romanized form which has vowels)
+// is almost certainly random keyboard mashing or spam. Checks three signals:
+//
+//  1. No vowels and length > 2 (original check — catches "dfgzsfr")
+//  2. Single character repeated ≥ 5 times (catches "aaaaaaa", "kkkkkkk")
+//  3. More than 4 consecutive consonants in any word (catches "brzzzkl", "strthpq")
+//
+// Safe-passes:
+//   - Singlish/Sinhala romanized words (always have vowels: "koheda", "ganna")
+//   - English words (always have vowels)
+//   - Very short inputs ≤ 2 chars (let Context Bridge / DROP rules handle "ok", "hi")
+//   - Pure digits (could be order numbers — handled by address/order context)
 func isLikelyGibberish(normalized string) bool {
 	if len(normalized) <= 2 {
-		return false // too short to judge — let Context Bridge / DROP rules handle it
+		return false // too short to judge
 	}
-	vowels := "aeiouAEIOU"
-	for _, ch := range normalized {
-		if strings.ContainsRune(vowels, ch) {
-			return false // has at least one vowel — not gibberish
+
+	// ── Signal 2: Single character repeated ≥ 5 times ────────────────────────
+	// "aaaaaaa", "kkkkkk", "11111" → spam key-hold
+	if len(normalized) >= 5 {
+		firstChar := rune(normalized[0])
+		allSame := true
+		for _, ch := range normalized {
+			if ch != firstChar {
+				allSame = false
+				break
+			}
+		}
+		if allSame {
+			return true
 		}
 	}
-	return true // no vowels found in a string longer than 2 chars → gibberish
+
+	vowels := "aeiouAEIOU"
+
+	// ── Signal 1: No vowels (original check) ─────────────────────────────────
+	hasVowel := false
+	for _, ch := range normalized {
+		if strings.ContainsRune(vowels, ch) {
+			hasVowel = true
+			break
+		}
+	}
+	if !hasVowel {
+		return true // no vowels → gibberish
+	}
+
+	// ── Signal 3: >4 consecutive consonants in any word ──────────────────────
+	// Real words rarely exceed 3 consecutive consonants (e.g. "str", "nts").
+	// Keyboard mashing creates sequences like "brthmqz", "strthpq".
+	consonants := "bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ"
+	for _, word := range strings.Fields(normalized) {
+		consRun := 0
+		maxConsRun := 0
+		for _, ch := range word {
+			if strings.ContainsRune(consonants, ch) {
+				consRun++
+				if consRun > maxConsRun {
+					maxConsRun = consRun
+				}
+			} else {
+				consRun = 0
+			}
+		}
+		if maxConsRun > 4 {
+			return true
+		}
+	}
+
+	return false
 }
 
 // semanticMatch embeds the incoming message and compares against all cached rule

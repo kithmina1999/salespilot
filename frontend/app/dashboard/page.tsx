@@ -233,8 +233,8 @@ export default function OverviewPage() {
             {t('dashboard.subtitle')}
           </p>
         </div>
-        <div className="text-xs text-zinc-600 font-mono bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-800">
-          {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+        <div className="text-xs text-zinc-200 font-mono bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-800">
+          {new Date().toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: 'numeric' })}
         </div>
       </div>
 
