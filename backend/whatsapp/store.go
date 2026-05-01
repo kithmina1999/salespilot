@@ -10,8 +10,22 @@ import "github.com/kithmina1999/salespilot/cache"
 // to whether the backend is in-memory or Redis.
 var AppStore cache.StateStore
 
+// appScorer is the package-level BehaviorScorer backed by AppStore.
+var appScorer *BehaviorScorer
+
 // SetStateStore wires the server-bootstrapped store into the whatsapp pipeline.
 // Called once from main.go before any webhook arrives.
 func SetStateStore(s cache.StateStore) {
 	AppStore = s
+	appScorer = NewBehaviorScorer(s)
+}
+
+// GetScorer returns the package-level BehaviorScorer.
+// Falls back to an ephemeral in-memory scorer if SetStateStore was never called
+// (e.g. in isolated unit tests or cold-start scenarios).
+func GetScorer() *BehaviorScorer {
+	if appScorer == nil {
+		appScorer = NewBehaviorScorer(cache.NewInMemoryStore(cache.DefaultConfig()))
+	}
+	return appScorer
 }

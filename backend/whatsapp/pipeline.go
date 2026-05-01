@@ -153,59 +153,64 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 		database.DB.Model(&customer).Updates(updates)
 	}
 
-	// --- LAYER 2: Safety Check - Rate Limiting (Two-Tier) ---
-	// Skip rate limiting if the customer is actively in a checkout flow
-	// (pending_address / pending_notes / pending_confirm).
-	// These are bot-prompted replies — NOT spam.
+	// --- LAYER 2: Behavior-Based Rate Limiting ---
+	// Replaces static burst/hour limits with rhythm-aware scoring.
+	// Checkout flow states (pending_address, pending_notes, pending_confirm, add_more)
+	// are fully exempt — these are bot-prompted replies, never spam.
 	inCheckoutFlow := func() bool {
 		var activeCart models.Cart
 		err := database.DB.
 			Where("phone = ? AND business_id = ? AND state IN ? AND expires_at > ?",
 				from, business.ID,
-				[]string{"pending_address", "pending_notes", "pending_confirm"},
+				[]string{"pending_address", "pending_notes", "pending_confirm", "add_more"},
 				time.Now()).
 			First(&activeCart).Error
 		return err == nil
 	}
 
-	// Tier 1: Burst guard — 8 messages per 3 minutes
-	if checkBurstLimit(from) && !inCheckoutFlow() {
-		log.Printf("⚠️ [%s] Burst limit hit for %s (8/3min). Throttling.", business.Name, from)
-		botSendText(business, fromRaw, "You're sending messages a bit fast! Please wait a moment before sending more.")
-		return
-	}
+	if !inCheckoutFlow() {
+		scopeKey := fmt.Sprintf("biz:%d:%s", business.ID, from)
+		result := GetScorer().RecordMessageForKey(scopeKey, time.Now(), text)
 
-	// Tier 2: Hourly abuse gate — 40 messages per hour → auto-blacklist
-	if checkHourLimit(from) {
-		log.Printf("🛑 [%s] Hour limit exceeded for %s. Auto-blacklisting.", business.Name, from)
+		switch result.Action {
+		case ActionDelay:
+			// Soft throttle: add a brief delay, then continue processing
+			log.Printf("🐢 [%s] BehaviorScorer DELAY for %s (score=%d) — introducing 1.5s pause", business.Name, from, result.Score)
+			time.Sleep(1500 * time.Millisecond)
 
-		// Auto-blacklist the number
-		database.DB.Create(&models.BlacklistedNumber{
-			BusinessID: business.ID,
-			Phone:      from,
-			Reason:     "Auto-blocked: Exceeded 40 messages per hour (Abuse Protection)",
-			BlockedAt:  time.Now(),
-		})
+		case ActionWarn:
+			// Send a soft warning, then continue processing
+			log.Printf("⚠️ [%s] BehaviorScorer WARN for %s (score=%d) — sending soft warning", business.Name, from, result.Score)
+			botSendText(business, fromRaw, "You're sending messages very fast 😊 Please slow down a little — I'm here to help!")
+			return
 
-		// Track in Audit Log directly to avoid import cycle
-		metaBytes, _ := json.Marshal(map[string]interface{}{"reason": "rate_limit_exceeded"})
-		database.DB.Create(&models.AuditLog{
-			BusinessID:   business.ID,
-			ActorType:    "system",
-			ActorID:      0,
-			Action:       "phone_blacklisted",
-			EntityType:   "blacklist",
-			EntityID:     from,
-			Metadata:     string(metaBytes),
-			IPAddress:    "127.0.0.1",
-			Risk:         "high",
-			BusinessName: business.Name,
-			Category:     "security",
-			BusinessPlan: business.Plan,
-		})
-
-		botSendText(business, fromRaw, "You are sending messages too quickly. You have been temporarily blocked to protect our systems. Please contact support.")
-		return
+		case ActionBlock:
+			// Hard block: auto-blacklist and notify
+			log.Printf("🛑 [%s] BehaviorScorer BLOCK for %s (score=%d) — auto-blacklisting", business.Name, from, result.Score)
+			database.DB.Create(&models.BlacklistedNumber{
+				BusinessID: business.ID,
+				Phone:      from,
+				Reason:     fmt.Sprintf("Auto-blocked: Behavior score %d (spam pattern detected)", result.Score),
+				BlockedAt:  time.Now(),
+			})
+			metaBytes, _ := json.Marshal(map[string]interface{}{"reason": "behavior_score_block", "score": result.Score})
+			database.DB.Create(&models.AuditLog{
+				BusinessID:   business.ID,
+				ActorType:    "system",
+				ActorID:      0,
+				Action:       "phone_blacklisted",
+				EntityType:   "blacklist",
+				EntityID:     from,
+				Metadata:     string(metaBytes),
+				IPAddress:    "127.0.0.1",
+				Risk:         "high",
+				BusinessName: business.Name,
+				Category:     "security",
+				BusinessPlan: business.Plan,
+			})
+			botSendText(business, fromRaw, "You are sending messages too quickly. You have been temporarily blocked to protect our systems. Please contact support.")
+			return
+		}
 	}
 
 	// ALWAYS log user message to DB
