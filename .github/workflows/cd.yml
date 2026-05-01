@@ -1,0 +1,17 @@
+name: CD
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deferred:
+    name: Deployment Deferred
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain status
+        run: |
+          echo "CD is intentionally deferred."
+          echo "Single-VPS deployment strategy, secrets, process manager, and rollback behavior still need to be decided."
