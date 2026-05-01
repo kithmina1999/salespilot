@@ -814,24 +814,11 @@ var orderIntentNegatives = []string{
 	"mage order", "order eka koheda", "order cancel", "order track",
 }
 
+// detectOrderIntent is the backward-compatible bool wrapper around ScoreOrderIntent.
+// All existing call sites continue to work unchanged while benefiting from
+// the new 3-tier weighted scoring and Jaro-Winkler fuzzy matching.
 func detectOrderIntent(msg string) bool {
-	lower := strings.ToLower(msg)
-	normalized := strings.ToLower(NormalizeMessage(msg))
-
-	// Negative patterns take priority — these are tracking/status queries, not purchases
-	for _, neg := range orderIntentNegatives {
-		if strings.Contains(lower, neg) {
-			return false
-		}
-	}
-
-	// Check positive patterns on both raw and normalized text
-	for _, kw := range orderIntentKeywords {
-		if strings.Contains(lower, kw) || strings.Contains(normalized, kw) {
-			return true
-		}
-	}
-	return false
+	return ScoreOrderIntent(msg).Confidence == "high"
 }
 
 // ─── Smart Cart Helpers ─────────────────────────────────────────────────────────
