@@ -37,6 +37,14 @@ func StartCronJobs() {
 		}
 	}()
 
+	// ── Every 6h: Auto-cancel stale unpaid bank-transfer orders (72h window) ─
+	go func() {
+		ticker := time.NewTicker(6 * time.Hour)
+		for range ticker.C {
+			CancelStaleTransferOrders()
+		}
+	}()
+
 	// ── Daily 6 AM: Monthly report dispatch ───────────────────────────────────
 	go func() {
 		for {
@@ -57,6 +65,7 @@ func StartCronJobs() {
 	// Run once on startup just in case
 	go checkExpiredPlans()
 	go checkExpiredTrials()
+	go CancelStaleTransferOrders() // catch any orders that went stale during downtime
 }
 
 func checkExpiredPlans() {
