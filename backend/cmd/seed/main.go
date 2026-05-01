@@ -1,156 +1,236 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
+	"time"
 
 	"github.com/kithmina1999/salespilot/config"
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func main() {
 	cfg := config.Load()
 	database.Init(cfg.DatabaseURL)
 
-	products := []models.Product{
+	db := database.DB
+
+	log.Println("🌱 Starting premium mock data seeding for 5 specialized businesses...")
+
+	passwordHash, _ := bcrypt.GenerateFromPassword([]byte("Demo@123"), bcrypt.DefaultCost)
+
+	businesses := []struct {
+		Name         string
+		Email        string
+		Phone        string
+		WAPhone      string
+		Products     []models.Product
+		ServicesMode bool
+	}{
 		{
-			Name:        "Classic Black T-Shirt",
-			Description: "සරල සහ අලංකාර කළු ටී-ෂර්ට් එක. සෑම අවස්ථාවකටම ගැලපෙනවා.",
-			Price:       1200,
-			Stock:       50,
-			Category:    "T-Shirts",
-			Sizes:       toJSON([]string{"S", "M", "L", "XL"}),
-			Colors:      toJSON([]string{"Black", "White"}),
-			ImageURL:    "",
-			Active:      true,
+			Name:    "Colombo Threads",
+			Email:   "admin@colombothreads.lk",
+			Phone:   "+94771000001",
+			WAPhone: "94771000001",
+			Products: []models.Product{
+				{Name: "Linen Casual Shirt", Price: 3500, Stock: 50, Category: "Men"},
+				{Name: "Floral Maxi Dress", Price: 4200, Stock: 30, Category: "Women"},
+				{Name: "Denim Jacket", Price: 6500, Stock: 20, Category: "Unisex"},
+				{Name: "Cotton Chinos", Price: 3800, Stock: 40, Category: "Men"},
+				{Name: "Silk Scarf", Price: 1500, Stock: 100, Category: "Accessories"},
+			},
 		},
 		{
-			Name:        "Floral Summer Dress",
-			Description: "ලස්සන මල් පැටර්න් එකක් සහිත ගිම්හාන ඇඳුම. සැහැල්ලු සහ සුවපහසුයි.",
-			Price:       3500,
-			Stock:       30,
-			Category:    "Dresses",
-			Sizes:       toJSON([]string{"S", "M", "L"}),
-			Colors:      toJSON([]string{"Pink", "Blue", "White"}),
-			ImageURL:    "",
-			Active:      true,
+			Name:    "Ceylon Hampers & Gifts",
+			Email:   "admin@ceylonhampers.lk",
+			Phone:   "+94771000002",
+			WAPhone: "94771000002",
+			Products: []models.Product{
+				{Name: "Anniversary Premium Hamper", Price: 12500, Stock: 15, Category: "Hampers"},
+				{Name: "Birthday Chocolate Bouquet", Price: 4500, Stock: 25, Category: "Gifts"},
+				{Name: "Spa Relax Gift Box", Price: 8000, Stock: 10, Category: "Hampers"},
+				{Name: "Corporate Premium Basket", Price: 15000, Stock: 5, Category: "Corporate"},
+			},
 		},
 		{
-			Name:        "Slim Fit Chinos",
-			Description: "ප්‍රමාණයට හොඳින් ගැලපෙන චිනෝස් කලිසම. කාර්යාලයට සහ අනියම් අවස්ථාවලට සුදුසුයි.",
-			Price:       2800,
-			Stock:       40,
-			Category:    "Pants",
-			Sizes:       toJSON([]string{"30", "32", "34", "36"}),
-			Colors:      toJSON([]string{"Khaki", "Navy", "Black"}),
-			ImageURL:    "",
-			Active:      true,
+			Name:    "TechHub Sri Lanka",
+			Email:   "admin@techhub.lk",
+			Phone:   "+94771000003",
+			WAPhone: "94771000003",
+			Products: []models.Product{
+				{Name: "iPhone 15 Pro Max 256GB", Price: 450000, Stock: 10, Category: "Phones"},
+				{Name: "AirPods Pro (2nd Gen)", Price: 85000, Stock: 30, Category: "Audio"},
+				{Name: "Apple Watch Series 9", Price: 145000, Stock: 15, Category: "Wearables"},
+				{Name: "MacBook Air M2", Price: 350000, Stock: 5, Category: "Laptops"},
+				{Name: "Anker 20W Fast Charger", Price: 4500, Stock: 100, Category: "Accessories"},
+			},
 		},
 		{
-			Name:        "Denim Jacket",
-			Description: "ක්ලැසික් ඩෙනිම් ජැකට් එක. සීතල කාලගුණයට සහ ස්ටයිල් එකට හොඳයි.",
-			Price:       4500,
-			Stock:       20,
-			Category:    "Jackets",
-			Sizes:       toJSON([]string{"M", "L", "XL"}),
-			Colors:      toJSON([]string{"Blue", "Black"}),
-			ImageURL:    "",
-			Active:      true,
+			Name:    "Luxe Beauty Colombo",
+			Email:   "admin@luxebeauty.lk",
+			Phone:   "+94771000004",
+			WAPhone: "94771000004",
+			Products: []models.Product{
+				{Name: "Velvet Matte Lipstick", Price: 3200, Stock: 50, Category: "Makeup"},
+				{Name: "Vitamin C Radiance Serum", Price: 4500, Stock: 40, Category: "Skincare"},
+				{Name: "Hydrating Moisturizer", Price: 5500, Stock: 35, Category: "Skincare"},
+				{Name: "Volume Mascara", Price: 2800, Stock: 60, Category: "Makeup"},
+			},
 		},
 		{
-			Name:        "Cotton Polo Shirt",
-			Description: "උසස් තත්ත්වයේ කපු පෝලෝ ෂර්ට් එක. සුවපහසු සහ අලංකාර.",
-			Price:       1800,
-			Stock:       45,
-			Category:    "T-Shirts",
-			Sizes:       toJSON([]string{"S", "M", "L", "XL"}),
-			Colors:      toJSON([]string{"White", "Green", "Navy"}),
-			ImageURL:    "",
-			Active:      true,
-		},
-		{
-			Name:        "Casual Linen Shirt",
-			Description: "සැහැල්ලු ලිනන් ෂර්ට් එක. උණුසුම් දිනවලට සුදුසුයි.",
-			Price:       2200,
-			Stock:       35,
-			Category:    "Shirts",
-			Sizes:       toJSON([]string{"S", "M", "L", "XL"}),
-			Colors:      toJSON([]string{"White", "Beige", "Light Blue"}),
-			ImageURL:    "",
-			Active:      true,
-		},
-		{
-			Name:        "Sports Jogger Pants",
-			Description: "ක්‍රීඩා සහ දෛනික භාවිතය සඳහා සුවපහසු ජොගර් කලිසම.",
-			Price:       1500,
-			Stock:       60,
-			Category:    "Pants",
-			Sizes:       toJSON([]string{"S", "M", "L", "XL"}),
-			Colors:      toJSON([]string{"Black", "Grey", "Navy"}),
-			ImageURL:    "",
-			Active:      true,
-		},
-		{
-			Name:        "Elegant Evening Gown",
-			Description: "විශේෂ අවස්ථාවලට සුදුසු අලංකාර සවස ඇඳුම.",
-			Price:       8500,
-			Stock:       10,
-			Category:    "Dresses",
-			Sizes:       toJSON([]string{"S", "M", "L"}),
-			Colors:      toJSON([]string{"Red", "Black", "Navy"}),
-			ImageURL:    "",
-			Active:      true,
-		},
-		{
-			Name:        "Leather Belt",
-			Description: "සැබෑ හම් බෙල්ට් එක. ඕනෑම ඇඳුමකට ගැලපෙනවා.",
-			Price:       950,
-			Stock:       80,
-			Category:    "Accessories",
-			Sizes:       toJSON([]string{"Free Size"}),
-			Colors:      toJSON([]string{"Brown", "Black"}),
-			ImageURL:    "",
-			Active:      true,
-		},
-		{
-			Name:        "Canvas Tote Bag",
-			Description: "විශාල කැන්වස් ටෝට් බෑග් එක. සාප්පු යාමට සහ දෛනික භාවිතයට.",
-			Price:       1100,
-			Stock:       55,
-			Category:    "Accessories",
-			Sizes:       toJSON([]string{"Free Size"}),
-			Colors:      toJSON([]string{"Natural", "Black", "Navy"}),
-			ImageURL:    "",
-			Active:      true,
+			Name:         "Serenity Spa & Salon",
+			Email:        "admin@serenityspa.lk",
+			Phone:        "+94771000005",
+			WAPhone:      "94771000005",
+			ServicesMode: true,
+			Products: []models.Product{
+				{Name: "Aromatherapy Massage (60 mins)", Price: 6500, Stock: 999, Category: "Massage"},
+				{Name: "Deep Cleansing Facial", Price: 5000, Stock: 999, Category: "Facial"},
+				{Name: "Gel Manicure & Pedicure", Price: 4500, Stock: 999, Category: "Nails"},
+				{Name: "Bridal Hair & Makeup Trial", Price: 15000, Stock: 999, Category: "Bridal"},
+			},
 		},
 	}
 
-	for _, p := range products {
-		var existing models.Product
-		result := database.DB.Where("name = ?", p.Name).First(&existing)
-		if result.RowsAffected == 0 {
-			database.DB.Create(&p)
-			fmt.Printf("✅ Added: %s (Rs.%.0f)\n", p.Name, p.Price)
-		} else {
-			fmt.Printf("⏭️  Skipped (exists): %s\n", p.Name)
+	for i, b := range businesses {
+		// 1. Create Business
+		biz := models.Business{
+			Name:                 b.Name,
+			Phone:                b.Phone,
+			APIKey:               fmt.Sprintf("demo_api_key_%d", i+1),
+			Plan:                 models.PlanPro, // Pro plan for screenshots
+			OnboardingComplete:   true,
+			WAStatus:             "connected", // Looks fully active
+			WAPhoneNumberID:      fmt.Sprintf("wa_phone_id_%d", i+1),
+			WABAID:               fmt.Sprintf("waba_id_%d", i+1),
+			WAAccessToken:        "EAA_dummy_token_for_screenshot",
+			BotName:              "AI Assistant",
+			GreetingMessage:      fmt.Sprintf("Welcome to %s! How can we help you today?", b.Name),
+			AllowCOD:             !b.ServicesMode, // Services usually don't do COD
+			AllowTransfer:        true,
+			MonthlyReportEnabled: true,
 		}
+		db.Create(&biz)
+
+		// 2. Create Admin User
+		user := models.User{
+			BusinessID:      biz.ID,
+			Email:           b.Email,
+			Phone:           b.Phone,
+			DisplayName:     "Admin",
+			PasswordHash:    string(passwordHash),
+			Role:            "admin",
+			IsEmailVerified: true,
+			IsActive:        true,
+		}
+		db.Create(&user)
+
+		// 3. Add Products/Services
+		for _, p := range b.Products {
+			p.BusinessID = biz.ID
+			db.Create(&p)
+		}
+
+		// 4. Add Mock Customers
+		customer1 := models.Customer{
+			BusinessID:  biz.ID,
+			Phone:       fmt.Sprintf("+947720000%d1", i+1),
+			WhatsappJid: fmt.Sprintf("947720000%d1@s.whatsapp.net", i+1),
+			Name:        "Kamal Perera",
+			Address:     "123 Galle Road, Colombo 03",
+			Tags:        "vip, repeat",
+		}
+		db.Create(&customer1)
+
+		customer2 := models.Customer{
+			BusinessID:  biz.ID,
+			Phone:       fmt.Sprintf("+947730000%d2", i+1),
+			WhatsappJid: fmt.Sprintf("947730000%d2@s.whatsapp.net", i+1),
+			Name:        "Nipunika Silva",
+			Address:     "45 Kandy Road, Kadawatha",
+		}
+		db.Create(&customer2)
+
+		// 5. Add Orders
+		statuses := []string{models.OrderStatusNew, models.OrderStatusConfirmed, models.OrderStatusShipped, models.OrderStatusDelivered}
+		
+		for j := 1; j <= 5; j++ {
+			c := customer1
+			if j%2 == 0 {
+				c = customer2
+			}
+			
+			status := statuses[rand.Intn(len(statuses))]
+			paymentStatus := "pending"
+			if status == models.OrderStatusDelivered || status == models.OrderStatusShipped {
+				paymentStatus = "paid"
+			}
+
+			order := models.Order{
+				BusinessID:       biz.ID,
+				BusinessOrderNum: uint(j),
+				CustomerPhone:    c.Phone,
+				CustomerName:     c.Name,
+				Address:          c.Address,
+				TotalPrice:       b.Products[0].Price * float64(j),
+				Status:           status,
+				PaymentMethod:    "bank_transfer",
+				PaymentStatus:    paymentStatus,
+				CreatedAt:        time.Now().Add(-time.Duration(j*24) * time.Hour), // Past dates for charts
+				UpdatedAt:        time.Now().Add(-time.Duration(j*12) * time.Hour),
+			}
+			db.Create(&order)
+
+			// Mock Finance: Add a PaymentProof if paid
+			if paymentStatus == "paid" {
+				proof := models.OrderPaymentProof{
+					OrderID:       order.ID,
+					BusinessID:    biz.ID,
+					CustomerPhone: c.Phone,
+					Amount:        order.TotalPrice,
+					ScreenshotURL: "/dummy-receipt.jpg",
+					Status:        "approved",
+				}
+				db.Create(&proof)
+			}
+		}
+
+		msg1 := models.Message{
+			BusinessID: biz.ID,
+			Phone:      customer1.Phone,
+			Role:       "user",
+			Content:    "Hi, I want to check the status of my order.",
+			Status:     "resolved",
+			IsRead:     true,
+		}
+		msg2 := models.Message{
+			BusinessID: biz.ID,
+			Phone:      customer1.Phone,
+			Role:       "model",
+			Content:    "Hello! Your order is currently being processed and will be dispatched tomorrow.",
+			Status:     "resolved",
+			IsRead:     true,
+		}
+		msg3 := models.Message{
+			BusinessID: biz.ID,
+			Phone:      customer2.Phone,
+			Role:       "user",
+			Content:    "Do you have this item in stock?",
+			Status:     "needs_attention", // To show in inbox
+			IsRead:     false,
+		}
+		db.Create(&msg1)
+		db.Model(&msg1).Update("created_at", time.Now().Add(-2*time.Hour))
+		db.Create(&msg2)
+		db.Model(&msg2).Update("created_at", time.Now().Add(-1*time.Hour))
+		db.Create(&msg3)
+		db.Model(&msg3).Update("created_at", time.Now().Add(-15*time.Minute))
+
+		log.Printf("✅ Seeded data for %s", b.Name)
 	}
 
-	fmt.Println("\n🎉 Seed data complete!")
-
-	// Show summary
-	var count int64
-	database.DB.Model(&models.Product{}).Where("active = ?", true).Count(&count)
-	fmt.Printf("📦 Total active products: %d\n", count)
-}
-
-func toJSON(arr []string) string {
-	b, err := json.Marshal(arr)
-	if err != nil {
-		log.Printf("JSON marshal error: %v", err)
-		return "[]"
-	}
-	return string(b)
+	log.Println("🎉 Seeding complete! You can now log in with the admin emails and password 'Demo@123'")
 }
