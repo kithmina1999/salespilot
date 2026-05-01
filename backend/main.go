@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/kithmina1999/salespilot/cache"
 	"github.com/kithmina1999/salespilot/config"
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/handlers"
@@ -28,6 +29,12 @@ func main() {
 
 	// Init database (PostgreSQL)
 	database.Init(cfg.DatabaseURL)
+
+	// Pluggable state store — backs BehaviorScorer, PromptShield token budgets,
+	// and first-message-of-day checks. Swap NewInMemoryStore → NewRedisStore
+	// in this single line when horizontal scaling requires shared state.
+	appStore := cache.NewInMemoryStore(cache.DefaultConfig())
+	whatsapp.SetStateStore(appStore)
 
 	// 10 concurrent workers
 	utils.InitWorkerPool(10)
@@ -283,5 +290,6 @@ func main() {
 	<-quit
 	log.Println("🛑 Shutdown signal received — draining worker pool...")
 	utils.DrainAndWait()
+	appStore.Stop() // stop cache GC goroutine cleanly
 	log.Println("✅ All workers finished — exiting cleanly")
 }
