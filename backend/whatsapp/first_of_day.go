@@ -1,0 +1,141 @@
+package whatsapp
+
+// first_of_day.go — S6: First-of-Day Custom Greeting
+//
+// Sends a personalized, time-of-day-aware greeting the first time a customer
+// messages a business each calendar day. Uses StateStore for tracking so the
+// state survives goroutine restarts within the same process and is ready for
+// Redis migration with zero code changes.
+//
+// Key design decisions:
+//   - TTL is calculated to midnight local time (not 24h from now), so customers
+//     get a new greeting on the next calendar day, not 24h after their last message.
+//   - Tenant-isolated: scope key includes business ID so the same phone number
+//     can be greeted at different businesses independently.
+//   - Language-aware: respects business.BotReplyLanguage for Sinhala greetings.
+//   - Falls back to generic greeting when customer name is not yet known.
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/kithmina1999/salespilot/cache"
+)
+
+// ─── FirstOfDayGreeter ────────────────────────────────────────────────────────
+
+// FirstOfDayGreeter checks and marks the first-of-day flag for a customer.
+// It is stateless itself — all state lives in the injected StateStore.
+type FirstOfDayGreeter struct {
+	store cache.StateStore
+}
+
+// NewFirstOfDayGreeter creates a greeter backed by the given state store.
+func NewFirstOfDayGreeter(store cache.StateStore) *FirstOfDayGreeter {
+	return &FirstOfDayGreeter{store: store}
+}
+
+// greeterKey returns the StateStore key for the first-of-day flag.
+// The key includes a date bucket so it auto-expires on the next calendar day.
+// Using a date suffix (rather than TTL alone) means all customers get
+// a fresh greeting at the same local midnight, not a rolling 24h window.
+func greeterKey(scopeKey string) string {
+	today := time.Now().In(time.FixedZone("LK", 5*60*60+30*60)) // UTC+5:30 Sri Lanka
+	return fmt.Sprintf("fod:%s:%s", scopeKey, today.Format("2006-01-02"))
+}
+
+// ttlUntilMidnight returns the duration from now until the next local midnight.
+// This is used as the TTL so the flag expires exactly when the calendar day rolls over.
+func ttlUntilMidnight() time.Duration {
+	loc := time.FixedZone("LK", 5*60*60+30*60)
+	now := time.Now().In(loc)
+	tomorrow := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 1, 0, loc)
+	return tomorrow.Sub(now)
+}
+
+// CheckAndMark checks if this is the customer's first message of the day.
+// If it is, it marks them as greeted and returns (greeting, true).
+// If they've already been greeted today, it returns ("", false).
+//
+// scopeKey should be "biz:{businessID}:{phone}" for tenant isolation.
+// name is the customer's display name (may be empty for anonymous customers).
+// lang is the business bot language (e.g. "en", "si").
+func (g *FirstOfDayGreeter) CheckAndMark(scopeKey string, name string) (string, bool) {
+	return g.CheckAndMarkWithTime(scopeKey, name, "en", time.Now())
+}
+
+// CheckAndMarkWithTime is the full version with explicit lang and time control.
+// Used internally and in tests for time-of-day verification.
+func (g *FirstOfDayGreeter) CheckAndMarkWithTime(scopeKey, name, lang string, now time.Time) (string, bool) {
+	key := greeterKey(scopeKey)
+
+	// Atomic check-and-set: Increment returns 1 only on the very first call
+	count, err := g.store.Increment(key, 1, ttlUntilMidnight())
+	if err != nil || count != 1 {
+		// Already greeted today (count > 1) or store error (be conservative — skip)
+		return "", false
+	}
+
+	return buildGreeting(lang, name, now), true
+}
+
+// ─── buildGreeting ────────────────────────────────────────────────────────────
+
+// buildGreeting builds a localized, time-of-day-aware greeting string.
+// Exported so tests can verify greeting content without touching the store.
+func buildGreeting(lang, name string, now time.Time) string {
+	loc := time.FixedZone("LK", 5*60*60+30*60)
+	hour := now.In(loc).Hour()
+
+	nameStr := ""
+	if name != "" {
+		nameStr = " " + name
+	}
+
+	switch lang {
+	case "si":
+		return buildSinhalaGreeting(nameStr, hour)
+	default:
+		return buildEnglishGreeting(nameStr, hour)
+	}
+}
+
+func buildEnglishGreeting(name string, hour int) string {
+	switch {
+	case hour >= 5 && hour < 12:
+		return fmt.Sprintf("Good morning%s! ☀️ How can I help you today?", name)
+	case hour >= 12 && hour < 17:
+		return fmt.Sprintf("Good afternoon%s! 😊 What can I do for you?", name)
+	case hour >= 17 && hour < 21:
+		return fmt.Sprintf("Good evening%s! 🌙 How can I help?", name)
+	default:
+		// Late night / very early
+		return fmt.Sprintf("Hello%s! 👋 What can I help you with?", name)
+	}
+}
+
+func buildSinhalaGreeting(name string, hour int) string {
+	// Singlish/Sinhala blended greetings — warm and natural for Sri Lankan customers
+	switch {
+	case hour >= 5 && hour < 12:
+		return fmt.Sprintf("සුබ උදෑසනක්%s! ☀️ මගෙන් මොනවද  ඕන?", name)
+	case hour >= 12 && hour < 17:
+		return fmt.Sprintf("ආයුබෝවන්%s! 😊 කොහොමද මම help කරන්න ඕන?", name)
+	default:
+		return fmt.Sprintf("ආයුබෝවන්%s! 🙏 මම help කරන්නද?", name)
+	}
+}
+
+// ─── Package-level accessor ───────────────────────────────────────────────────
+
+// appGreeter is the package-level FirstOfDayGreeter backed by AppStore.
+var appGreeter *FirstOfDayGreeter
+
+// GetGreeter returns the package-level FirstOfDayGreeter.
+// If SetStateStore was never called (e.g. in tests), falls back to an ephemeral store.
+func GetGreeter() *FirstOfDayGreeter {
+	if appGreeter == nil {
+		appGreeter = NewFirstOfDayGreeter(cache.NewInMemoryStore(cache.DefaultConfig()))
+	}
+	return appGreeter
+}

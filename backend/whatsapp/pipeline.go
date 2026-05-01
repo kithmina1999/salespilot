@@ -237,6 +237,20 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 	database.DB.Model(business).Update("system_message_count", business.SystemMessageCount+1)
 	business.SystemMessageCount++
 
+	// --- FIRST-OF-DAY GREETING (between bot-pause and usage limit check) ---
+	// Fires once per customer per calendar day per business. Sends a warm,
+	// time-of-day-aware greeting before processing the actual message.
+	// Uses StateStore so the flag resets at midnight without any cron job.
+	{
+		scopeKey := fmt.Sprintf("biz:%d:%s", business.ID, from)
+		if greetingMsg, isFirst := GetGreeter().CheckAndMarkWithTime(
+			scopeKey, customer.Name, business.BotReplyLanguage, time.Now(),
+		); isFirst {
+			log.Printf("👋 [%s] First-of-day greeting sent to %s", business.Name, from)
+			botSendText(business, fromRaw, greetingMsg)
+		}
+	}
+
 	// Only enforce hard inbound cap on Free plan (Growth/Pro = unlimited inbound)
 	if business.Plan == models.PlanFree && business.SystemMessageCount > 200 {
 		log.Printf("⚠️ [%s] Free plan inbound limit hit for %s.", business.Name, from)

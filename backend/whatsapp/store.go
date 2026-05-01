@@ -18,6 +18,7 @@ var appScorer *BehaviorScorer
 func SetStateStore(s cache.StateStore) {
 	AppStore = s
 	appScorer = NewBehaviorScorer(s)
+	appGreeter = NewFirstOfDayGreeter(s)
 }
 
 // GetScorer returns the package-level BehaviorScorer.
