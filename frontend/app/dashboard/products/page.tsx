@@ -15,6 +15,7 @@ interface Product {
   id: number;
   name: string;
   category: string;
+  type: string;         // "product" | "service" | "digital"
   price: number;
   stock: number;
   active: boolean;
@@ -22,6 +23,12 @@ interface Product {
   image_url: string;
   retailer_id: string; // Meta Commerce Catalog Retailer ID
 }
+
+const PRODUCT_TYPES = [
+  { value: 'product', label: 'Product',  icon: '📦', desc: 'Physical goods' },
+  { value: 'service', label: 'Service',  icon: '🏷️', desc: 'Appointments, labour' },
+  { value: 'digital', label: 'Digital',  icon: '📥', desc: 'Downloads, vouchers' },
+] as const;
 
 // ── Sync Setup Dialog — multi-step guide ──────────────────────────────────────
 const STEPS = [
@@ -207,7 +214,7 @@ export default function ProductsPage() {
   const [modalMode,    setModalMode]    = useState<'create' | 'edit' | null>(null);
   const [editTargetId, setEditTargetId] = useState<number | null>(null);
   const [form, setForm] = useState({
-    name: '', category: '', price: '', stock: '',
+    name: '', category: '', type: 'product', price: '', stock: '',
     description: '', active: true, retailer_id: '',
   });
 
@@ -225,7 +232,7 @@ export default function ProductsPage() {
 
   function openCreate() {
     setEditTargetId(null);
-    setForm({ name: '', category: '', price: '', stock: '', description: '', active: true, retailer_id: '' });
+    setForm({ name: '', category: '', type: 'product', price: '', stock: '', description: '', active: true, retailer_id: '' });
     setModalMode('create');
   }
 
@@ -233,6 +240,7 @@ export default function ProductsPage() {
     setEditTargetId(p.id);
     setForm({
       name: p.name, category: p.category,
+      type: p.type || 'product',
       price: p.price.toString(), stock: p.stock.toString(),
       description: p.description || '', active: p.active,
       retailer_id: p.retailer_id || '',
@@ -252,6 +260,7 @@ export default function ProductsPage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           name: form.name, category: form.category,
+          type: form.type,
           price: parseFloat(form.price), stock: parseInt(form.stock),
           description: form.description, active: form.active,
           retailer_id: form.retailer_id,
@@ -355,6 +364,7 @@ export default function ProductsPage() {
             <tr className="border-b border-zinc-800 bg-zinc-900/60">
               <th className="font-semibold px-5 py-3.5 text-zinc-500 text-xs uppercase tracking-wider">{t('products.product_name')}</th>
               <th className="font-semibold px-5 py-3.5 text-zinc-500 text-xs uppercase tracking-wider">{t('products.category')}</th>
+              <th className="font-semibold px-5 py-3.5 text-zinc-500 text-xs uppercase tracking-wider">Type</th>
               <th className="font-semibold px-5 py-3.5 text-zinc-500 text-xs uppercase tracking-wider">{t('products.price')}</th>
               <th className="font-semibold px-5 py-3.5 text-zinc-500 text-xs uppercase tracking-wider">{t('products.stock')}</th>
               <th className="font-semibold px-5 py-3.5 text-zinc-500 text-xs uppercase tracking-wider">WA Catalog</th>
@@ -364,9 +374,9 @@ export default function ProductsPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="text-center py-14 text-zinc-600"><Loader2 size={22} className="animate-spin mx-auto" /></td></tr>
+              <tr><td colSpan={8} className="text-center py-14 text-zinc-600"><Loader2 size={22} className="animate-spin mx-auto" /></td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={7}>
+              <tr><td colSpan={8}>
                 <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-600">
                   <PackageOpen size={40} className="opacity-30" />
                   <p className="text-sm font-medium">{t('products.no_products')}</p>
@@ -391,6 +401,22 @@ export default function ProductsPage() {
                     <span className="text-xs px-2 py-1 rounded-md bg-zinc-800 border border-zinc-700/50 text-zinc-400">
                       {p.category || 'Uncategorized'}
                     </span>
+                  </td>
+                  {/* Type */}
+                  <td className="px-5 py-3.5">
+                    {(() => {
+                      const pt = PRODUCT_TYPES.find(t => t.value === (p.type || 'product'));
+                      const isDefault = !p.type || p.type === 'product';
+                      return (
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                          isDefault
+                            ? 'text-zinc-500 bg-zinc-800/60 border-zinc-700/40'
+                            : 'text-violet-300 bg-violet-500/10 border-violet-500/20'
+                        }`}>
+                          {pt?.icon} {pt?.label ?? 'Product'}
+                        </span>
+                      );
+                    })()}
                   </td>
                   {/* Price */}
                   <td className="px-5 py-3.5 font-mono text-sm text-zinc-300">Rs. {p.price.toFixed(2)}</td>
@@ -475,11 +501,28 @@ export default function ProductsPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-zinc-400 block mb-1.5">Category</label>
-                <input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
-                  placeholder="e.g. Skincare, Clothing…"
-                  className="w-full px-3 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm outline-none focus:border-zinc-600 text-white transition-colors" />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-zinc-400 block mb-1.5">Category</label>
+                  <input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
+                    placeholder="e.g. Skincare, Clothing…"
+                    className="w-full px-3 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm outline-none focus:border-zinc-600 text-white transition-colors" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-zinc-400 block mb-1.5">Type</label>
+                  <select
+                    id="product-type-select"
+                    value={form.type}
+                    onChange={e => setForm({ ...form, type: e.target.value })}
+                    className="w-full px-3 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm outline-none focus:border-zinc-600 text-white transition-colors"
+                  >
+                    {PRODUCT_TYPES.map(pt => (
+                      <option key={pt.value} value={pt.value}>
+                        {pt.icon} {pt.label} — {pt.desc}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div>
