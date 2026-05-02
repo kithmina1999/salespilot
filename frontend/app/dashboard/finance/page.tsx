@@ -1,10 +1,10 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import {
   TrendingUp, DollarSign, ShoppingBag, Package, XCircle,
   BarChart3, Loader2, Award, ArrowUp, ArrowDown,
 } from 'lucide-react';
+import { DashboardEmptyInsight, DashboardSectionHeader, SegmentedControl } from '@/components/dashboard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -173,21 +173,12 @@ export default function FinancePage() {
       </div>
 
       {/* Range picker */}
-      <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-900 border border-zinc-800 w-fit">
-        {RANGES.map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setRange(key)}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              range === key
-                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm'
-                : 'text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        label="Revenue range"
+        options={RANGES.map(({ key, label }) => ({ value: key, label }))}
+        value={range}
+        onChange={setRange}
+      />
 
       {loading ? (
         <div className="flex items-center justify-center py-28 text-zinc-600">
@@ -254,31 +245,35 @@ export default function FinancePage() {
 
           {/* Revenue chart */}
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-sm font-black text-white">Daily Revenue</h2>
-                <p className="text-xs text-zinc-600 mt-0.5">Delivered orders only · {range === '7d' ? 'Last 7 days' : range === '30d' ? 'Last 30 days' : 'Last 90 days'}</p>
-              </div>
+            <DashboardSectionHeader
+              className="mb-4"
+              title="Daily Revenue"
+              description={`Delivered-order revenue by day. Amounts shown in LKR · ${range === '7d' ? 'Last 7 days' : range === '30d' ? 'Last 30 days' : 'Last 90 days'}`}
+              actions={(
               <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
                 {fmtK(stats?.total_revenue ?? 0)} total
               </span>
-            </div>
+              )}
+            />
             {chart.length > 0 ? (
-              <Sparkline data={chart} />
+              <>
+                <Sparkline data={chart} />
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-400">
+                  <span>Y-axis: delivered revenue in LKR</span>
+                  <span>X-axis: calendar day</span>
+                </div>
+              </>
             ) : (
-              <div className="dash-empty min-h-32">
-                <BarChart3 size={24} className="text-emerald-400" />
-                <div>
-                  <p className="dash-empty-title">No delivered orders in this range</p>
-                  <p className="dash-empty-copy mt-1">
-                    Revenue is calculated from delivered orders. Review orders or add products so customers can place their first order.
-                  </p>
-                </div>
-                <div className="flex flex-wrap justify-center gap-3">
-                  <Link href="/dashboard/orders" className="dash-primary-action">Review Orders</Link>
-                  <Link href="/dashboard/products" className="dash-secondary-action">Add Products</Link>
-                </div>
-              </div>
+              <DashboardEmptyInsight
+                className="min-h-32"
+                icon={<BarChart3 size={24} className="text-emerald-400" />}
+                title="No delivered orders in this range"
+                description="Revenue is calculated from delivered orders. Review orders or add products so customers can place their first order."
+                primaryHref="/dashboard/orders"
+                primaryLabel="Review Orders"
+                secondaryHref="/dashboard/products"
+                secondaryLabel="Add Products"
+              />
             )}
           </div>
 
@@ -289,14 +284,14 @@ export default function FinancePage() {
               Top Products by Revenue
             </h2>
             {products.length === 0 ? (
-              <div className="dash-empty py-8">
-                <Package size={26} className="text-amber-400" />
-                <div>
-                  <p className="dash-empty-title">No product revenue yet</p>
-                  <p className="dash-empty-copy mt-1">Top products appear after orders are delivered in the selected range.</p>
-                </div>
-                <Link href="/dashboard/products" className="dash-secondary-action">Manage Products</Link>
-              </div>
+              <DashboardEmptyInsight
+                className="py-8"
+                icon={<Package size={26} className="text-amber-400" />}
+                title="No product revenue yet"
+                description="Top products appear after orders are delivered in the selected range."
+                secondaryHref="/dashboard/products"
+                secondaryLabel="Manage Products"
+              />
             ) : (
               <div className="space-y-3">
                 {products.map((p, i) => (

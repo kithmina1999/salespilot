@@ -1,14 +1,14 @@
 'use client';
 import { useState, useRef, useCallback, useEffect } from 'react';
-import Link from 'next/link';
 import useSWR, { mutate as globalMutate } from 'swr';
 import {
-  ShoppingBag, Search, TrendingUp, Package, Clock,
+  ShoppingBag, TrendingUp, Package, Clock,
   XCircle, Truck, MapPin, StickyNote, Phone, User, Hash,
   CreditCard, AlertTriangle, ChevronRight, X, Loader2,
   CheckCircle2, BanknoteIcon, Eye, ThumbsUp, ThumbsDown,
 } from 'lucide-react';
 import { useLocale } from '@/lib/locale';
+import { DashboardEmptyInsight, SegmentedControl, ToolbarSearch } from '@/components/dashboard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -903,32 +903,25 @@ export default function OrdersPage() {
       {/* Toolbar: date range + search */}
       <div className="flex flex-wrap items-center gap-3 justify-between">
 
-        {/* Date range quick filters */}
-        <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-900 border border-zinc-800">
-          {DATE_RANGES_T.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setDateRange(key)}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                dateRange === key
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm'
-                  : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="Show orders"
+          options={DATE_RANGES_T.map(({ key, label }) => ({ value: key, label }))}
+          value={dateRange}
+          onChange={setDateRange}
+        />
 
-        {/* Search */}
-        <div className="relative">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-          <input
-            type="text"
-            placeholder={t('common.search') + ' name, phone, #...'}
+        <div className="flex items-center gap-3">
+          {search && (
+            <span className="text-xs font-medium text-zinc-400">
+              Showing {filtered.length} of {totalOrders}
+            </span>
+          )}
+          <ToolbarSearch
+            label="Search orders"
+            placeholder="Search orders by name, phone, or number"
             value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-8 pr-4 py-2 rounded-xl text-sm bg-zinc-900 border border-zinc-800 text-zinc-200 placeholder-zinc-600 outline-none focus:border-zinc-600 transition-colors w-56"
+            onChange={setSearch}
+            className="w-72 max-w-full"
           />
         </div>
       </div>
@@ -940,23 +933,16 @@ export default function OrdersPage() {
           <span className="text-sm font-medium">{t('common.loading')}…</span>
         </div>
       ) : totalOrders === 0 ? (
-        <div className="dash-empty py-16">
-          <ShoppingBag size={40} className="text-emerald-400" />
-          <div>
-            <p className="dash-empty-title">{t('orders.no_orders')}</p>
-            <p className="dash-empty-copy mt-1">
-              Orders appear here when customers buy through your WhatsApp bot. Connect WhatsApp and add products to start receiving real orders.
-            </p>
-          </div>
-          <div className="flex flex-wrap justify-center gap-3">
-            <Link href="/dashboard/connect" className="dash-primary-action">
-              Connect WhatsApp
-            </Link>
-            <Link href="/dashboard/products" className="dash-secondary-action">
-              Add Products
-            </Link>
-          </div>
-        </div>
+        <DashboardEmptyInsight
+          className="py-16"
+          icon={<ShoppingBag size={40} className="text-emerald-400" />}
+          title={t('orders.no_orders')}
+          description="Orders appear here when customers buy through your WhatsApp bot. Connect WhatsApp and add products to start receiving real orders."
+          primaryHref="/dashboard/connect"
+          primaryLabel="Connect WhatsApp"
+          secondaryHref="/dashboard/products"
+          secondaryLabel="Add Products"
+        />
       ) : (
         <div className="overflow-x-auto pb-4">
           <div className="flex gap-4 w-fit mx-auto" style={{ minHeight: '62vh' }}>

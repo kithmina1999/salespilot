@@ -3,10 +3,11 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   UserCircle, ShoppingBag, MessageSquare, AlertCircle, CheckCircle2,
-  Bot, Pencil, X, Check, Tag, Send, Loader2, ArrowLeft, Search,
+  Bot, Pencil, X, Check, Tag, Send, Loader2, ArrowLeft,
   Wifi, WifiOff, Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ToolbarSearch } from '@/components/dashboard';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface ChatSummary {
@@ -270,15 +271,12 @@ export default function ChatsPage() {
           </span>
         </div>
         {/* Search */}
-        <div className="relative">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-          <input
-            placeholder="Search name or number…"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="w-full pl-8 pr-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs outline-none focus:border-zinc-600 text-zinc-200 placeholder-zinc-500 transition-colors"
-          />
-        </div>
+        <ToolbarSearch
+          label="Search conversations"
+          placeholder="Search conversations by name or number"
+          value={searchTerm}
+          onChange={setSearchTerm}
+        />
       </div>
 
       {/* List */}

@@ -1,13 +1,14 @@
 'use client';
 import { useState, useEffect } from 'react';
 import {
-  Plus, Search, PackageOpen, Edit2, Trash, ShoppingBag,
+  Plus, PackageOpen, Edit2, Trash, ShoppingBag,
   CheckCircle2, X, ChevronRight, ExternalLink, Copy, AlertCircle, Loader2, Link2, Lock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAppStore } from '@/lib/store';
 import { useLocale } from '@/lib/locale';
 import { useProducts } from '@/hooks/useProducts';
+import { ToolbarSearch } from '@/components/dashboard';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -338,15 +339,13 @@ export default function ProductsPage() {
       )}
 
       {/* ── Search bar ── */}
-      <div className="relative max-w-sm mb-5">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder={t('common.search') + ' ' + t('products.title').toLowerCase() + '…'}
-          className="w-full pl-9 pr-4 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm outline-none focus:border-zinc-600 transition-colors text-zinc-200 placeholder-zinc-600"
-        />
-      </div>
+      <ToolbarSearch
+        label="Search products"
+        placeholder={t('common.search') + ' ' + t('products.title').toLowerCase() + '…'}
+        value={search}
+        onChange={setSearch}
+        className="max-w-sm mb-5"
+      />
 
       {/* ── Table ── */}
       <div className="border border-zinc-800 rounded-2xl overflow-hidden bg-zinc-900/50 overflow-x-auto">

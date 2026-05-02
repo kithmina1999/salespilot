@@ -196,8 +196,11 @@ export default function UsageMeterGrid() {
 
   return (
     <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Monthly Usage</p>
+      <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Monthly Usage</p>
+          <p className="text-sm text-zinc-400 mt-1">Tracks current usage against this month’s plan limits.</p>
+        </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {metrics.map((m) => (
