@@ -30,3 +30,14 @@ func GetScorer() *BehaviorScorer {
 	}
 	return appScorer
 }
+
+// GetStore returns the package-level StateStore.
+// Falls back to an ephemeral in-memory store if SetStateStore was never called
+// (e.g. in isolated unit tests). The ephemeral store is NOT shared with
+// GetScorer() or GetGreeter() — use SetStateStore() in production.
+func GetStore() cache.StateStore {
+	if AppStore == nil {
+		AppStore = cache.NewInMemoryStore(cache.DefaultConfig())
+	}
+	return AppStore
+}

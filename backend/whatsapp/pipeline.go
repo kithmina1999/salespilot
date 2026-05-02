@@ -430,12 +430,39 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 	if business.Plan == models.PlanPro {
 		maxAI = -1 // Pro plan = unlimited AI replies
 	}
+
+	// ── 3B: 80% Monthly Warning (log once per day) ────────────────────────────
+	if shouldWarn80Percent(business.AIMessageCount, maxAI) {
+		warnKey := fmt.Sprintf("ai_warn_80:%d", business.ID)
+		if _, err := GetStore().Get(warnKey); err != nil { // ErrKeyNotFound → first warn today
+			_ = GetStore().Set(warnKey, 1, 24*time.Hour)
+			log.Printf("⚠️ [%s] AI usage at %d/%d (%.0f%%) — 80%% monthly warning",
+				business.Name, business.AIMessageCount, maxAI,
+				float64(business.AIMessageCount)/float64(maxAI)*100)
+		}
+	}
+
 	if maxAI > 0 && business.AIMessageCount > maxAI {
 		log.Printf("⚠️ [%s] AI Message Limit Hit (%d). AI Bot Disabled for %s.", business.Name, maxAI, from)
 		botSendText(business, fromRaw,
 			"I am currently receiving too many complex questions. Please wait for a human representative.")
 		return
 	}
+
+	// ── 3A: Daily Safety Cap (hard stop at 100 Gemini calls/day) ─────────────
+	// Check-before-increment: rejected calls are never counted.
+	// The key auto-expires at midnight via a TTL set to end-of-day.
+	const dailyGeminiCap = 100
+	dailyKey := fmt.Sprintf("ai_daily:%d", business.ID)
+	dailyCount, _ := GetStore().Get(dailyKey)
+	if isDailyCapped(dailyCount, dailyGeminiCap) {
+		log.Printf("🛑 [%s] Daily AI safety cap hit (%d/%d) — serving fallback to %s",
+			business.Name, dailyCount, dailyGeminiCap, from)
+		botSendText(business, fromRaw, geminiErrorReply(faqHint))
+		return
+	}
+	// Increment AFTER the cap check — only counts calls that reach Gemini
+	GetStore().Increment(dailyKey, 1, ttlUntilMidnight())
 
 	// --- LAYER 6.5: Native Commerce Catalog (if catalog linked and product intent detected) ---
 	// Do this BEFORE Gemini to save AI tokens on simple product browsing requests.
@@ -1067,6 +1094,31 @@ func geminiErrorReply(faqHint string) string {
 		return faqHint
 	}
 	return "Sorry, I'm having trouble right now. Please try again!"
+}
+
+// isDailyCapped reports whether the daily Gemini call count has reached or
+// exceeded the per-business hard cap.
+//
+// cap=0 disables the feature entirely (never capped), which lets operators
+// opt out by setting the cap to zero without code changes.
+func isDailyCapped(dailyCount, cap int) bool {
+	if cap <= 0 {
+		return false // cap disabled
+	}
+	return dailyCount >= cap
+}
+
+// shouldWarn80Percent reports whether the business's monthly AI usage has
+// crossed the 80% threshold but not yet hit the hard cap.
+//
+// Returns false when max <= 0 (unlimited Pro plan) so unlimited-plan
+// businesses are never warned.
+func shouldWarn80Percent(count, max int) bool {
+	if max <= 0 {
+		return false // unlimited plan
+	}
+	pct := float64(count) / float64(max) * 100
+	return pct >= 80 && pct < 100
 }
 
 // detectCatalogIntent returns true when the customer's message signals they want to browse products.
