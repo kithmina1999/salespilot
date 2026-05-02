@@ -1,0 +1,37 @@
+# ── Stage 1: Build ────────────────────────────────────────────────────────────
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Install deps (layer-cached until package-lock changes)
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+
+# Copy source — build-time env vars are baked in here
+COPY frontend/ .
+
+# API_URL is used by next.config.ts rewrites at BUILD time
+# Override with --build-arg API_URL=https://api.salespilot.lk when building
+ARG API_URL=http://backend:8080
+ENV API_URL=$API_URL
+
+RUN npm run build
+
+# ── Stage 2: Runtime (standalone output) ─────────────────────────────────────
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# Copy only what Next.js standalone output needs
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD wget -qO- http://localhost:3000 || exit 1
+
+CMD ["node", "server.js"]

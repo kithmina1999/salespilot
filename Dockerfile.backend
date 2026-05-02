@@ -1,0 +1,36 @@
+# ── Stage 1: Build ────────────────────────────────────────────────────────────
+FROM golang:1.26-alpine AS builder
+
+# CGO disabled — pure Go binary, no libc dependency in the final image
+ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
+
+WORKDIR /app
+
+# Download deps first (layer-cached until go.mod/go.sum change)
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source and build
+COPY . .
+RUN go build -ldflags="-s -w" -o salespilot .
+
+# ── Stage 2: Runtime ──────────────────────────────────────────────────────────
+FROM alpine:3.21
+
+# ca-certificates: needed for outbound TLS (Gemini, Meta API, Resend, etc.)
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+# Copy binary from builder
+COPY --from=builder /app/salespilot .
+
+# uploads/ directory must persist between restarts — mount a Docker volume here
+RUN mkdir -p uploads/products
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD wget -qO- http://localhost:8080/health || exit 1
+
+CMD ["./salespilot"]

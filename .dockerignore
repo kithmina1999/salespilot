@@ -1,0 +1,35 @@
+# .dockerignore — applied to the repo-root build context
+
+# Git
+.git
+.gitignore
+.github
+
+# Dev environment files — NEVER include in image
+.env
+.env.*
+!.env.production.example
+
+# Compiled artifacts (built inside Docker instead)
+backend/main.exe
+backend/tmp.exe
+backend/*.db
+backend/out.log
+backend/out.txt
+backend/uploads/
+
+# Node modules (installed inside Docker)
+frontend/node_modules
+landing/node_modules
+salespilot-admin-main/node_modules
+
+# Next.js caches and dev output
+frontend/.next
+landing/.next
+salespilot-admin-main/.next
+
+# Docs / plans (not needed in image)
+*.md
+*.png
+*.jpg
+create_issues.js

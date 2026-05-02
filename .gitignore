@@ -3,6 +3,8 @@
 *.log
 *.sqlite
 *.db
+.env.production.example
+.env.production
 
 # Backend ignores
 backend/.env
@@ -11,6 +13,7 @@ backend/out.*
 backend/whatsapp_sessions.db
 backend/uploads/
 backend/tmp/
+
 
 # Keep child gitignores working
 frontend/node_modules/
@@ -21,3 +24,4 @@ salespilot-admin-main/node_modules/
 salespilot-admin-main/.next/
 
 .agent
+

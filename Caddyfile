@@ -1,0 +1,38 @@
+# Caddyfile — SalesPilot Production Reverse Proxy
+#
+# Caddy auto-provisions and renews Let's Encrypt TLS for all domains.
+# Replace <YOUR_VPS_IP> with the actual IP before restricting admin access.
+
+# ── Public landing page ──────────────────────────────────────────────────────
+salespilot.lk {
+    reverse_proxy landing:3000
+    encode gzip
+}
+
+# ── Merchant dashboard ───────────────────────────────────────────────────────
+app.salespilot.lk {
+    reverse_proxy dashboard:3000
+    encode gzip
+}
+
+# ── Go API ───────────────────────────────────────────────────────────────────
+api.salespilot.lk {
+    reverse_proxy backend:8080
+
+    # Generous timeout for Gemini AI calls (up to 30s)
+    reverse_proxy backend:8080 {
+        transport http {
+            response_header_timeout 35s
+        }
+    }
+}
+
+# ── Super Admin panel (IP-restricted) ────────────────────────────────────────
+admin.salespilot.lk {
+    # Replace with your actual office/home IP before deploy
+    @blocked not remote_ip <YOUR_VPS_IP>
+    respond @blocked "Access Denied" 403
+
+    reverse_proxy admin:3000
+    encode gzip
+}

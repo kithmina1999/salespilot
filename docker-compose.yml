@@ -1,0 +1,105 @@
+services:
+
+  # ── Go API ──────────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../Dockerfile.backend
+    restart: unless-stopped
+    env_file: .env.production
+    ports:
+      - "8080:8080"
+    volumes:
+      # Persist uploaded product images across container restarts
+      - uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── Next.js Dashboard ───────────────────────────────────────────────────────
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        # Must match the public API domain — baked into the Next.js rewrite at build time
+        API_URL: https://api.salespilot.lk
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=https://api.salespilot.lk
+      - PORT=3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ── Next.js Landing Page ────────────────────────────────────────────────────
+  landing:
+    build:
+      context: .
+      dockerfile: Dockerfile.landing
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+    ports:
+      - "3002:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ── Next.js Admin Panel ─────────────────────────────────────────────────────
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile.admin
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=https://api.salespilot.lk
+      - PORT=3000
+    ports:
+      - "3001:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ── Caddy Reverse Proxy + TLS ───────────────────────────────────────────────
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3 (QUIC)
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - dashboard
+      - landing
+      - admin
+      - backend
+
+volumes:
+  uploads:
+  caddy_data:
+  caddy_config:

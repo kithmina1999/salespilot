@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Banknote, Truck, Building2, Info, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Banknote, Truck, Building2, Info, ToggleLeft, ToggleRight, CreditCard } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -117,6 +117,22 @@ export default function PaymentsTab() {
             enabled={config.allow_transfer}
             onToggle={v => setConfig(prev => ({ ...prev, allow_transfer: v }))}
           />
+
+          {/* PayHere Coming Soon */}
+          <div className="border border-dashed border-zinc-700 rounded-xl p-4 opacity-60 bg-zinc-950/30">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-zinc-900">
+                <CreditCard size={18} className="text-zinc-500" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-zinc-400">Online Payment (PayHere)</p>
+                <p className="text-xs text-zinc-500 mt-0.5">Coming soon — accept card payments directly</p>
+              </div>
+              <span className="ml-auto text-[10px] font-bold bg-amber-500/10 border border-amber-500/20 text-amber-400 px-2 py-0.5 rounded-md">
+                COMING SOON
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
