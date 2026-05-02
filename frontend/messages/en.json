@@ -33,7 +33,8 @@
     "products": "Products",
     "customers": "Customers",
     "faq_rules": "FAQ Rules",
-    "analytics": "Analytics",
+    "analytics": "Finance",
+    "finance": "Finance",
     "settings": "Settings",
     "billing": "Billing",
     "connect":"WhatsApp ",
@@ -79,8 +80,8 @@
     "trial_started": "Your 14-day Starter trial has begun."
   },
   "dashboard": {
-    "title": "Command Center",
-    "subtitle": "Real-time business intelligence — revenue, customers, AI performance & more.",
+    "title": "Dashboard Overview",
+    "subtitle": "Revenue, orders, customers, and bot performance in one place.",
     "welcome": "Welcome back",
     "overview": "Overview",
     "today": "Today",

@@ -372,11 +372,14 @@ function RulesContent() {
           {loading ? (
             <div className="p-8 text-center text-sm border rounded-xl border-zinc-800 text-zinc-400">{t('common.loading')}…</div>
           ) : customRules.length === 0 ? (
-            <div className="p-10 border border-dashed rounded-xl flex flex-col items-center justify-center text-center border-zinc-800 bg-zinc-900/20">
-              <BookOpen size={32} className="mb-3 opacity-20" />
-              <p className="text-sm">{t('rules.no_rules')}</p>
-              <button onClick={openCreateModal} className="mt-2 text-xs text-blue-400 hover:text-blue-300 transition-colors">
-                {t('rules.no_rules_hint')}
+            <div className="dash-empty">
+              <BookOpen size={32} className="text-emerald-400" />
+              <div>
+                <p className="dash-empty-title">{t('rules.no_rules')}</p>
+                <p className="dash-empty-copy mt-1">{t('rules.no_rules_hint')}</p>
+              </div>
+              <button onClick={openCreateModal} className="dash-primary-action">
+                <Plus size={15} /> {t('rules.add_rule')}
               </button>
             </div>
           ) : (

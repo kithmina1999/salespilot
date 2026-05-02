@@ -39,7 +39,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
         <TrialBanner />
         <ConnectionBanner />
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 relative">
+        <main className="dashboard-shell flex-1 overflow-y-auto p-4 md:p-6 relative">
           {children}
         </main>
       </div>

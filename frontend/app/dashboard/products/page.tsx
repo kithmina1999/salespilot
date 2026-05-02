@@ -367,10 +367,15 @@ export default function ProductsPage() {
               <tr><td colSpan={7} className="text-center py-14 text-zinc-600"><Loader2 size={22} className="animate-spin mx-auto" /></td></tr>
             ) : filtered.length === 0 ? (
               <tr><td colSpan={7}>
-                <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-600">
-                  <PackageOpen size={40} className="opacity-30" />
-                  <p className="text-sm font-medium">{t('products.no_products')}</p>
-                  <p className="text-xs opacity-60">{t('products.no_products_hint')}</p>
+                <div className="dash-empty m-5 py-16">
+                  <PackageOpen size={40} className="text-emerald-400" />
+                  <div>
+                    <p className="dash-empty-title">{t('products.no_products')}</p>
+                    <p className="dash-empty-copy mt-1">{t('products.no_products_hint')}</p>
+                  </div>
+                  <button type="button" onClick={openCreate} className="dash-primary-action">
+                    <Plus size={15} /> {t('products.add_product')}
+                  </button>
                 </div>
               </td></tr>
             ) : (

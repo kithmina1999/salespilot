@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef, useCallback, useEffect } from 'react';
+import Link from 'next/link';
 import useSWR, { mutate as globalMutate } from 'swr';
 import {
   ShoppingBag, Search, TrendingUp, Package, Clock,
@@ -691,7 +692,7 @@ function KanbanColumn({ colKey, label, emoji, orders, onDragStart, onDrop, onCar
         {orders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="text-2xl mb-2 opacity-30">{emoji}</div>
-            <p className="text-xs text-zinc-700 font-medium">No orders here</p>
+            <p className="text-xs text-zinc-400 font-medium">No {label.toLowerCase()} orders</p>
             {isOver && <p className="text-xs text-zinc-500 mt-1">Drop to move here</p>}
           </div>
         ) : (
@@ -937,6 +938,24 @@ export default function OrdersPage() {
         <div className="flex items-center justify-center py-28 text-zinc-600">
           <Loader2 size={26} className="animate-spin mr-3" />
           <span className="text-sm font-medium">{t('common.loading')}…</span>
+        </div>
+      ) : totalOrders === 0 ? (
+        <div className="dash-empty py-16">
+          <ShoppingBag size={40} className="text-emerald-400" />
+          <div>
+            <p className="dash-empty-title">{t('orders.no_orders')}</p>
+            <p className="dash-empty-copy mt-1">
+              Orders appear here when customers buy through your WhatsApp bot. Connect WhatsApp and add products to start receiving real orders.
+            </p>
+          </div>
+          <div className="flex flex-wrap justify-center gap-3">
+            <Link href="/dashboard/connect" className="dash-primary-action">
+              Connect WhatsApp
+            </Link>
+            <Link href="/dashboard/products" className="dash-secondary-action">
+              Add Products
+            </Link>
+          </div>
         </div>
       ) : (
         <div className="overflow-x-auto pb-4">

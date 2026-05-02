@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import {
   TrendingUp, DollarSign, ShoppingBag, Package, XCircle,
   BarChart3, Loader2, Award, ArrowUp, ArrowDown,
@@ -45,7 +46,7 @@ const fmtK = (n: number) => n >= 1000 ? `Rs.${(n/1000).toFixed(1)}k` : fmtM(n);
 // ─── Mini Sparkline (SVG path) ────────────────────────────────────────────────
 
 function Sparkline({ data }: { data: ChartPoint[] }) {
-  if (data.length < 2) return <div className="h-32 flex items-center justify-center text-zinc-700 text-xs">Not enough data</div>;
+  if (data.length < 2) return <div className="h-32 flex items-center justify-center text-zinc-400 text-xs">Not enough data</div>;
 
   const W = 600; const H = 120; const PAD = 8;
   const revenues = data.map(d => d.revenue);
@@ -265,8 +266,18 @@ export default function FinancePage() {
             {chart.length > 0 ? (
               <Sparkline data={chart} />
             ) : (
-              <div className="h-32 flex items-center justify-center text-zinc-700 text-sm">
-                No delivered orders in this range
+              <div className="dash-empty min-h-32">
+                <BarChart3 size={24} className="text-emerald-400" />
+                <div>
+                  <p className="dash-empty-title">No delivered orders in this range</p>
+                  <p className="dash-empty-copy mt-1">
+                    Revenue is calculated from delivered orders. Review orders or add products so customers can place their first order.
+                  </p>
+                </div>
+                <div className="flex flex-wrap justify-center gap-3">
+                  <Link href="/dashboard/orders" className="dash-primary-action">Review Orders</Link>
+                  <Link href="/dashboard/products" className="dash-secondary-action">Add Products</Link>
+                </div>
               </div>
             )}
           </div>
@@ -278,7 +289,14 @@ export default function FinancePage() {
               Top Products by Revenue
             </h2>
             {products.length === 0 ? (
-              <p className="text-sm text-zinc-700 py-6 text-center">No data in this range</p>
+              <div className="dash-empty py-8">
+                <Package size={26} className="text-amber-400" />
+                <div>
+                  <p className="dash-empty-title">No product revenue yet</p>
+                  <p className="dash-empty-copy mt-1">Top products appear after orders are delivered in the selected range.</p>
+                </div>
+                <Link href="/dashboard/products" className="dash-secondary-action">Manage Products</Link>
+              </div>
             ) : (
               <div className="space-y-3">
                 {products.map((p, i) => (
