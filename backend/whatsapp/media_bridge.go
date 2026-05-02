@@ -211,6 +211,10 @@ func handlePaymentProofImage(business *models.Business, fromNormalized, fromRaw,
 	}
 	if err := database.DB.Create(&proof).Error; err != nil {
 		log.Printf("❌ [MediaBridge] Failed to create OrderPaymentProof: %v", err)
+	} else {
+		go createNotification(buildProofNotification(
+			business.ID, proof.ID, int(pendingOrder.BusinessOrderNum), fromNormalized, pendingOrder.TotalPrice,
+		))
 	}
 
 	// Update order payment status

@@ -658,6 +658,7 @@ func finalizeOrder(cart *models.Cart, business *models.Business, phone, fromRaw 
 	botSendText(business, fromRaw, receipt)
 
 	go notifyTenantNewOrder(business, &order, customerName)
+	go createNotification(buildOrderNotification(business.ID, int(orderNum), customerName, phone, cart.TotalPrice))
 	log.Printf("✅ [OrderBot] Order #%d created for %s (biz=%d)", orderNum, phone, business.ID)
 }
 

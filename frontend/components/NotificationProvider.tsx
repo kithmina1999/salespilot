@@ -6,13 +6,14 @@ import { toast } from 'sonner';
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export interface NotifItem {
-  id: number;           // message_id from backend
-  title: string;        // e.g. customer name / phone
-  preview: string;      // message snippet
-  phone: string;        // for routing
+  id: number;           // message_id or notification.id from backend
+  title: string;        // e.g. customer name / phone / order title
+  preview: string;      // message snippet or notification body
+  phone: string;        // for routing (empty for non-chat events)
   timestamp: number;    // Date.now()
   read: boolean;
   route: string;        // where to navigate on click
+  type: 'chat' | 'new_order' | 'payment_proof'; // drives icon in bell
 }
 
 interface NotificationState {
@@ -85,6 +86,14 @@ export default function NotificationProvider({ children }: { children: React.Rea
       saveHistory(updated);
       return updated;
     });
+    // Mark event notifications as read on the backend (fire-and-forget)
+    const token = localStorage.getItem('token');
+    if (token) {
+      fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/dashboard/notifications/read`,
+        { method: 'POST', headers: { Authorization: `Bearer ${token}` } }
+      ).catch(() => {});
+    }
   }
 
   const poll = useCallback(async () => {
@@ -102,6 +111,7 @@ export default function NotificationProvider({ children }: { children: React.Rea
         total_unread: number;
         unread_threads: number;
         latest: { message_id: number; phone: string; preview: string; customer_name: string } | null;
+        events: { id: number; type: string; title: string; body: string; ref_id: number; created_at: string }[] | null;
       } = await res.json();
 
       setTotalUnread(data.total_unread ?? 0);
@@ -136,17 +146,16 @@ export default function NotificationProvider({ children }: { children: React.Rea
           timestamp: Date.now(),
           read:      false,
           route:     '/dashboard/chats',
+          type:      'chat',
         };
 
         setNotifications(prev => {
-          // Avoid duplicate IDs
           if (prev.some(n => n.id === newNotif.id)) return prev;
           const updated = [newNotif, ...prev].slice(0, MAX_HISTORY);
           saveHistory(updated);
           return updated;
         });
 
-        // Toast
         toast(threadLabel, {
           description: latest.preview?.slice(0, 80) || '',
           duration:    5000,
@@ -154,6 +163,35 @@ export default function NotificationProvider({ children }: { children: React.Rea
             label:   'View',
             onClick: () => router.push('/dashboard/chats'),
           },
+        });
+      }
+
+      // Merge event notifications (orders, payment proofs)
+      const events = data.events ?? [];
+      if (events.length > 0) {
+        setNotifications(prev => {
+          let updated = [...prev];
+          let added = false;
+          for (const ev of events) {
+            const uid = ev.id + 1_000_000; // namespace collision with chat message IDs
+            if (updated.some(n => n.id === uid)) continue;
+            const item: NotifItem = {
+              id:        uid,
+              title:     ev.title,
+              preview:   ev.body,
+              phone:     '',
+              timestamp: new Date(ev.created_at).getTime() || Date.now(),
+              read:      false,
+              route:     ev.type === 'payment_proof' ? '/dashboard/orders' : '/dashboard/orders',
+              type:      ev.type as NotifItem['type'],
+            };
+            updated = [item, ...updated];
+            added = true;
+          }
+          if (!added) return prev;
+          updated = updated.slice(0, MAX_HISTORY);
+          saveHistory(updated);
+          return updated;
         });
       }
     } catch {

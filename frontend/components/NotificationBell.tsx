@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
-import { Bell, MessageSquare, X, CheckCheck } from 'lucide-react';
+import { Bell, MessageSquare, ShoppingCart, CreditCard, X, CheckCheck } from 'lucide-react';
 import { useNotifications, type NotifItem } from '@/components/NotificationProvider';
 
 // ── Time formatter ─────────────────────────────────────────────────────────────
@@ -189,13 +189,17 @@ export default function NotificationBell({ collapsed, mobile = false }: Notifica
                           !notif.read ? 'bg-emerald-500/4' : ''
                         }`}
                       >
-                        {/* Icon */}
+                        {/* Icon — type-aware */}
                         <div className={`mt-0.5 w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
                           !notif.read
-                            ? 'bg-emerald-500/15 text-emerald-400'
+                            ? notif.type === 'new_order'      ? 'bg-emerald-500/15 text-emerald-400'
+                            : notif.type === 'payment_proof'  ? 'bg-violet-500/15 text-violet-400'
+                            : 'bg-emerald-500/15 text-emerald-400'
                             : 'bg-zinc-800 text-zinc-500'
                         }`}>
-                          <MessageSquare size={13} />
+                          {notif.type === 'new_order'     ? <ShoppingCart size={13} />
+                          : notif.type === 'payment_proof' ? <CreditCard size={13} />
+                          : <MessageSquare size={13} />}
                         </div>
 
                         {/* Content */}
@@ -211,8 +215,13 @@ export default function NotificationBell({ collapsed, mobile = false }: Notifica
                           <p className="text-xs text-zinc-500 mt-0.5 line-clamp-2 leading-relaxed">
                             {notif.preview}
                           </p>
-                          <p className="text-[10px] text-emerald-500/70 mt-1 font-medium group-hover:text-emerald-400 transition-colors">
-                            View in Chats →
+                          <p className={`text-[10px] mt-1 font-medium transition-colors ${
+                            notif.type === 'payment_proof' ? 'text-violet-500/70 group-hover:text-violet-400'
+                            : 'text-emerald-500/70 group-hover:text-emerald-400'
+                          }`}>
+                            {notif.type === 'new_order' ? 'View in Orders →'
+                            : notif.type === 'payment_proof' ? 'Review Payment →'
+                            : 'View in Chats →'}
                           </p>
                         </div>
 

@@ -210,6 +210,7 @@ func main() {
 		// Dashboard Core Analytics
 		dash.GET("/dashboard/stats", handlers.GetDashboardStats)
 		dash.GET("/dashboard/notifications", handlers.GetNotifications)
+		dash.POST("/dashboard/notifications/read", handlers.MarkNotificationsRead)
 
 		// Dashboard Settings & Audit
 		dash.GET("/settings/business", handlers.GetBusinessSettings)

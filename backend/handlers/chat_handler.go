@@ -168,11 +168,26 @@ func GetNotifications(c *gin.Context) {
 		}
 	}
 
+	// Fetch recent unread event notifications (orders, payment proofs) — max 20
+	var events []models.Notification
+	database.DB.Where("business_id = ? AND is_read = false", businessID).
+		Order("created_at DESC").Limit(20).Find(&events)
+
 	c.JSON(http.StatusOK, gin.H{
 		"total_unread":   result.TotalUnread,
 		"unread_threads": result.UnreadThreads,
 		"latest":         latest,
+		"events":         events,
 	})
+}
+
+// MarkNotificationsRead marks all unread Notification records as read for this business.
+func MarkNotificationsRead(c *gin.Context) {
+	businessID := c.GetUint("business_id")
+	database.DB.Model(&models.Notification{}).
+		Where("business_id = ? AND is_read = false", businessID).
+		Update("is_read", true)
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
 // SendManualReply allows merchants to override the bot and send a manual message from the dashboard
