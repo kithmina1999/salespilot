@@ -247,7 +247,7 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 			scopeKey, customer.Name, business.BotReplyLanguage, time.Now(),
 		); isFirst {
 			log.Printf("👋 [%s] First-of-day greeting sent to %s", business.Name, from)
-			botSendText(business, fromRaw, greetingMsg)
+			botSendText(business, fromRaw, buildMergedGreeting(business.GreetingMessage, greetingMsg))
 		}
 	}
 
@@ -706,9 +706,31 @@ func isSinglish(msg string) bool {
 //   - English words (always have vowels)
 //   - Very short inputs ≤ 2 chars (let Context Bridge / DROP rules handle "ok", "hi")
 //   - Pure digits (could be order numbers — handled by address/order context)
+// safeAbbreviations is the allowlist of vowel-free tokens that are legitimate
+// commerce abbreviations in Sri Lankan WhatsApp conversations.
+// Any word in the incoming message that matches an entry here will pass through
+// the gibberish detector without penalty.
+var safeAbbreviations = map[string]bool{
+	"nxt": true, "btw": true, "pls": true, "plz": true,
+	"thx": true, "tnx": true, "brb": true, "omw": true,
+	"qty": true, "pcs": true, "drs": true, "lkr": true,
+	"msg": true, "blk": true, "wht": true, "grn": true,
+	"sm": true, "md": true, "lg": true, "xl": true,
+	"xxl": true, "xs": true,
+}
+
 func isLikelyGibberish(normalized string) bool {
 	if len(normalized) <= 2 {
 		return false // too short to judge
+	}
+
+	// ── Safe Abbreviation Allowlist ────────────────────────────────────────────
+	// If ANY word in the message is a known safe abbreviation, let the whole
+	// message through. This prevents silencing "pls send nxt week", "qty 2 xl".
+	for _, word := range strings.Fields(normalized) {
+		if safeAbbreviations[strings.ToLower(word)] {
+			return false
+		}
 	}
 
 	// ── Signal 2: Single character repeated ≥ 5 times ────────────────────────

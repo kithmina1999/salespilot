@@ -503,7 +503,7 @@ func commitAddress(cart *models.Cart, business *models.Business, phone, fromRaw,
 func handlePendingNotes(cart *models.Cart, business *models.Business, fromRaw, msg string) {
 	notes := ""
 	if msg != "skip_notes" {
-		notes = strings.TrimSpace(msg)
+		notes = filterFillerNotes(msg)
 	}
 
 	// If bank transfer is enabled, we must ask the customer which method they want.
@@ -820,6 +820,29 @@ func notifyTenantNewOrder(business *models.Business, order *models.Order, custom
 }
 
 // ─── Utils ──────────────────────────────────────────────────────────────────────
+
+// filterFillerNotes returns an empty string when the customer types a filler
+// acknowledgement word at the delivery-notes step (e.g. "ok", "continue", "next").
+// These phrases mean "skip" and must not be saved as actual delivery instructions.
+// For any genuine note (multiple words, or words not in the filler list) the
+// trimmed input is returned unchanged.
+//
+// The set deliberately contains only single-word tokens; "no bell" is a valid
+// delivery instruction even though "no" alone is a filler.
+var fillerNotes = map[string]bool{
+	"ok": true, "okay": true, "k": true, "continue": true,
+	"next": true, "yes": true, "yep": true, "sure": true,
+	"no": true, "nope": true, "none": true, "nothing": true,
+	"no notes": true, "nah": true, "na": true,
+}
+
+func filterFillerNotes(msg string) string {
+	trimmed := strings.TrimSpace(msg)
+	if fillerNotes[strings.ToLower(trimmed)] {
+		return ""
+	}
+	return trimmed
+}
 
 // orderIntentKeywords are multi-word purchase-intent phrases (not single words).
 // Single words like "order", "buy", "purchase" are intentionally excluded —
