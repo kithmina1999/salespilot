@@ -370,6 +370,33 @@ func handlePendingQty(cart *models.Cart, business *models.Business, fromRaw, msg
 	)
 }
 
+// resolveAddMoreIntent returns true if a message received in the add_more cart state
+// represents a NEW purchase-intent signal (customer wants a different item).
+// Returns false for button IDs, browse signals, and general chat.
+// When true, the caller should fall through to the order bot for fresh item detection.
+//
+// Evaluation order: purchase intent wins over browse signals because
+// detectCatalogIntent's keyword list overlaps with buy words ("buy", "order", "ganna").
+func resolveAddMoreIntent(msg string) bool {
+	// Button IDs handled directly — not intent
+	switch msg {
+	case "browse_more", "checkout":
+		return false
+	}
+
+	// High-confidence purchase intent wins first — escalate to order bot
+	if ScoreOrderIntent(msg).Confidence == "high" {
+		return true
+	}
+
+	// Explicit browse-only signals stay in add_more flow
+	if isBrowseSignal(msg) {
+		return false
+	}
+
+	return false
+}
+
 func handleAddMore(cart *models.Cart, business *models.Business, fromRaw, msg string) bool {
 	switch msg {
 	case "browse_more":
@@ -385,8 +412,13 @@ func handleAddMore(cart *models.Cart, business *models.Business, fromRaw, msg st
 			showProductList(business, fromRaw)
 			return true
 		}
-		// General intent is handled upstream (ClassifyMessageIntent in handleCartMessage)
-		// Anything still reaching here → remind customer of their options
+		// New purchase intent → fall through so the order bot detects the new item
+		// (e.g. "mata oil ekak ganna one" while in add_more state)
+		if resolveAddMoreIntent(msg) {
+			updateCart(cart, map[string]interface{}{"state": models.CartStateBrowsing})
+			return false // signal: let handleCartMessage re-process as fresh intent
+		}
+		// General chat → remind customer of their options
 		botSendButtons(business, fromRaw,
 			"Ready to checkout or want to add more?",
 			[]Button{{ID: "browse_more", Title: "➕ Add More"}, {ID: "checkout", Title: "🛒 Checkout"}},
@@ -814,24 +846,11 @@ var orderIntentNegatives = []string{
 	"mage order", "order eka koheda", "order cancel", "order track",
 }
 
+// detectOrderIntent is the backward-compatible bool wrapper around ScoreOrderIntent.
+// All existing call sites continue to work unchanged while benefiting from
+// the new 3-tier weighted scoring and Jaro-Winkler fuzzy matching.
 func detectOrderIntent(msg string) bool {
-	lower := strings.ToLower(msg)
-	normalized := strings.ToLower(NormalizeMessage(msg))
-
-	// Negative patterns take priority — these are tracking/status queries, not purchases
-	for _, neg := range orderIntentNegatives {
-		if strings.Contains(lower, neg) {
-			return false
-		}
-	}
-
-	// Check positive patterns on both raw and normalized text
-	for _, kw := range orderIntentKeywords {
-		if strings.Contains(lower, kw) || strings.Contains(normalized, kw) {
-			return true
-		}
-	}
-	return false
+	return ScoreOrderIntent(msg).Confidence == "high"
 }
 
 // ─── Smart Cart Helpers ─────────────────────────────────────────────────────────

@@ -33,7 +33,8 @@
     "products": "නිෂ්පාදන",
     "customers": "ගනුදෙනුකරුවන්",
     "faq_rules": "FAQ රීති",
-    "analytics": "විශ්ලේෂණ",
+    "analytics": "Finance",
+    "finance": "Finance",
     "settings": "සැකසුම්",
     "billing": "බිල්පත",
     "connect": "WhatsApp සම්බන්ක",
@@ -77,8 +78,8 @@
     "trial_started": "ඔබේ දින 14 Starter trial ආරම්භ වී ඇත."
   },
   "dashboard": {
-    "title": "Command Center",
-    "subtitle": "Real-time ව්‍යාපාර දත්ත — ආදායම, ගනුදෙනුකරුවන්, AI කාර්යසාධනය.",
+    "title": "Dashboard Overview",
+    "subtitle": "Revenue, orders, customers, and bot performance in one place.",
     "welcome": "නැවත සාදරයෙන් පිළිගනිමු",
     "overview": "දළ විශ්ලේෂණය",
     "today": "අද",

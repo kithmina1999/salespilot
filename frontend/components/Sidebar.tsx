@@ -32,7 +32,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const nav = [
     { href: '/dashboard',          icon: LayoutDashboard, labelKey: 'nav.dashboard' },
     { href: '/dashboard/orders',   icon: ShoppingBag,     labelKey: 'nav.orders'    },
-    { href: '/dashboard/finance',  icon: TrendingUp,      labelKey: 'nav.analytics' },
+    { href: '/dashboard/finance',  icon: TrendingUp,      labelKey: 'nav.finance'   },
     { href: '/dashboard/products', icon: Package,         labelKey: 'nav.products'  },
     { href: '/dashboard/rules',    icon: BookOpen,        labelKey: 'nav.faq_rules' },
     { href: '/dashboard/chats',    icon: MessageSquare,   labelKey: 'nav.inbox'     },

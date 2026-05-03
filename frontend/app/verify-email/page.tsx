@@ -1,21 +1,22 @@
 'use client';
-import { useState, useEffect, FormEvent } from 'react';
+import { Suspense, useState, useEffect, FormEvent } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
-import { Loader2, Mail, KeyRound, ArrowLeft } from 'lucide-react';
+import { Loader2, Mail, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
-import Image from 'next/image';
 import AuthShell from '@/components/AuthShell';
 
-const inputStyle = {
-  background: 'var(--bg)',
-  border: '1px solid var(--border)',
-  color: 'var(--text)',
-};
-
 export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={null}>
+      <VerifyEmailContent />
+    </Suspense>
+  );
+}
+
+function VerifyEmailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const emailParam = searchParams.get('email') || '';

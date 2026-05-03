@@ -1,11 +1,13 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import {
   UserCircle, ShoppingBag, MessageSquare, AlertCircle, CheckCircle2,
-  Bot, Pencil, X, Check, Tag, Send, Loader2, ArrowLeft, Search,
+  Bot, Pencil, X, Check, Tag, Send, Loader2, ArrowLeft,
   Wifi, WifiOff, Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ToolbarSearch } from '@/components/dashboard';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface ChatSummary {
@@ -269,23 +271,26 @@ export default function ChatsPage() {
           </span>
         </div>
         {/* Search */}
-        <div className="relative">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-          <input
-            placeholder="Search name or number…"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="w-full pl-8 pr-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs outline-none focus:border-zinc-600 text-zinc-200 placeholder-zinc-500 transition-colors"
-          />
-        </div>
+        <ToolbarSearch
+          label="Search conversations"
+          placeholder="Search conversations by name or number"
+          value={searchTerm}
+          onChange={setSearchTerm}
+        />
       </div>
 
       {/* List */}
       <div className="flex-1 overflow-y-auto">
         {filteredInbox.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-40 gap-2 text-zinc-600">
-            <MessageSquare size={28} className="opacity-30" />
-            <p className="text-xs">No conversations yet</p>
+          <div className="dash-empty m-4 h-auto">
+            <MessageSquare size={28} className="text-emerald-400" />
+            <div>
+              <p className="dash-empty-title">No conversations yet</p>
+              <p className="dash-empty-copy mt-1">Connect WhatsApp to start receiving customer messages in this inbox.</p>
+            </div>
+            <Link href="/dashboard/connect" className="dash-secondary-action">
+              Connect WhatsApp
+            </Link>
           </div>
         )}
         {filteredInbox.map(chat => {
@@ -389,9 +394,10 @@ export default function ChatsPage() {
                 <Loader2 className="animate-spin text-zinc-600" size={24} />
               </div>
             ) : messages.length === 0 ? (
-              <div className="flex flex-col h-full items-center justify-center gap-2 text-zinc-600">
-                <MessageSquare size={32} className="opacity-20" />
-                <p className="text-sm">No messages yet</p>
+              <div className="flex flex-col h-full items-center justify-center gap-3 text-center text-zinc-400">
+                <MessageSquare size={32} className="text-emerald-400" />
+                <p className="text-sm font-bold text-zinc-100">No messages yet</p>
+                <p className="text-sm text-zinc-400 max-w-xs">This conversation will fill as the customer and bot exchange messages.</p>
               </div>
             ) : (
               messages.map((msg, i) => {
@@ -497,12 +503,12 @@ export default function ChatsPage() {
           </div>
         </>
       ) : (
-        <div className="flex flex-col h-full items-center justify-center gap-3 text-zinc-600">
+        <div className="flex flex-col h-full items-center justify-center gap-3 text-zinc-400 text-center">
           <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
-            <MessageSquare size={28} className="opacity-30" />
+            <MessageSquare size={28} className="text-emerald-400" />
           </div>
-          <p className="text-sm font-medium">Select a conversation</p>
-          <p className="text-xs text-zinc-700">Pick a chat from the inbox to start</p>
+          <p className="text-sm font-bold text-zinc-100">Select a conversation</p>
+          <p className="text-sm text-zinc-400">Pick a chat from the inbox to view messages and customer details.</p>
         </div>
       )}
     </div>

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import QuickFAQModal from '@/components/QuickFAQModal';
 import { useLocale } from '@/lib/locale';
+import { DashboardEmptyInsight, DashboardSectionHeader, SegmentedControl } from '@/components/dashboard';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -233,8 +234,8 @@ export default function OverviewPage() {
             {t('dashboard.subtitle')}
           </p>
         </div>
-        <div className="text-xs text-zinc-600 font-mono bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-800">
-          {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+        <div className="text-xs text-zinc-200 font-mono bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-800">
+          {new Date().toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: 'numeric' })}
         </div>
       </div>
 
@@ -297,27 +298,23 @@ export default function OverviewPage() {
 
         {/* 30-Day Trend Chart (2 cols) */}
         <div className="lg:col-span-2 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 flex flex-col">
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-            <div>
-              <h3 className="text-base font-bold text-white">30-Day Performance</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">Revenue (bars) & order volume (line)</p>
-            </div>
-            <div className="flex bg-zinc-800 rounded-xl p-1 gap-1">
-              {(['revenue', 'orders', 'both'] as ChartTab[]).map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setChartTab(tab)}
-                  className={`px-3 py-1 text-xs font-bold rounded-lg transition-all capitalize ${
-                    chartTab === tab
-                      ? 'bg-emerald-500 text-white shadow'
-                      : 'text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-          </div>
+          <DashboardSectionHeader
+            className="mb-4"
+            title="30-Day Performance"
+            description="Revenue bars use LKR on the left axis; order volume uses the right axis."
+            actions={(
+              <SegmentedControl
+                label="Chart view"
+                options={[
+                  { value: 'revenue', label: 'Revenue' },
+                  { value: 'orders', label: 'Orders' },
+                  { value: 'both', label: 'Both' },
+                ]}
+                value={chartTab}
+                onChange={setChartTab}
+              />
+            )}
+          />
           <div className="flex-1 min-h-[280px]">
             {trend30d.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -349,17 +346,27 @@ export default function OverviewPage() {
                 </ComposedChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-zinc-500 italic text-sm">
-                No order data yet. Your first order will appear here!
-              </div>
+              <DashboardEmptyInsight
+                className="h-full"
+                icon={<BarChart3 className="h-7 w-7 text-emerald-400" />}
+                title="No 30-day performance data yet"
+                description="Revenue and order volume appear here after customers place orders through WhatsApp."
+                primaryHref="/dashboard/connect"
+                primaryLabel="Connect WhatsApp"
+                secondaryHref="/dashboard/products"
+                secondaryLabel="Add Products"
+              />
             )}
           </div>
         </div>
 
         {/* Order Status Donut (1 col) */}
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 flex flex-col">
-          <h3 className="text-base font-bold text-white mb-1">Order Status</h3>
-          <p className="text-xs text-zinc-500 mb-4">This month breakdown</p>
+          <DashboardSectionHeader
+            className="mb-4"
+            title="Order Status"
+            description="This month’s order count by current status."
+          />
 
           {donutData.length > 0 ? (
             <>
@@ -402,9 +409,14 @@ export default function OverviewPage() {
               </div>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm italic">
-              No orders this month yet.
-            </div>
+            <DashboardEmptyInsight
+              className="flex-1"
+              icon={<ShoppingCart className="h-7 w-7 text-emerald-400" />}
+              title="No orders this month yet"
+              description="Status breakdown appears after orders are created and move through the fulfillment flow."
+              primaryHref="/dashboard/orders"
+              primaryLabel="Review Orders"
+            />
           )}
         </div>
       </div>
@@ -556,8 +568,11 @@ export default function OverviewPage() {
 
         {/* Traffic Chart */}
         <div className="lg:col-span-2 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 flex flex-col h-[340px]">
-          <h3 className="text-base font-bold text-white mb-1">7-Day Message Traffic</h3>
-          <p className="text-xs text-zinc-500 mb-4">Customer messages (blue) vs AI replies (green)</p>
+          <DashboardSectionHeader
+            className="mb-4"
+            title="7-Day Message Traffic"
+            description="Customer messages and AI replies over the last 7 days."
+          />
           <div className="flex-1 w-full min-h-0">
             {trafficData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -581,9 +596,14 @@ export default function OverviewPage() {
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-full text-zinc-500 italic text-sm">
-                No messaging data yet. Connect WhatsApp to start tracking!
-              </div>
+              <DashboardEmptyInsight
+                className="h-full"
+                icon={<Activity className="h-7 w-7 text-emerald-400" />}
+                title="No messaging data yet"
+                description="Message traffic starts tracking after WhatsApp is connected and customers send messages."
+                primaryHref="/dashboard/connect"
+                primaryLabel="Connect WhatsApp"
+              />
             )}
           </div>
         </div>
