@@ -126,7 +126,7 @@ export default function PlanStatusCard({ onUpgrade }: Props) {
     ? new Date(planExpiry).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: 'numeric' })
     : null;
 
-  const planLabel = plan === 'pro' ? 'Pro' : plan === 'starter' ? 'Starter' : 'Free';
+  const planLabel = isOnTrial ? 'Free Trial' : plan === 'pro' ? 'Pro' : plan === 'starter' ? 'Starter' : 'Free';
 
   // For urgency check in non-ring text
   const trialMsLeft   = trialExpiresAt ? Math.max(0, new Date(trialExpiresAt).getTime() - Date.now()) : 0;

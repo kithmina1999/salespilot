@@ -34,6 +34,7 @@ export interface RulesStats {
   ai_quota_used: number;
   plan: string;
   rule_generation_count: number;
+  rule_generation_limit: number;
   no_sinhala_coverage: number;
   top_unmatched: { message: string; count: number }[];
 }
@@ -74,6 +75,7 @@ async function fetchRulesPageData(): Promise<RulesPageData> {
       ai_quota_used:         statsData.ai_quota_used         ?? 0,
       plan:                  statsData.plan                  ?? 'free',
       rule_generation_count: statsData.rule_generation_count ?? 0,
+      rule_generation_limit: statsData.rule_generation_limit ?? 3,
       no_sinhala_coverage:   statsData.no_sinhala_coverage   ?? 0,
       top_unmatched:         statsData.top_unmatched          ?? [],
     },
@@ -92,6 +94,7 @@ const EMPTY_STATS: RulesStats = {
   ai_quota_used: 0,
   plan: 'free',
   rule_generation_count: 0,
+  rule_generation_limit: 3,
   no_sinhala_coverage: 0,
   top_unmatched: [],
 };

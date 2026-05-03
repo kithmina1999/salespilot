@@ -126,7 +126,9 @@ export default function UsageMeterGrid() {
   const plan = business?.plan ?? 'free';
   const isPaid = plan === 'starter' || plan === 'pro';
   const isActiveTrial = usage?.active_trial ?? false;
-  const hasAccess = isPaid || isActiveTrial;
+  const usageContext = !isPaid && isActiveTrial
+    ? 'Tracks current usage against trial limits. Upgrade to keep access after the trial.'
+    : 'Tracks current usage against this month’s plan limits.';
 
   if (!usage) {
     return (
@@ -199,7 +201,7 @@ export default function UsageMeterGrid() {
       <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Monthly Usage</p>
-          <p className="text-sm text-zinc-400 mt-1">Tracks current usage against this month’s plan limits.</p>
+          <p className="text-sm text-zinc-400 mt-1">{usageContext}</p>
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

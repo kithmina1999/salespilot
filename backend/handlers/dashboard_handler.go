@@ -226,11 +226,22 @@ func GetDashboardStats(c *gin.Context) {
 		botAutomationPctPrev = float64(aiMsgCountPrev) / float64(totalMsgPrev) * 100
 	}
 
-	// ── 14. Customers last month (for % change on total_customers card) ───────
+	// ── Customers last month (for % change on total_customers card) ───────
 	var totalCustomersLastMonth int64
 	database.DB.Model(&models.Message{}).
 		Where("business_id = ? AND created_at < ?", businessID, thisMonthStart).
 		Distinct("phone").Count(&totalCustomersLastMonth)
+
+	// Calculate Rule Generation Limit based on plan & trial
+	activeTrial := biz.IsInActiveTrial()
+	maxRuleGens := models.FreeRuleGenLimit
+	if activeTrial {
+		maxRuleGens = models.StarterRuleGenLimit
+	} else if biz.Plan == models.PlanStarter {
+		maxRuleGens = models.StarterRuleGenLimit
+	} else if biz.Plan == models.PlanPro {
+		maxRuleGens = models.ProRuleGenLimit
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		// ── Original fields (kept for backward compat) ──
@@ -241,7 +252,9 @@ func GetDashboardStats(c *gin.Context) {
 		"system_quota_used":     biz.SystemMessageCount,
 		"ai_quota_used":         biz.AIMessageCount,
 		"plan":                  biz.Plan,
+		"active_trial":          activeTrial,
 		"rule_generation_count": biz.RuleGenerationCount,
+		"rule_generation_limit": maxRuleGens,
 		"top_unmatched":         unmatched,
 		"daily_stats":           dailyStats,
 
