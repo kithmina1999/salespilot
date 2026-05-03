@@ -232,23 +232,14 @@ function RulesContent() {
         </div>
         <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
           {/* AI Generate button */}
-          {stats.plan === 'free' ? (
+          {stats.rule_generation_count >= stats.rule_generation_limit ? (
             <button
               disabled
-              title="Upgrade to Starter or Pro to use AI Rule Generation"
+              title={stats.plan === 'free' ? "Free limit reached. Upgrade to Starter or Pro for more." : "Monthly limit reached. Upgrade to Pro for unlimited generation."}
               className="flex items-center gap-2 px-4 py-2.5 sm:py-2 rounded-lg text-sm font-bold bg-amber-500/10 text-amber-500/50 border border-amber-500/20 cursor-not-allowed flex-1 sm:flex-none justify-center"
               style={{ minHeight: '44px' }}
             >
-              <LockIcon size={16} /> Generate with AI ✨
-            </button>
-          ) : stats.plan === 'starter' && stats.rule_generation_count >= 30 ? (
-            <button
-              disabled
-              title="Monthly limit reached. Upgrade to Pro for unlimited generation."
-              className="flex items-center gap-2 px-4 py-2.5 sm:py-2 rounded-lg text-sm font-bold bg-amber-500/10 text-amber-500/50 border border-amber-500/20 cursor-not-allowed flex-1 sm:flex-none justify-center"
-              style={{ minHeight: '44px' }}
-            >
-              <LockIcon size={16} /> Limit Reached
+              <LockIcon size={16} /> {stats.plan === 'free' ? "Free Limit Reached" : "Limit Reached"}
             </button>
           ) : (
             <button
@@ -372,11 +363,14 @@ function RulesContent() {
           {loading ? (
             <div className="p-8 text-center text-sm border rounded-xl border-zinc-800 text-zinc-400">{t('common.loading')}…</div>
           ) : customRules.length === 0 ? (
-            <div className="p-10 border border-dashed rounded-xl flex flex-col items-center justify-center text-center border-zinc-800 bg-zinc-900/20">
-              <BookOpen size={32} className="mb-3 opacity-20" />
-              <p className="text-sm">{t('rules.no_rules')}</p>
-              <button onClick={openCreateModal} className="mt-2 text-xs text-blue-400 hover:text-blue-300 transition-colors">
-                {t('rules.no_rules_hint')}
+            <div className="dash-empty">
+              <BookOpen size={32} className="text-emerald-400" />
+              <div>
+                <p className="dash-empty-title">{t('rules.no_rules')}</p>
+                <p className="dash-empty-copy mt-1">{t('rules.no_rules_hint')}</p>
+              </div>
+              <button onClick={openCreateModal} className="dash-primary-action">
+                <Plus size={15} /> {t('rules.add_rule')}
               </button>
             </div>
           ) : (

@@ -116,6 +116,8 @@ func Login(c *gin.Context) {
 		"business": gin.H{
 			"id":                  biz.ID,
 			"name":                biz.Name,
+			"plan":                biz.Plan,
+			"wa_status":           biz.WAStatus,
 			"onboarding_complete": biz.OnboardingComplete,
 		},
 	})

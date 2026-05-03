@@ -9,8 +9,6 @@ export default function DashboardGuard({ children }: { children: React.ReactNode
   const [loading, setLoading] = useState(true);
 
   const token = useAppStore((s) => s.token);
-  const business = useAppStore((s) => s.business);
-  const businessLoaded = useAppStore((s) => s.businessLoaded);
   const fetchAll = useAppStore((s) => s.fetchAll);
   const clearSession = useAppStore((s) => s.clearSession);
 
@@ -23,21 +21,12 @@ export default function DashboardGuard({ children }: { children: React.ReactNode
       return;
     }
 
-    // 2. Store already has data loaded — skip fetch
-    if (businessLoaded && business) {
-      if (!business.onboarding_complete) {
-        router.replace('/onboarding');
-      } else {
-        setLoading(false);
-      }
-      return;
-    }
-
-    // 3. Fetch everything into the store with a hard 6s timeout
-    const controller = new AbortController();
+    // 2. Always fetch fresh data from the API on mount.
+    // We intentionally do NOT skip based on `businessLoaded` because that flag
+    // is set by setSession() at login time (before any real fetch), and skipping
+    // here would mean usage/billing/plan data is never loaded for the session.
     const timeout = setTimeout(() => {
-      controller.abort();
-      // Timeout — let user through if token exists
+      // Hard 6s timeout — let user through if token exists
       setLoading(false);
     }, 6000);
 
@@ -58,7 +47,8 @@ export default function DashboardGuard({ children }: { children: React.ReactNode
       .finally(() => {
         clearTimeout(timeout);
       });
-  }, [router, token, businessLoaded, business, fetchAll, clearSession]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   if (loading) {
     return (

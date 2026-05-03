@@ -15,6 +15,7 @@ interface LoginResponse {
     id: number;
     name: string;
     plan: string;
+    wa_status: string;
     onboarding_complete: boolean;
   };
 }
@@ -51,8 +52,8 @@ export default function LoginPage() {
         {
           id: data.business.id,
           name: data.business.name,
-          plan: data.business.plan as any ?? 'free',
-          wa_status: 'not_connected',
+          plan: (data.business.plan ?? 'free') as any,
+          wa_status: (data.business.wa_status ?? 'not_connected') as any,
           onboarding_complete: data.business.onboarding_complete,
           response_language: 'sinhala_first',
           bot_name: 'AI Assistant',

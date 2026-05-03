@@ -98,4 +98,76 @@ body {
   .auth-success-box {
     @apply bg-green-50 border border-green-200 rounded-[10px] p-[14px] text-green-700 text-[0.84rem] mb-4 text-center leading-[1.6];
   }
+
+  /* Dashboard readability primitives */
+  .dashboard-shell {
+    @apply text-zinc-100;
+  }
+
+  .dashboard-shell .text-\[9px\],
+  .dashboard-shell .text-\[10px\],
+  .dashboard-shell .text-\[11px\] {
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  .dashboard-shell .text-zinc-700 {
+    color: #71717a;
+  }
+
+  .dashboard-shell .text-zinc-600 {
+    color: #a1a1aa;
+  }
+
+  .dashboard-shell .placeholder-zinc-600::placeholder {
+    color: #71717a;
+  }
+
+  .dash-page {
+    @apply max-w-7xl mx-auto pb-24;
+  }
+
+  .dash-page-title {
+    @apply text-2xl md:text-3xl font-black tracking-tight text-white;
+  }
+
+  .dash-page-subtitle {
+    @apply text-sm text-zinc-400 mt-1 leading-6;
+  }
+
+  .dash-card {
+    @apply rounded-2xl border border-zinc-800 bg-zinc-900/50;
+  }
+
+  .dash-label {
+    @apply text-xs font-bold uppercase tracking-widest text-zinc-400;
+  }
+
+  .dash-muted {
+    @apply text-sm text-zinc-400 leading-6;
+  }
+
+  .dash-empty {
+    @apply flex flex-col items-center justify-center text-center gap-3 rounded-2xl border border-dashed border-zinc-700 bg-zinc-900/30 p-8 text-zinc-300;
+  }
+
+  .dash-empty-title {
+    @apply text-sm font-bold text-zinc-100;
+  }
+
+  .dash-empty-copy {
+    @apply text-sm text-zinc-400 leading-6 max-w-md;
+  }
+
+  .dash-primary-action {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-black text-black shadow-lg shadow-emerald-500/15 transition-all hover:bg-emerald-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .dash-secondary-action {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-sm font-bold text-zinc-200 transition-all hover:border-zinc-600 hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500;
+  }
+
+  .dash-input {
+    @apply rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition-colors focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/20;
+  }
 }

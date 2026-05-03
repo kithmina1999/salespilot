@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { toast } from 'sonner';
+import { useAppStore } from '@/lib/store';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -140,6 +141,7 @@ export default function ConnectPage() {
   const [view, setView] = useState<ViewState>('not_connected');
   const [waState, setWaState] = useState<WAState | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
+  const fetchBusiness = useAppStore(s => s.fetchBusiness);
 
   // Form state
   const [phoneNumberId, setPhoneNumberId] = useState('');
@@ -185,6 +187,7 @@ export default function ConnectPage() {
       const data = await apiFetch<WAState>('/api/v1/whatsapp/status');
       setWaState(data);
       setView('connected');
+      fetchBusiness(); // Sync global store
       // Clear form
       setPhoneNumberId(''); setWabaId(''); setAccessToken('');
     } catch (err: unknown) {
@@ -203,9 +206,11 @@ export default function ConnectPage() {
       await apiFetch('/api/v1/whatsapp/test', { method: 'POST' });
       setTestResult('ok');
       toast.success('Credentials verified — connection is healthy!');
+      fetchBusiness(); // Sync global store
     } catch {
       setTestResult('fail');
       toast.error('Credentials are invalid or token has expired. Please reconnect.');
+      fetchBusiness(); // Sync global store
     } finally {
       setTesting(false);
     }
@@ -221,6 +226,7 @@ export default function ConnectPage() {
       setWaState(null);
       setTestResult(null);
       setView('not_connected');
+      fetchBusiness(); // Sync global store
     } catch {
       toast.error('Failed to disconnect. Try again.');
     } finally {

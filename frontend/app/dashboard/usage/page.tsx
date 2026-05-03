@@ -11,6 +11,7 @@ import PlanCompareTable  from '@/components/usage/PlanCompareTable';
 import PaymentHistoryCard from '@/components/usage/PaymentHistoryCard';
 import SubscribeTab      from '@/components/usage/SubscribeTab';
 import ActivateTab       from '@/components/usage/ActivateTab';
+import { DashboardSectionHeader, SegmentedControl } from '@/components/dashboard';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -95,34 +96,35 @@ export default function UsagePage() {
           Usage &amp; Plan
         </h1>
         <p className="text-sm text-zinc-500 mt-1">
-          Monitor your monthly usage and manage your subscription.
+          Monitor monthly limits, subscribe to a plan, or activate an approved billing code.
         </p>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex items-center gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-2xl mb-8">
-        {tabs.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`relative flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${
-              tab === t.id
-                ? 'bg-zinc-800 text-white shadow'
-                : 'text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            {t.icon}
-            {t.label}
-            {t.badge && (
-              <span className="absolute top-1.5 right-2 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-            )}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        label="Usage and billing section"
+        options={tabs.map(t => ({
+          value: t.id,
+          label: t.label,
+          icon: (
+            <span className="relative inline-flex">
+              {t.icon}
+              {t.badge && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-emerald-400" />}
+            </span>
+          ),
+        }))}
+        value={tab}
+        onChange={setTab}
+        className="mb-8"
+      />
 
       {/* ── Tab: My Plan ── */}
       {tab === 'plan' && (
         <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <DashboardSectionHeader
+            title="My Plan"
+            description="Limits reset monthly. Locked items require a paid plan or active trial."
+          />
+
           {/* Plan status with trial ring */}
           <PlanStatusCard onUpgrade={() => setTab('subscribe')} />
 

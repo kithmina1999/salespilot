@@ -33,7 +33,8 @@
     "products": "பொருட்கள்",
     "customers": "வாடிக்கையாளர்கள்",
     "faq_rules": "FAQ விதிகள்",
-    "analytics": "பகுப்பாய்வு",
+    "analytics": "Finance",
+    "finance": "Finance",
     "settings": "அமைப்புகள்",
     "billing": "பில்லிங்",
     "connect": "WhatsApp இணைப்பு",
@@ -77,8 +78,8 @@
     "trial_started": "உங்கள் 14-நாள் Starter trial தொடங்கிவிட்டது."
   },
   "dashboard": {
-    "title": "Command Center",
-    "subtitle": "நிகழ்நேர வணிக தகவல் — வருவாய், வாடிக்கையாளர்கள், AI செயல்திறன்.",
+    "title": "Dashboard Overview",
+    "subtitle": "Revenue, orders, customers, and bot performance in one place.",
     "welcome": "மீண்டும் வரவேற்கிறோம்",
     "overview": "கண்ணோட்டம்",
     "today": "இன்று",
