@@ -101,6 +101,7 @@ func TranslateRule(c *gin.Context) {
 	}
 
 	prompt := fmt.Sprintf(`Translate the following text into natural, conversational %s suitable for a WhatsApp business bot.
+Focus on translating the MEANING and INTENT naturally, rather than doing a strict word-for-word translation. Preserve the natural essence of the language.
 Preserve any formatting like *bold* or emojis. Do not add any introductory text, just return the translated string.
 
 Text:

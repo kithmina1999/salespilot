@@ -2,7 +2,8 @@
 import { useState, useEffect, Suspense } from 'react';
 import {
   Plus, Search, BookOpen, Cpu, BarChart3, AlertTriangle,
-  Sparkles, ShieldAlert, Edit2, Lock as LockIcon, Library, MessageSquare
+  Sparkles, ShieldAlert, Edit2, Lock as LockIcon, Library, MessageSquare,
+  Wand2
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -14,6 +15,7 @@ import { useRulesPage } from '@/hooks/useRulesPage';
 import { Rule, parseResponses } from './types';
 import { RuleModal, AIGenerateModal } from './components/RuleModal';
 import { RulesDataTable } from './components/RulesDataTable';
+import { BulkTranslateModal } from './components/BulkTranslateModal';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main content (wrapped in Suspense for useSearchParams)
@@ -57,6 +59,7 @@ function RulesContent() {
   const [generateIntent,    setGenerateIntent]    = useState('');
   const [generating, setGenerating] = useState(false);
   const [drafting,   setDrafting]   = useState(false);
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
 
   // Seed from URL — open create modal pre-filled
   useEffect(() => {
@@ -92,6 +95,28 @@ function RulesContent() {
   }
 
   // ── Handlers ──────────────────────────────────────────────────────────────
+
+  const handleBulkApprove = async (updatedRules: Rule[]) => {
+    try {
+      const token = localStorage.getItem('token');
+      // We can update them sequentially or all at once. For simplicity, sequential updates:
+      for (const rule of updatedRules) {
+        const res = await fetch(`/api/v1/rules/${rule.ID}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            responses: JSON.parse(rule.responses || '{}'),
+          }),
+        });
+        if (!res.ok) throw new Error(`Failed to update rule ${rule.ID}`);
+      }
+      import('sonner').then(m => m.toast.success('Bulk translations saved!'));
+      setBulkModalOpen(false);
+      revalidate();
+    } catch (err: any) {
+      import('sonner').then(m => m.toast.error(err.message));
+    }
+  };
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const token = localStorage.getItem('token');
@@ -254,6 +279,13 @@ function RulesContent() {
               <Sparkles size={16} /> Generate with AI
             </button>
           )}
+          <button
+            onClick={() => setBulkModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 sm:py-2 rounded-lg text-sm font-bold bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-white shadow-sm transition-transform hover:scale-105 flex-1 sm:flex-none justify-center"
+            style={{ minHeight: '44px' }}
+          >
+            <Wand2 size={16} className="text-amber-500" /> Bulk Translate
+          </button>
           <button
             onClick={openCreateModal}
             className="flex items-center gap-2 px-4 py-2.5 sm:py-2 rounded-lg text-sm font-bold bg-white hover:bg-zinc-200 text-black shadow-lg transition-transform hover:scale-105 flex-1 sm:flex-none justify-center"
@@ -447,6 +479,15 @@ function RulesContent() {
       </div>
 
       {/* ── Modals ── */}
+      {bulkModalOpen && (
+        <BulkTranslateModal
+          rules={customRules as any}
+          sourceLang="en"
+          targetLang="si"
+          onClose={() => setBulkModalOpen(false)}
+          onApprove={handleBulkApprove as any}
+        />
+      )}
       {(modalMode === 'create' || modalMode === 'edit_custom' || modalMode === 'clone_common') && (
         <RuleModal
           mode={modalMode}
