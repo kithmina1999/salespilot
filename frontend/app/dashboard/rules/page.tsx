@@ -303,20 +303,19 @@ function RulesContent() {
         {/* ── Missing Knowledge Inbox ── */}
         {stats.top_unmatched?.length > 0 && (
           <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 relative pt-2">
-              <div
-                className={`flex items-center justify-between p-4 rounded-xl border border-amber-500/20 bg-amber-500/10`}
-              >
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <ShieldAlert size={18} className="text-amber-500" />
-                  <h2 className="text-lg font-bold text-amber-500">Missing Knowledge Inbox</h2>
-                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-[10px] font-black text-amber-400 ml-2 tracking-wide uppercase">
-                    {stats.top_unmatched.length} Fails
-                  </span>
+              <div className="flex items-center justify-between p-4 rounded-xl border border-amber-500/20 bg-amber-500/10">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <ShieldAlert size={18} className="text-amber-500" />
+                    <h2 className="text-lg font-bold text-amber-500">Missing Knowledge Inbox</h2>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-[10px] font-black text-amber-400 ml-2 tracking-wide uppercase">
+                      {stats.top_unmatched.length} Fails
+                    </span>
+                  </div>
+                  <p className="text-sm text-zinc-400">
+                    Your bot failed to answer these questions recently. Convert them to rules to guarantee 24/7 resolution.
+                  </p>
                 </div>
-                <p className="text-sm text-zinc-400">
-                  Your bot failed to answer these questions recently. Convert them to rules to guarantee 24/7 resolution.
-                </p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto max-h-[280px] pr-2 custom-scrollbar">
                 {stats.top_unmatched.map((um, idx) => (
@@ -344,7 +343,6 @@ function RulesContent() {
                 ))}
               </div>
               </div>
-          </div>
         )}
 
         {/* ── Main Rules Engine UI (Tabs) ── */}
