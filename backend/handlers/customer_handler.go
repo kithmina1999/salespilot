@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
+	"gorm.io/gorm"
 )
 
 type UpsertCustomerRequest struct {
@@ -99,7 +100,9 @@ func ToggleBotPause(c *gin.Context) {
 	}
 
 	var customer models.Customer
-	if err := database.DB.Where(models.Customer{BusinessID: businessID, Phone: phone}).FirstOrCreate(&customer).Error; err != nil {
+	if err := database.DB.Where(models.Customer{BusinessID: businessID, Phone: phone}).
+		Assign(models.Customer{BusinessID: businessID, Phone: phone}).
+		FirstOrCreate(&customer).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to access customer profile"})
 		return
 	}
@@ -114,10 +117,13 @@ func ToggleBotPause(c *gin.Context) {
 		updates["bot_paused_until"] = &importTime
 	} else {
 		// Resume immediately
-		updates["bot_paused_until"] = nil
+		updates["bot_paused_until"] = gorm.Expr("NULL")
 	}
 
-	database.DB.Model(&customer).Updates(updates)
+	if err := database.DB.Model(&customer).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update bot status"})
+		return
+	}
 
 	// Fetch updated to return
 	database.DB.First(&customer, customer.ID)

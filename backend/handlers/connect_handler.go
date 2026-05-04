@@ -127,9 +127,21 @@ func TestMetaConnection(c *gin.Context) {
 		return
 	}
 
-	// Mark as confirmed connected
-	database.DB.Model(&biz).Update("wa_status", "connected")
-	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "Meta credentials verified successfully"})
+	now := time.Now()
+	database.DB.Model(&biz).Updates(map[string]interface{}{
+		"wa_status":    "connected",
+		"connected_at": now,
+	})
+
+	c.JSON(http.StatusOK, gin.H{
+		"ok":              true,
+		"message":         "Meta credentials verified successfully",
+		"status":          "connected",
+		"is_connected":    true,
+		"phone_number_id": biz.WAPhoneNumberID,
+		"waba_id":         biz.WABAID,
+		"connected_at":    now,
+	})
 }
 
 // ─────────────────────────────────────────────────────────────────

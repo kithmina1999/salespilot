@@ -82,7 +82,8 @@ export default function SettingsPage() {
   }, []);
 
   return (
-    <div className="max-w-5xl mx-auto pb-20">
+    <div className="max-w-7xl mx-auto w-full pb-12">
+      <div className="max-w-5xl mx-auto">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight mb-1 text-zinc-100 flex items-center gap-3">
@@ -146,6 +147,7 @@ export default function SettingsPage() {
           {activeTab === 'reports'   && <ReportsTab />}
           {activeTab === 'danger'    && <DangerZoneTab />}
         </div>
+      </div>
       </div>
     </div>
   );

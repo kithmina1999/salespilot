@@ -6,7 +6,7 @@ import ConnectionBanner from '@/components/ConnectionBanner';
 import TrialBanner from '@/components/TrialBanner';
 import TrialUpsellController from '@/components/TrialUpsellModal';
 import DashboardGuard from '@/components/DashboardGuard';
-import NotificationProvider from '@/components/NotificationProvider';
+import NotificationListener from '@/components/NotificationListener';
 import { SidebarProvider, useSidebar } from '@/components/SidebarContext';
 
 // Inner layout uses the context
@@ -50,12 +50,11 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <DashboardGuard>
-      <NotificationProvider>
-        <SidebarProvider>
-          <DashboardInner>{children}</DashboardInner>
-          <TrialUpsellController />
-        </SidebarProvider>
-      </NotificationProvider>
+      <NotificationListener />
+      <SidebarProvider>
+        <DashboardInner>{children}</DashboardInner>
+        <TrialUpsellController />
+      </SidebarProvider>
     </DashboardGuard>
   );
 }

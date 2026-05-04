@@ -221,7 +221,7 @@ export default function OverviewPage() {
     : 0;
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 p-2 md:p-6 pb-24">
+    <div className="max-w-7xl mx-auto w-full space-y-8 animate-in fade-in duration-500 pb-12">
 
       {/* ── Header ── */}
       <div className="flex items-start justify-between flex-wrap gap-4">

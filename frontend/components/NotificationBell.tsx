@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { Bell, MessageSquare, X, CheckCheck } from 'lucide-react';
-import { useNotifications, type NotifItem } from '@/components/NotificationProvider';
+import { useNotificationStore, type NotifItem } from '@/hooks/useNotificationStore';
+import { useNotificationQuery } from '@/hooks/useNotificationQuery';
 
 // ── Time formatter ─────────────────────────────────────────────────────────────
 
@@ -27,7 +28,8 @@ interface NotificationBellProps {
 
 export default function NotificationBell({ collapsed, mobile = false }: NotificationBellProps) {
   const router = useRouter();
-  const { notifications, markAllRead } = useNotifications();
+  const { notifications, clearAll, removeNotification } = useNotificationStore();
+  const { data, mutate } = useNotificationQuery();
   const [open, setOpen]       = useState(false);
   const [mounted, setMounted] = useState(false);
   const containerRef           = useRef<HTMLDivElement>(null);
@@ -36,7 +38,7 @@ export default function NotificationBell({ collapsed, mobile = false }: Notifica
   // SSR safety — portals need the DOM to exist
   useEffect(() => { setMounted(true); }, []);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = data?.total_unread || 0;
 
   // Close on outside click
   useEffect(() => {
@@ -66,15 +68,24 @@ export default function NotificationBell({ collapsed, mobile = false }: Notifica
   }
 
   function handleNotifClick(notif: NotifItem) {
-    // Mark all as read when user opens the panel and clicks
-    markAllRead();
+    // Remove specific notification from local dropdown
+    removeNotification(notif.id);
     setOpen(false);
     router.push(notif.route);
   }
 
-  function handleMarkAll(e: React.MouseEvent) {
+  async function handleMarkAll(e: React.MouseEvent) {
     e.stopPropagation();
-    markAllRead();
+    clearAll();
+    
+    try {
+      const token = localStorage.getItem('token');
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/dashboard/notifications/mark-read`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      mutate();
+    } catch (err) {}
   }
 
   return (
@@ -185,23 +196,17 @@ export default function NotificationBell({ collapsed, mobile = false }: Notifica
                       <button
                         key={notif.id}
                         onClick={() => handleNotifClick(notif)}
-                        className={`w-full text-left px-4 py-3 hover:bg-zinc-900/80 transition-colors flex items-start gap-3 group ${
-                          !notif.read ? 'bg-emerald-500/4' : ''
-                        }`}
+                        className={`w-full text-left px-4 py-3 hover:bg-zinc-900/80 transition-colors flex items-start gap-3 group bg-emerald-500/4`}
                       >
                         {/* Icon */}
-                        <div className={`mt-0.5 w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                          !notif.read
-                            ? 'bg-emerald-500/15 text-emerald-400'
-                            : 'bg-zinc-800 text-zinc-500'
-                        }`}>
+                        <div className={`mt-0.5 w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-emerald-500/15 text-emerald-400`}>
                           <MessageSquare size={13} />
                         </div>
 
                         {/* Content */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
-                            <p className={`text-sm font-bold truncate ${!notif.read ? 'text-white' : 'text-zinc-300'}`}>
+                            <p className={`text-sm font-bold truncate text-white`}>
                               {notif.title}
                             </p>
                             <span className="text-[10px] text-zinc-600 shrink-0">
@@ -217,9 +222,7 @@ export default function NotificationBell({ collapsed, mobile = false }: Notifica
                         </div>
 
                         {/* Unread dot */}
-                        {!notif.read && (
-                          <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 mt-2 shadow-sm shadow-emerald-500/50" />
-                        )}
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 mt-2 shadow-sm shadow-emerald-500/50" />
                       </button>
                     ))}
                   </div>

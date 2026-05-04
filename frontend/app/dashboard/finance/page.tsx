@@ -151,7 +151,7 @@ export default function FinancePage() {
   const maxRev = Math.max(...products.map(p => p.revenue), 1);
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-7xl mx-auto w-full space-y-6 pb-12">
 
       {/* Header */}
       <div className="flex items-start justify-between">

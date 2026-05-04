@@ -1,0 +1,15 @@
+done 1: regarding the whatsapp connection banner : it need a refresh to render new status need to fix that;
+done 1.1: AI Rule Gens AI-generated FAQ rules created this month. 0 / 3 but in daq it say ai gen is disabled for free plans
+done 2: regarding the whatsapp page: when we test connection we need to update whatsapp status in db to upto dat connection data since test connection doing manual updating the wahtsapp connection so we need to store them in db.
+done 3: regardign the bot pause button in chat page: it soemtime glsich out noly work whe nudpate suer profile we need to fix it to work normally.
+done 4: product update not working need to take a look.
+done 5: currently in /billing : when we have 0 more days left we need to udpate or current paln sectio ndispaly tiem from hours then to minutes whe n0 hours and 0 minutes left we need to udpate or current paln section status to canceld and disable all buttons. and di
+done 6: it say thatcurrent paln i on trial but say ai offline we need to get into conssitense whether we are on free paln or trial plan; after trial expired 
+7: need to add some ads about subscrbtion beenfits and lets tenants make susbcribe form free paln to paid
+8 : in /setting genral tab: we need to add drop down to add selected bot langauges to let tenant enter cusotm greeting in all languages otherwise use default faq if the langauge is availble for them.
+9: add remaing half implemented features in /settings tabs
+10: update Report tab to logs 
+11: Implemented a feature where user can complain or report about issue or bug and missing feature or requenst new features
+12: ssytem logs in /settings need to be optimized so in year so huge logs not to be cause troubles
+13: Make AI replaceable
+14:Make queue pluggable

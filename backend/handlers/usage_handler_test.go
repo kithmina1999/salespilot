@@ -87,3 +87,26 @@ func TestGetUsageEntitlementsFreeTrialUsesTrialLimits(t *testing.T) {
 		t.Fatalf("free trial should not allow cloudinary uploads")
 	}
 }
+
+func TestGetUsageEntitlementsExpiredPaidPlanFallsBackToFreeLimits(t *testing.T) {
+	now := time.Date(2026, 5, 3, 12, 0, 0, 0, time.UTC)
+	expiredAt := now.Add(-time.Minute)
+
+	ent := getUsageEntitlements(models.Business{
+		Plan:          models.PlanPro,
+		PlanExpiresAt: &expiredAt,
+	}, now)
+
+	if ent.ActiveTrial {
+		t.Fatalf("expired paid plan should not be treated as active trial")
+	}
+	if ent.MaxAIMessages != models.FreeAILimit {
+		t.Fatalf("MaxAIMessages = %d, want free limit %d", ent.MaxAIMessages, models.FreeAILimit)
+	}
+	if ent.MaxProducts != models.FreeProductLimit {
+		t.Fatalf("MaxProducts = %d, want free limit %d", ent.MaxProducts, models.FreeProductLimit)
+	}
+	if ent.CanUploadCloudinary {
+		t.Fatalf("expired paid plan should not keep paid upload access")
+	}
+}

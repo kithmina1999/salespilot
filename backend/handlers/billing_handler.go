@@ -33,6 +33,60 @@ var billingAmounts = map[string]map[string]float64{
 	},
 }
 
+type billingTimeRemaining struct {
+	Status        string
+	EffectivePlan string
+	ActiveTrial   bool
+	ExpiresAt     *time.Time
+	TotalSeconds  int64
+	Days          int
+	Hours         int
+	Minutes       int
+}
+
+func getBillingTimeRemaining(biz models.Business, now time.Time) billingTimeRemaining {
+	status := "free"
+	effectivePlan := models.PlanFree
+	var expiresAt *time.Time
+
+	switch {
+	case biz.Plan == models.PlanStarter || biz.Plan == models.PlanPro:
+		status = "paid_active"
+		effectivePlan = biz.Plan
+		expiresAt = biz.PlanExpiresAt
+	case biz.Plan == models.PlanFree && biz.TrialExpiresAt != nil && biz.TrialExpiresAt.After(now):
+		status = "trial_active"
+		effectivePlan = models.PlanFree
+		expiresAt = biz.TrialExpiresAt
+	}
+
+	if expiresAt == nil {
+		return billingTimeRemaining{Status: status, EffectivePlan: effectivePlan, ActiveTrial: status == "trial_active"}
+	}
+
+	remaining := expiresAt.Sub(now)
+	if remaining <= 0 {
+		if status == "paid_active" {
+			status = "expired_to_free"
+		} else {
+			status = "trial_expired_to_free"
+		}
+		return billingTimeRemaining{Status: status, EffectivePlan: models.PlanFree, ExpiresAt: expiresAt}
+	}
+
+	totalSeconds := int64(remaining.Seconds())
+	return billingTimeRemaining{
+		Status:        status,
+		EffectivePlan: effectivePlan,
+		ActiveTrial:   status == "trial_active",
+		ExpiresAt:     expiresAt,
+		TotalSeconds:  totalSeconds,
+		Days:          int(totalSeconds / 86400),
+		Hours:         int((totalSeconds % 86400) / 3600),
+		Minutes:       int((totalSeconds % 3600) / 60),
+	}
+}
+
 // generateOrderID creates a unique order ID per payment attempt.
 func generateOrderID(businessID uint) string {
 	return fmt.Sprintf("OC-%d-%d-%d", businessID, time.Now().Unix(), rand.Intn(9999))
@@ -52,23 +106,25 @@ func payhereHash(merchantID, orderID string, amount float64, currency, merchantS
 // ─────────────────────────────────────────────────────────────────
 func BillingStatus(c *gin.Context) {
 	businessID := c.GetUint("business_id")
+	now := time.Now()
 	var biz models.Business
 	if err := database.DB.First(&biz, businessID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Business not found"})
 		return
 	}
+	remaining := getBillingTimeRemaining(biz, now)
 
 	// Determine days remaining if plan is active
 	var daysRemaining *int
-	if biz.PlanExpiresAt != nil && biz.PlanExpiresAt.After(time.Now()) {
-		d := int(time.Until(*biz.PlanExpiresAt).Hours() / 24)
+	if biz.PlanExpiresAt != nil && biz.PlanExpiresAt.After(now) {
+		d := int(biz.PlanExpiresAt.Sub(now).Hours() / 24)
 		daysRemaining = &d
 	}
 
 	// Trial days remaining
 	var trialDaysRemaining *int
-	if biz.TrialExpiresAt != nil && biz.TrialExpiresAt.After(time.Now()) {
-		d := int(time.Until(*biz.TrialExpiresAt).Hours() / 24)
+	if biz.TrialExpiresAt != nil && biz.TrialExpiresAt.After(now) {
+		d := int(biz.TrialExpiresAt.Sub(now).Hours() / 24)
 		trialDaysRemaining = &d
 	}
 
@@ -87,11 +143,18 @@ func BillingStatus(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"plan":                  biz.Plan,
+		"effective_plan":        remaining.EffectivePlan,
+		"status":                remaining.Status,
+		"active_trial":          remaining.ActiveTrial,
 		"billing_cycle":         biz.BillingCycle,
 		"plan_expires_at":       biz.PlanExpiresAt,
 		"days_remaining":        daysRemaining,
 		"trial_expires_at":      biz.TrialExpiresAt,
 		"trial_days_remaining":  trialDaysRemaining,
+		"expires_at":            remaining.ExpiresAt,
+		"seconds_remaining":     remaining.TotalSeconds,
+		"hours_remaining":       remaining.Hours,
+		"minutes_remaining":     remaining.Minutes,
 		"grace_period":          gracePeriodActive,
 		"grace_ends_at":         graceEndsAt,
 		"ai_message_count":      biz.AIMessageCount,
@@ -267,8 +330,8 @@ outer:
 	}
 
 	database.DB.Model(&biz).Updates(map[string]interface{}{
-		"plan": detectedPlan,
-		"billing_cycle": detectedCycle,
+		"plan":             detectedPlan,
+		"billing_cycle":    detectedCycle,
 		"plan_expires_at":  expiresAt,
 		"payhere_order_id": paymentID,
 	})

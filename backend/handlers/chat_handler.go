@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
@@ -62,28 +63,41 @@ func ListChats(c *gin.Context) {
 
 // GetChatProfile returns the full chat log, the customer profile, and the order history for a single phone number.
 func GetChatProfile(c *gin.Context) {
-	db := c.MustGet("db").(*gorm.DB)
+	businessID := c.GetUint("business_id")
 	phone := c.Param("phone")
+	markRead := c.Query("mark_read") == "true"
 
-	// 1. Get all messages
+	// 1. Get all messages for this business
 	var messages []models.Message
-	if err := db.Where("phone = ?", phone).Order("created_at ASC").Find(&messages).Error; err != nil {
+	if err := database.DB.Where("phone = ? AND business_id = ?", phone, businessID).Order("created_at ASC").Find(&messages).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch messages"})
 		return
 	}
 
-	// 2. Auto-mark all unread user messages as read (merchant opened the chat)
-	db.Model(&models.Message{}).
-		Where("phone = ? AND role = 'user' AND is_read = false", phone).
-		Update("is_read", true)
+	// 2. Only mark messages as read when merchant explicitly opens the chat (not on background polls)
+	if markRead {
+		database.DB.Model(&models.Message{}).
+			Where("phone = ? AND business_id = ? AND role = 'user' AND is_read = false", phone, businessID).
+			Update("is_read", true)
+	}
 
-	// 3. Get customer profile (might be empty if they never placed an order or we never upserted them)
+	// 3. Get customer profile (scoped to this business)
 	var customer models.Customer
-	db.Where("phone = ?", phone).First(&customer)
+	database.DB.Where("phone = ? AND business_id = ?", phone, businessID).First(&customer)
+
+	// Auto-clear expired pause state before returning it to the frontend to prevent UI loops
+	if customer.BotPaused && customer.BotPausedUntil != nil && time.Now().After(*customer.BotPausedUntil) {
+		database.DB.Model(&customer).Updates(map[string]interface{}{
+			"bot_paused":       false,
+			"bot_paused_until": gorm.Expr("NULL"),
+		})
+		customer.BotPaused = false
+		customer.BotPausedUntil = nil
+	}
 
 	// 4. Get order history
 	var orders []models.Order
-	db.Where("customer_phone = ?", phone).Order("created_at DESC").Find(&orders)
+	database.DB.Where("customer_phone = ? AND business_id = ?", phone, businessID).Order("created_at DESC").Find(&orders)
 
 	// Build the response payload
 	c.JSON(http.StatusOK, gin.H{
@@ -173,6 +187,24 @@ func GetNotifications(c *gin.Context) {
 		"unread_threads": result.UnreadThreads,
 		"latest":         latest,
 	})
+}
+
+// MarkAllNotificationsRead marks all unread messages that require merchant attention as read.
+func MarkAllNotificationsRead(c *gin.Context) {
+	businessID := c.GetUint("business_id")
+
+	var phones []string
+	database.DB.Model(&models.Customer{}).
+		Where("business_id = ? AND bot_paused = true AND (bot_paused_until IS NULL OR bot_paused_until > NOW())", businessID).
+		Pluck("phone", &phones)
+
+	if len(phones) > 0 {
+		database.DB.Model(&models.Message{}).
+			Where("business_id = ? AND role = 'user' AND is_read = false AND phone IN ?", businessID, phones).
+			Update("is_read", true)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "All notifications marked as read"})
 }
 
 // SendManualReply allows merchants to override the bot and send a manual message from the dashboard

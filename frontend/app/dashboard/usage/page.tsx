@@ -87,7 +87,8 @@ export default function UsagePage() {
   const isPaid = plan === 'starter' || plan === 'pro';
 
   return (
-    <div className="max-w-3xl mx-auto pb-24">
+    <div className="max-w-7xl mx-auto w-full pb-12">
+      <div className="max-w-3xl mx-auto">
 
       {/* Page header */}
       <div className="pb-6 mb-8 border-b border-zinc-800">
@@ -164,6 +165,7 @@ export default function UsagePage() {
           onGoSubscribe={() => setTab('subscribe')}
         />
       )}
+      </div>
     </div>
   );
 }

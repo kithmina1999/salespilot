@@ -243,6 +243,17 @@ export default function ProductsPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const price = Number.parseFloat(form.price);
+    const stock = Number.parseInt(form.stock, 10);
+    if (!Number.isFinite(price) || price < 0) {
+      toast.error('Enter a valid product price');
+      return;
+    }
+    if (!Number.isFinite(stock) || stock < 0) {
+      toast.error('Enter a valid stock quantity');
+      return;
+    }
+
     const token = localStorage.getItem('token');
     const url = modalMode === 'create'
       ? `${API_URL}/api/v1/products`
@@ -253,7 +264,7 @@ export default function ProductsPage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           name: form.name, category: form.category,
-          price: parseFloat(form.price), stock: parseInt(form.stock),
+          price, stock,
           description: form.description, active: form.active,
           retailer_id: form.retailer_id,
         }),
@@ -261,8 +272,11 @@ export default function ProductsPage() {
       if (res.ok) {
         toast.success(modalMode === 'create' ? 'Product created' : 'Product updated');
         setModalMode(null);
-        revalidate(); // SWR revalidation replaces manual fetchProducts()
-      } else { toast.error('Failed to save product'); }
+        await revalidate(); // SWR revalidation replaces manual fetchProducts()
+      } else {
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error || 'Failed to save product');
+      }
     } catch { toast.error('Network error'); }
   }
 
@@ -279,7 +293,7 @@ export default function ProductsPage() {
   const catalogConnected = !!catalogID;
 
   return (
-    <div className="max-w-6xl mx-auto pb-12">
+    <div className="max-w-7xl mx-auto w-full pb-12">
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>

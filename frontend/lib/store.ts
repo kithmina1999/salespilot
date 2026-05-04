@@ -80,6 +80,12 @@ export interface AppUsage {
 export interface AppPricing {
   starter: { monthly: number; annual: number };
   pro: { monthly: number; annual: number };
+  status: 'free' | 'trial_active' | 'trial_expired_to_free' | 'paid_active' | 'expired_to_free' | 'paid_grace';
+  active_trial: boolean;
+  expires_at: string | null;
+  seconds_remaining: number;
+  hours_remaining: number;
+  minutes_remaining: number;
   promo_active: boolean;
   promo_ends_at: string;
   trial_days_remaining: number | null;
@@ -242,6 +248,12 @@ export const useAppStore = create<AppState>()(
               pricing: {
                 starter: b.pricing?.starter ?? { monthly: 1490, annual: 14900 },
                 pro: b.pricing?.pro ?? { monthly: 3490, annual: 34900 },
+                status: b.status ?? 'free',
+                active_trial: b.active_trial ?? false,
+                expires_at: b.expires_at ?? null,
+                seconds_remaining: b.seconds_remaining ?? 0,
+                hours_remaining: b.hours_remaining ?? 0,
+                minutes_remaining: b.minutes_remaining ?? 0,
                 promo_active: b.promo_active ?? false,
                 promo_ends_at: b.promo_ends_at ?? '',
                 trial_days_remaining: b.trial_days_remaining ?? null,
@@ -249,7 +261,7 @@ export const useAppStore = create<AppState>()(
               },
               // Also update business plan from billing (most authoritative source)
               business: get().business
-                ? { ...get().business!, plan: b.plan }
+                ? { ...get().business!, plan: (b.effective_plan ?? b.plan) }
                 : get().business,
             });
           }

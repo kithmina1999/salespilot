@@ -852,7 +852,7 @@ export default function OrdersPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="max-w-7xl mx-auto w-full space-y-5 pb-12">
 
       {/* Header */}
       <div className="flex items-start justify-between">

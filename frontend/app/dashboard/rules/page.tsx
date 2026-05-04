@@ -215,7 +215,7 @@ function RulesContent() {
   // Render
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-6xl mx-auto pb-12">
+    <div className="max-w-7xl mx-auto w-full pb-12">
 
       {/* Upgrade banner */}
       {upgradeMessage && (

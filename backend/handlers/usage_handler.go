@@ -32,8 +32,10 @@ func getUsageEntitlements(biz models.Business, now time.Time) usageEntitlements 
 		MaxStorageBytes:   0,
 	}
 
-	switch biz.Plan {
-	case models.PlanStarter:
+	paidPlanActive := biz.PlanExpiresAt == nil || biz.PlanExpiresAt.After(now)
+
+	switch {
+	case biz.Plan == models.PlanStarter && paidPlanActive:
 		ent.MaxProducts = 100
 		ent.MaxRules = -1
 		ent.MaxAIMessages = models.StarterAILimit
@@ -43,7 +45,7 @@ func getUsageEntitlements(biz models.Business, now time.Time) usageEntitlements 
 		ent.CanUploadCloudinary = true
 		ent.CanSendWhatsAppImages = true
 		return ent
-	case models.PlanPro:
+	case biz.Plan == models.PlanPro && paidPlanActive:
 		ent.MaxProducts = -1
 		ent.MaxRules = -1
 		ent.MaxAIMessages = models.ProAILimit

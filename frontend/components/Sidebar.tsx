@@ -9,10 +9,10 @@ import {
   QrCode, LogOut, ShoppingBag, Settings, CreditCard,
   X, ChevronLeft, ChevronRight, TrendingUp,
 } from 'lucide-react';
-import { useNotifications } from '@/components/NotificationProvider';
 import NotificationBell from '@/components/NotificationBell';
 import { useSidebar } from './SidebarContext';
 import { useLocale } from '@/lib/locale';
+import { useNotificationQuery } from '@/hooks/useNotificationQuery';
 
 interface SidebarProps {
   /** Mobile open state — controlled by layout */
@@ -24,7 +24,8 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [showLogout, setShowLogout] = useState(false);
-  const { totalUnread } = useNotifications();
+  const { data } = useNotificationQuery();
+  const unreadCount = data?.total_unread || 0;
   const { collapsed, setCollapsed } = useSidebar();
   const { t } = useLocale();
 
@@ -126,9 +127,9 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
               <div className="relative shrink-0">
                 <Icon size={16} />
-                {isChats && totalUnread > 0 && (
+                {isChats && unreadCount > 0 && (
                   <span className="absolute -top-1.5 -right-2 bg-red-500 text-white text-[8px] font-black min-w-[14px] h-[14px] rounded-full flex items-center justify-center px-0.5 leading-none">
-                    {totalUnread > 99 ? '99+' : totalUnread}
+                    {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 )}
               </div>
