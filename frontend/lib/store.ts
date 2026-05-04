@@ -102,6 +102,9 @@ interface AppState {
   usage: AppUsage | null;
   pricing: AppPricing | null;
 
+  // Appearance
+  appearance: { fontScale: 'sm' | 'md' | 'lg' | 'xl' };
+
   // Load state
   businessLoaded: boolean;
   usageLoaded: boolean;
@@ -125,6 +128,8 @@ interface AppState {
 
   /** Update onboarding complete flag after finishing wizard */
   markOnboardingComplete: () => void;
+
+  setFontScale: (scale: 'sm' | 'md' | 'lg' | 'xl') => void;
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────
@@ -138,6 +143,7 @@ export const useAppStore = create<AppState>()(
       business: null,
       usage: null,
       pricing: null,
+      appearance: { fontScale: 'md' },
       businessLoaded: false,
       usageLoaded: false,
 
@@ -282,13 +288,16 @@ export const useAppStore = create<AppState>()(
             : state.business,
         }));
       },
+
+      setFontScale: (scale) => set({ appearance: { fontScale: scale } }),
     }),
 
     {
       name: 'salespilot-app',           // localStorage key
-      partialize: (state) => ({         // Only persist auth — data re-fetched on mount
+      partialize: (state) => ({         // Only persist auth and appearance
         token: state.token,
         user: state.user,
+        appearance: state.appearance,
       }),
     }
   )

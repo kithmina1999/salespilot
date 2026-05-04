@@ -15,7 +15,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
   const { collapsed } = useSidebar();
 
   return (
-    <div className="flex min-h-screen bg-zinc-950">
+    <div className="flex min-h-screen bg-background">
       {/* Sidebar — handles desktop (collapsible) + mobile (drawer) */}
       <Sidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
 
@@ -24,16 +24,16 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
 
         {/* ── Mobile Top Bar ── */}
         <header
-          className="md:hidden flex items-center gap-3 px-4 h-14 border-b border-zinc-800/70 shrink-0 bg-zinc-950"
+          className="md:hidden flex items-center gap-3 px-4 h-14 border-b border-border shrink-0 bg-background"
         >
           <button
             onClick={() => setMobileOpen(true)}
-            className="flex items-center justify-center w-9 h-9 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+            className="flex items-center justify-center w-9 h-9 rounded-lg text-muted-foreground hover:text-accent-foreground hover:bg-accent transition-colors"
             aria-label="Open menu"
           >
             <Menu size={20} />
           </button>
-          <span className="text-sm font-bold text-zinc-200 tracking-tight">SalesPilot</span>
+          <span className="text-sm font-bold text-foreground tracking-tight">SalesPilot</span>
         </header>
 
         <TrialBanner />

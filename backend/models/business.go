@@ -19,7 +19,7 @@ const (
 )
 // Plan Limits
 const (
-    FreeMsgLimit         = 300    // inbound messages/month
+    FreeMsgLimit         = 500    // inbound messages/month
     FreeRuleLimit        = 10     // active FAQ rules
     FreeAILimit          = 0      // AI replies (trial handled separately)
     FreeRuleGenLimit     = 3      // AI rule generations
@@ -58,7 +58,7 @@ type Business struct {
 	WABAID          string     `json:"waba_id"`                              // set when tenant connects Meta account
 	WAAccessToken   string     `json:"wa_access_token"`                      // set when tenant connects Meta account
 	BotName         string     `json:"bot_name" gorm:"default:'AI Assistant'"`
-	GreetingMessage string     `json:"greeting_message"`
+	BotPersonality string     `json:"bot_personality"`
 	OperatingHours  string     `json:"operating_hours"`
 	DeliveryPolicy  string     `json:"delivery_policy"`
 	ConnectedAt     *time.Time `json:"connected_at"`

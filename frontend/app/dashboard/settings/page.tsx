@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { UserCog, Shield, ShieldCheck, Bell, History, AlertTriangle, Settings, Globe, Banknote } from 'lucide-react';
+import { UserCog, Shield, ShieldCheck, Bell, History, AlertTriangle, Settings, Globe, Banknote, Monitor } from 'lucide-react';
 import GeneralTab from './_components/GeneralTab';
+import AppearanceTab from './_components/AppearanceTab';
 import SecurityTab from './_components/SecurityTab';
 import BlockedNumbersTab from './_components/BlockedNumbersTab';
 import AuditLogTab from './_components/AuditLogTab';
@@ -17,7 +18,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 export type BusinessSettings = {
   name: string;
   bot_name: string;
-  greeting_message: string;
+  bot_personality: string;
   operating_hours: string;
   delivery_policy: string;
   response_language: string;
@@ -48,6 +49,7 @@ export default function SettingsPage() {
 
   const TABS = [
     { id: 'general',   label: t('settings.general'),  icon: UserCog,       color: 'text-emerald-400' },
+    { id: 'appearance',label: 'Appearance',             icon: Monitor,       color: 'text-pink-400'    },
     { id: 'language',  label: t('settings.language'),  icon: Globe,         color: 'text-blue-400'    },
     { id: 'payments',  label: 'Payments',               icon: Banknote,      color: 'text-emerald-400' },
     { id: 'security',  label: t('settings.security'),  icon: Shield,        color: 'text-blue-400'    },
@@ -58,7 +60,7 @@ export default function SettingsPage() {
   ];
 
   const [settings, setSettings] = useState<BusinessSettings>({
-    name: '', bot_name: '', greeting_message: '',
+    name: '', bot_name: '', bot_personality: '',
     operating_hours: '', delivery_policy: '',
     response_language: 'sinhala_first',
     bot_reply_language: 'en',
@@ -86,11 +88,11 @@ export default function SettingsPage() {
       <div className="max-w-5xl mx-auto">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-1 text-zinc-100 flex items-center gap-3">
-          <Settings size={28} className="text-zinc-500" />
+        <h1 className="text-3xl font-bold tracking-tight mb-1 text-foreground flex items-center gap-3">
+          <Settings size={28} className="text-muted-foreground" />
           {t('settings.title')}
         </h1>
-        <p className="text-sm text-zinc-400">{t('settings.general')} — {t('settings.security').toLowerCase()}, {t('settings.language').toLowerCase()}.</p>
+        <p className="text-sm text-muted-foreground">{t('settings.general')} — {t('settings.security').toLowerCase()}, {t('settings.language').toLowerCase()}.</p>
       </div>
 
       <div className="flex flex-col md:flex-row gap-6">
@@ -104,8 +106,8 @@ export default function SettingsPage() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
                   activeTab === tab.id
-                    ? 'bg-zinc-800 text-white'
-                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'
+                    ? 'bg-accent text-accent-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
                 }`}
               >
                 <tab.icon size={14} className={activeTab === tab.id ? tab.color : ''} />
@@ -122,13 +124,13 @@ export default function SettingsPage() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-all ${
                   activeTab === tab.id
-                    ? 'bg-zinc-800/80 text-white shadow-sm'
-                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/50'
-                } ${tab.id === 'danger' ? 'mt-4 border-t border-zinc-800 pt-4' : ''}`}
+                    ? 'bg-accent text-accent-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                } ${tab.id === 'danger' ? 'mt-4 border-t border-border pt-4' : ''}`}
               >
                 <tab.icon
                   size={15}
-                  className={`shrink-0 transition-colors ${activeTab === tab.id ? tab.color : 'text-zinc-600 group-hover:text-zinc-400'}`}
+                  className={`shrink-0 transition-colors ${activeTab === tab.id ? tab.color : 'text-muted-foreground group-hover:text-foreground'}`}
                 />
                 {tab.label}
               </button>
@@ -139,6 +141,7 @@ export default function SettingsPage() {
         {/* ── Tab Content ── */}
         <div className="flex-1 min-w-0 animate-in fade-in slide-in-from-bottom-1 duration-200" key={activeTab}>
           {activeTab === 'general'   && <GeneralTab settings={settings} setSettings={setSettings} billing={billing} />}
+          {activeTab === 'appearance'&& <AppearanceTab />}
           {activeTab === 'language'  && <LanguageTab settings={settings} />}
           {activeTab === 'payments'  && <PaymentsTab />}
           {activeTab === 'security'  && <SecurityTab />}

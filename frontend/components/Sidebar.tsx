@@ -13,6 +13,8 @@ import NotificationBell from '@/components/NotificationBell';
 import { useSidebar } from './SidebarContext';
 import { useLocale } from '@/lib/locale';
 import { useNotificationQuery } from '@/hooks/useNotificationQuery';
+import { useAppStore } from '@/lib/store';
+import { Zap } from 'lucide-react';
 
 interface SidebarProps {
   /** Mobile open state — controlled by layout */
@@ -28,6 +30,12 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const unreadCount = data?.total_unread || 0;
   const { collapsed, setCollapsed } = useSidebar();
   const { t } = useLocale();
+
+  const business = useAppStore((s) => s.business);
+  const usage = useAppStore((s) => s.usage);
+  const isFreePlan = business?.plan === 'free';
+  const isTrialActive = usage?.active_trial === true;
+  const showUpgradeAd = isFreePlan && !isTrialActive;
 
   // Nav items built inside component so labels re-render on locale change
   const nav = [
@@ -65,12 +73,12 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   // ── Shared sidebar body (used for both desktop + mobile) ───────────────────
   const SidebarBody = ({ mobile = false }: { mobile?: boolean }) => (
     <aside
-      className={`flex flex-col h-full  bg-zinc-950 border-r border-zinc-800/70 transition-all duration-300 ease-in-out ${
+      className={`flex flex-col h-full bg-sidebar border-r border-sidebar-border transition-all duration-300 ease-in-out ${
         mobile ? 'w-64' : collapsed ? 'w-[60px]' : 'w-56'
       }`}
     >
       {/* ── Logo row ───────────────────────────────────────────────────────── */}
-      <div className={`flex items-center border-b border-zinc-800/70 shrink-0 h-14 ${collapsed && !mobile ? 'justify-center px-0' : 'px-4 justify-between'}`}>
+      <div className={`flex items-center border-b border-sidebar-border shrink-0 h-14 ${collapsed && !mobile ? 'justify-center px-0' : 'px-4 justify-between'}`}>
         {(!collapsed || mobile) && (
           <Image
             src="/assets/logo-text.jpeg"
@@ -85,7 +93,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         {!mobile && (
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className={`flex items-center justify-center w-7 h-7 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors ${collapsed ? '' : ''}`}
+            className={`flex items-center justify-center w-7 h-7 rounded-lg text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors ${collapsed ? '' : ''}`}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {collapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
@@ -95,7 +103,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         {mobile && (
           <button
             onClick={onMobileClose}
-            className="flex items-center justify-center w-7 h-7 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors"
+            className="flex items-center justify-center w-7 h-7 rounded-lg text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
           >
             <X size={15} />
           </button>
@@ -116,8 +124,8 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               title={collapsed && !mobile ? (NAV_FALLBACK[href] ?? label) : undefined}
               className={`group relative flex items-center gap-3 px-2.5 py-2.5 rounded-lg text-sm transition-all duration-150 ${
                 active
-                  ? 'bg-emerald-500/10 text-emerald-400 font-semibold'
-                  : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold'
+                  : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50'
               }`}
             >
               {/* Active indicator */}
@@ -141,7 +149,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
               {/* Tooltip for collapsed desktop state */}
               {collapsed && !mobile && (
-                <span className="pointer-events-none absolute left-full ml-3 px-2 py-1 rounded-md bg-zinc-800 border border-zinc-700 text-xs text-zinc-200 font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity shadow-xl z-50">
+                <span className="pointer-events-none absolute left-full ml-3 px-2 py-1 rounded-md bg-popover border border-border text-xs text-popover-foreground font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity shadow-xl z-50">
                   {NAV_FALLBACK[href] ?? label}
                 </span>
               )}
@@ -151,18 +159,37 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       </nav>
 
       {/* ── Notification Bell + Logout ─────────────────────────────────────── */}
-      <div className="px-2 pb-3 border-t border-zinc-800/70 pt-2 space-y-0.5">
+      <div className="px-2 pb-3 border-t border-sidebar-border pt-2 space-y-0.5">
+        {/* Sidebar Upgrade Ad */}
+        {showUpgradeAd && (!collapsed || mobile) && (
+          <div className="mb-2 p-3 bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-xl">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <Zap size={14} className="text-amber-500 fill-amber-500" />
+              <span className="text-xs font-bold text-amber-500 tracking-wide uppercase">Reactivate AI</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground leading-snug mb-2.5">
+              Upgrade to unlock up to 5,000 AI replies & unlimited inbound messages.
+            </p>
+            <Link
+              href="/dashboard/usage"
+              className="block w-full py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-500 text-[11px] font-bold text-center rounded-lg transition-colors"
+            >
+              Upgrade Now
+            </Link>
+          </div>
+        )}
+
         <NotificationBell collapsed={collapsed} mobile={mobile} />
 
         <button
           onClick={() => setShowLogout(true)}
           title={collapsed && !mobile ? t('nav.logout') : undefined}
-          className="group relative w-full flex items-center gap-3 px-2.5 py-2.5 rounded-lg text-sm text-zinc-500 hover:text-red-400 hover:bg-red-500/5 transition-all"
+          className="group relative w-full flex items-center gap-3 px-2.5 py-2.5 rounded-lg text-sm text-sidebar-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-all"
         >
           <LogOut size={16} className="shrink-0" />
           {(!collapsed || mobile) && <span>{t('nav.logout')}</span>}
           {collapsed && !mobile && (
-            <span className="pointer-events-none absolute left-full ml-3 px-2 py-1 rounded-md bg-zinc-800 border border-zinc-700 text-xs text-zinc-200 font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity shadow-xl z-50">
+            <span className="pointer-events-none absolute left-full ml-3 px-2 py-1 rounded-md bg-popover border border-border text-xs text-popover-foreground font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity shadow-xl z-50">
               {t('nav.logout')}
             </span>
           )}
@@ -199,20 +226,20 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       {/* ── Logout confirm modal ──────────────────────────────────────────── */}
       {showLogout && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-60 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="bg-background border border-border rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">
                 <LogOut size={19} className="text-red-400" />
               </div>
-              <h3 className="text-base font-bold text-white">{t('auth.logout')}</h3>
+              <h3 className="text-base font-bold text-foreground">{t('auth.logout')}</h3>
             </div>
-            <p className="text-sm text-zinc-400 mb-6 leading-relaxed">
+            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
               {t('common.confirm')}? {t('auth.logout').toLowerCase()} SalesPilot?
             </p>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setShowLogout(false)}
-                className="px-5 py-2 rounded-xl text-sm font-bold text-zinc-300 hover:bg-zinc-800 transition-colors"
+                className="px-5 py-2 rounded-xl text-sm font-bold text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
               >
                 {t('common.cancel')}
               </button>

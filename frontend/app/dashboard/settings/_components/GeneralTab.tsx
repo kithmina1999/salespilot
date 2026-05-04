@@ -122,17 +122,35 @@ export default function GeneralTab({ settings, setSettings, billing }: Props) {
           </div>
 
           <div>
-            <label className={labelCls}>System Greeting / Brand Voice</label>
+            <label className={labelCls}>Bot Personality & Instructions</label>
             <textarea
-              value={settings.greeting_message}
-              onChange={e => update('greeting_message', e.target.value)}
-              placeholder="e.g. We are a premium electronics store. Keep answers short and friendly."
-              rows={3}
+              value={settings.bot_personality || ''}
+              onChange={e => update('bot_personality', e.target.value)}
+              placeholder="e.g. You are a friendly and helpful assistant. Keep your answers very short (1-2 sentences). Always be polite."
+              rows={4}
               className={`${inputCls} resize-none leading-relaxed`}
             />
-            <p className="text-[11px] mt-1.5 text-zinc-600">
-              Sets the AI's tone and persona. Leave blank to use the default assistant style.
-            </p>
+            <div className="mt-2 space-y-1.5">
+              <p className="text-[11px] text-zinc-500">
+                Define how the AI behaves and speaks across all languages. The AI will automatically translate this persona.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => update('bot_personality', "You are a friendly and casual sales assistant. Keep your answers extremely short, natural, and use emojis. Encourage the customer to ask questions.")}
+                  className="text-[10px] px-2 py-1 rounded bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
+                >
+                  Use Friendly Default
+                </button>
+                <button
+                  type="button"
+                  onClick={() => update('bot_personality', "You are a highly professional and polite customer support agent. Provide clear, direct, and formal answers without emojis.")}
+                  className="text-[10px] px-2 py-1 rounded bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
+                >
+                  Use Professional Default
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="flex justify-end pt-2">

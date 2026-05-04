@@ -13,3 +13,4 @@ done 6: it say thatcurrent paln i on trial but say ai offline we need to get int
 12: ssytem logs in /settings need to be optimized so in year so huge logs not to be cause troubles
 13: Make AI replaceable
 14:Make queue pluggable
+15: Proposal: Move Bot Personality into a dedicated settings tab with pre-made templates and testing preview.

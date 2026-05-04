@@ -135,7 +135,7 @@ export default function TrialBanner() {
           )}
           {phase === 'expiring' && (
             <p className="text-sm font-bold" style={{ color: style.accent }}>
-              Your AI has stopped. Customers get no reply.
+              Your Starter Trial has expired and AI is disabled. Upgrade to reactivate.
             </p>
           )}
         </div>
@@ -215,7 +215,7 @@ export default function TrialBanner() {
           )}
           {phase === 'expiring' && (
             <p className="text-sm font-bold" style={{ color: style.accent }}>
-              Your AI has stopped. Customers messaging you right now are getting no reply.
+              Your Starter Trial has expired and AI is disabled. Upgrade to a paid plan to reactivate your AI Assistant, unlock up to 5,000 AI replies, and get unlimited inbound messages.
             </p>
           )}
         </div>

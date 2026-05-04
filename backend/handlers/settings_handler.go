@@ -14,7 +14,7 @@ import (
 type SettingsUpdateRequest struct {
 	Name              string `json:"name"`
 	BotName           string `json:"bot_name"`
-	GreetingMessage   string `json:"greeting_message"`
+	BotPersonality    string `json:"bot_personality"`
 	OperatingHours    string `json:"operating_hours"`
 	DeliveryPolicy    string `json:"delivery_policy"`
 	MetaCatalogID     string `json:"meta_catalog_id"`
@@ -50,7 +50,7 @@ func GetBusinessSettings(c *gin.Context) {
 		"plan":                 biz.Plan,
 		"ai_message_count":     biz.AIMessageCount,
 		"ai_message_limit":     biz.AIMessageLimit,
-		"greeting_message":     biz.GreetingMessage,
+		"bot_personality":      biz.BotPersonality,
 		"operating_hours":      biz.OperatingHours,
 		"delivery_policy":      biz.DeliveryPolicy,
 		"onboarding_complete":  biz.OnboardingComplete,
@@ -92,7 +92,7 @@ func UpdateBusinessSettings(c *gin.Context) {
 		biz.Name = req.Name
 	}
 	biz.BotName = req.BotName
-	biz.GreetingMessage = req.GreetingMessage
+	biz.BotPersonality = req.BotPersonality
 	biz.OperatingHours = req.OperatingHours
 	biz.DeliveryPolicy = req.DeliveryPolicy
 	biz.MetaCatalogID = req.MetaCatalogID
