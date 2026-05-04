@@ -17,16 +17,16 @@ import (
 	"gorm.io/gorm"
 )
 
-// ListRules fetches all Global (Common) rules and all Custom rules for the tenant
+// ListRules fetches all RuleTemplates and all Custom rules for the tenant
 func ListRules(c *gin.Context) {
 	db := c.MustGet("db").(*gorm.DB)
 
-	var commonRules []models.Rule
+	var commonRules []models.RuleTemplate
 	var customRules []models.Rule
 
-	// Fetch Common Rules (BusinessID is NULL)
-	if err := database.DB.Where("business_id IS NULL").Find(&commonRules).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch common rules"})
+	// Fetch Rule Templates
+	if err := database.DB.Find(&commonRules).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch rule templates"})
 		return
 	}
 
@@ -37,9 +37,49 @@ func ListRules(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"common_rules": commonRules,
+		"common_rules": commonRules, // Keeping key as common_rules for backwards compatibility with frontend initially
 		"custom_rules": customRules,
 	})
+}
+
+// CloneTemplate copies a RuleTemplate into the business's custom rules
+func CloneTemplate(c *gin.Context) {
+	businessID := c.GetUint("business_id")
+	
+	var req struct {
+		TemplateID uint `json:"template_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Template ID is required"})
+		return
+	}
+
+	var template models.RuleTemplate
+	if err := database.DB.First(&template, req.TemplateID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Template not found"})
+		return
+	}
+
+	// Create new rule from template
+	rule := models.Rule{
+		BusinessID:      &businessID,
+		Category:        template.Category,
+		Keywords:        template.Keywords,
+		Responses:       template.Responses,
+		IsActive:        true,
+		IsDropRule:      template.IsDropRule,
+		IsContextBridge: template.IsContextBridge,
+	}
+
+	if err := database.DB.Create(&rule).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clone template"})
+		return
+	}
+
+	// Background embed
+	go whatsapp.EmbedAndStoreRule(&rule)
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Template cloned successfully", "rule": rule})
 }
 
 // CreateRule creates a new Custom rule for the tenant

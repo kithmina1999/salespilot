@@ -7,12 +7,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// Rule defines automated FAQ responses.
-// If BusinessID is NULL, the rule is global (SaaS-wide).
-// If BusinessID is set, it belongs to a specific tenant.
+// Rule defines automated FAQ responses for a specific tenant.
+// (Global rules are deprecated; use RuleTemplate instead).
 type Rule struct {
 	gorm.Model
 	BusinessID *uint  `json:"business_id" gorm:"index"`
+	Category   string `json:"category" gorm:"index"` // e.g., "Shipping", "General"
 	Keywords   string `json:"keywords" gorm:"type:text"` // comma-separated keywords
 
 	// New: extensible per-language response map, e.g. {"en": "...", "si": "...", "ta": "..."}
@@ -74,3 +74,13 @@ func (r *Rule) SetResponse(langCode, text string) {
 	r.Responses = string(b)
 }
 
+// RuleTemplate defines seed FAQ rules that businesses can clone into their own accounts.
+type RuleTemplate struct {
+	gorm.Model
+	Category        string `json:"category" gorm:"index"`
+	Keywords        string `json:"keywords" gorm:"type:text"`
+	Responses       string `json:"responses" gorm:"type:text;default:'{}'"`
+	IsDropRule      bool   `json:"is_drop_rule" gorm:"default:false"`
+	IsContextBridge bool   `json:"is_context_bridge" gorm:"default:false"`
+	Embedding       []byte `json:"-" gorm:"type:bytea"`
+}

@@ -20,6 +20,7 @@ import { API_URL, getToken } from './_shared';
 
 export interface RuleEntry {
   ID: number;
+  category: string;
   keywords: string;
   response: string;
   sinhala_response: string;

@@ -55,7 +55,7 @@ func Init(dsn string) {
 	// Auto-migrate all models (creates/updates tables in Postgres)
 	err = DB.AutoMigrate(
 		&models.Business{}, &models.User{}, &models.Product{}, &models.Order{},
-		&models.Customer{}, &models.Rule{}, &models.Message{},
+		&models.Customer{}, &models.Rule{}, &models.RuleTemplate{}, &models.Message{},
 		&models.UnmatchedMessage{}, &models.AuditLog{},
 		&models.BlacklistedNumber{}, &models.ActivationCode{},
 		&models.PasswordResetToken{},        // WhatsApp OTP password reset
@@ -254,10 +254,11 @@ func seedDemoData() {
 			},
 		}
 		for i := range globalRules {
-			globalRules[i].BusinessID = nil
+			globalRules[i].BusinessID = &defaultBiz.ID
+			globalRules[i].Category = "General"
 			DB.Create(&globalRules[i])
 		}
-		log.Printf("✅ Seeded %d production global FAQ rules", len(globalRules))
+		log.Printf("✅ Seeded %d rules for demo business", len(globalRules))
 
 		// ── TIER 1: Hard DROP Rules ────────────────────────────────────────────
 		dropRules := []models.Rule{
@@ -266,10 +267,11 @@ func seedDemoData() {
 			{Keywords: "test,testing,1,2,3,asdf,qwerty,aaa,bbb,abc,xyz,hello test", IsDropRule: true, IsActive: true},
 		}
 		for i := range dropRules {
-			dropRules[i].BusinessID = nil
+			dropRules[i].BusinessID = &defaultBiz.ID
+			dropRules[i].Category = "System"
 			DB.Create(&dropRules[i])
 		}
-		log.Printf("🔇 Seeded %d global Tier 1 DROP rules", len(dropRules))
+		log.Printf("🔇 Seeded %d Tier 1 DROP rules for demo business", len(dropRules))
 
 		// ── TIER 2: Context Bridge Rules ──────────────────────────────────────
 		bridgeRules := []models.Rule{
@@ -278,10 +280,29 @@ func seedDemoData() {
 			{Keywords: "hm,hmm,right,exactly,correct,true,i see,makes sense", IsContextBridge: true, IsActive: true},
 		}
 		for i := range bridgeRules {
-			bridgeRules[i].BusinessID = nil
+			bridgeRules[i].BusinessID = &defaultBiz.ID
+			bridgeRules[i].Category = "System"
 			DB.Create(&bridgeRules[i])
 		}
-		log.Printf("🔄 Seeded %d global Tier 2 Context Bridge rules", len(bridgeRules))
+		log.Printf("🔄 Seeded %d Tier 2 Context Bridge rules for demo business", len(bridgeRules))
+
+		// ── RULE TEMPLATES (SaaS-wide) ───────────────────────────────────────────
+		templates := []models.RuleTemplate{
+			{
+				Category: "Shipping",
+				Keywords: "shipping,delivery,courier,postage",
+				Responses: `{"en": "We offer island-wide delivery within 2-4 working days. Delivery fee starts at Rs. 350."}`,
+			},
+			{
+				Category: "Payments",
+				Keywords: "payment,pay,bank transfer,cod",
+				Responses: `{"en": "We accept Bank Transfer and Cash on Delivery (COD)."}`,
+			},
+		}
+		for i := range templates {
+			DB.Create(&templates[i])
+		}
+		log.Printf("📚 Seeded %d Rule Templates", len(templates))
 
 		log.Println("🚀 Demo data seeding complete")
 	}

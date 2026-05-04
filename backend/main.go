@@ -180,6 +180,7 @@ func main() {
 		// Dashboard Rule (FAQ) Management
 		dash.GET("/rules", handlers.ListRules)
 		dash.POST("/rules", handlers.CreateRule)
+		dash.POST("/rules/clone-template", handlers.CloneTemplate)
 		dash.PUT("/rules/:id", handlers.UpdateRule)
 		dash.DELETE("/rules/:id", handlers.DeleteRule)
 		dash.POST("/faqs/draft", handlers.DraftFAQ)
