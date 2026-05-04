@@ -251,11 +251,20 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 		}
 	}
 
-	// Only enforce hard inbound cap on Free plan (Growth/Pro = unlimited inbound)
-	if business.Plan == models.PlanFree && business.SystemMessageCount > 200 {
-		log.Printf("⚠️ [%s] Free plan inbound limit hit for %s.", business.Name, from)
+	// Enforce inbound cap (500) for Free plan and Trials. Paid plans are unlimited.
+	inboundLimit := -1
+	if business.Plan == models.PlanFree {
+		if business.IsInActiveTrial() {
+			inboundLimit = models.TrialMsgLimit
+		} else {
+			inboundLimit = models.FreeMsgLimit
+		}
+	}
+
+	if inboundLimit > 0 && business.SystemMessageCount > inboundLimit {
+		log.Printf("⚠️ [%s] Inbound message limit (%d) hit for %s.", business.Name, inboundLimit, from)
 		botSendText(business, fromRaw,
-			"Our free bot has reached its monthly message limit. We'll be back next month!")
+			"Our bot has reached its monthly message limit. We'll be back next month!")
 		return
 	}
 
@@ -944,8 +953,8 @@ RESPONSE STYLE (follow strictly):
 	detectedLang := DetectMessageLanguage(text)
 	tenantContext += buildLangPolicy(business, detectedLang)
 
-	if business.GreetingMessage != "" {
-		tenantContext += fmt.Sprintf("Your official greeting message intent is: \"%s\"\n", business.GreetingMessage)
+	if business.BotPersonality != "" {
+		tenantContext += fmt.Sprintf("\nBOT PERSONALITY & INSTRUCTIONS:\n%s\n\n", business.BotPersonality)
 	}
 	if business.OperatingHours != "" {
 		tenantContext += fmt.Sprintf("Business Operating Hours: %s\n", business.OperatingHours)

@@ -676,7 +676,7 @@ export default function OnboardingPage() {
           industry: selectedCategory?.key ?? 'other',
           selected_rule_ids: selectedRuleIds,
           bot_name: 'AI Assistant',
-          greeting: '',
+          bot_personality: 'You are a friendly and helpful sales assistant. Keep your answers short, polite, and use emojis. Encourage the customer to ask questions.',
           operating_hours: '',
           delivery_policy: '',
         }),

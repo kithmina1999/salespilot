@@ -313,7 +313,7 @@ func DraftFAQ(c *gin.Context) {
 		// Transforms a specific raw customer message into a broadly-scoped FAQ rule.
 		prompt = `You are an AI assistant helping a Sri Lankan eCommerce business owner build a WhatsApp FAQ knowledge base.
 Business Name: ` + biz.Name + `
-Business Context: ` + biz.GreetingMessage + `
+Bot Personality: ` + biz.BotPersonality + `
 Delivery Policy: ` + biz.DeliveryPolicy + `
 Operating Hours: ` + biz.OperatingHours + `
 
@@ -358,7 +358,7 @@ Return ONLY a raw JSON object (no markdown, no code fences):
 		// Tenant has typed their own keywords; just draft the responses.
 		prompt = `You are an AI assistant helping a Sri Lankan eCommerce business owner create a WhatsApp FAQ.
 Business Name: ` + biz.Name + `
-Business Context: ` + biz.GreetingMessage + `
+Bot Personality: ` + biz.BotPersonality + `
 Delivery Policy: ` + biz.DeliveryPolicy + `
 Operating Hours: ` + biz.OperatingHours + `
 
@@ -537,7 +537,7 @@ func GenerateRule(c *gin.Context) {
 
 	prompt := `You are an AI assistant helping a Sri Lankan eCommerce business owner build WhatsApp FAQ rules.
 Business Name: ` + biz.Name + `
-Business Context: ` + biz.GreetingMessage + `
+Bot Personality: ` + biz.BotPersonality + `
 Delivery Policy: ` + biz.DeliveryPolicy + `
 Operating Hours: ` + biz.OperatingHours + `
 

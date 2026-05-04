@@ -43,6 +43,12 @@ func enrichAndSend(
 	phone, fromRaw, replyText, originalMsg string,
 ) {
 	result := enrichReply(business, phone, originalMsg, replyText)
+
+	// Inject promotional watermark for Free plan users after their trial expires
+	if business.Plan == models.PlanFree && !business.IsInActiveTrial() {
+		result.Text += "\n\n⚡ _Powered by SalesPilot.lk - Get your own AI bot free_"
+	}
+
 	var sendErr error
 	if len(result.Buttons) > 0 {
 		// botSendButtons logs to DB internally — no extra Create needed

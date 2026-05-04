@@ -108,7 +108,7 @@ func main() {
 			WABAID:               fmt.Sprintf("waba_id_%d", i+1),
 			WAAccessToken:        "EAA_dummy_token_for_screenshot",
 			BotName:              "AI Assistant",
-			GreetingMessage:      fmt.Sprintf("Welcome to %s! How can we help you today?", b.Name),
+			BotPersonality:      fmt.Sprintf("You are a friendly and polite AI sales assistant for %s. Keep your answers short and helpful.", b.Name),
 			AllowCOD:             !b.ServicesMode, // Services usually don't do COD
 			AllowTransfer:        true,
 			MonthlyReportEnabled: true,

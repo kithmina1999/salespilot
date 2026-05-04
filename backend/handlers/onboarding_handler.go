@@ -33,7 +33,7 @@ type GeneratedSeedData struct {
 		Response        string `json:"response"`
 		SinhalaResponse string `json:"sinhala_response"`
 	} `json:"rules"`
-	Greeting string `json:"greeting"`
+	BotPersonality string `json:"bot_personality"`
 }
 
 func OnboardingSeed(c *gin.Context) {
@@ -77,7 +77,7 @@ Your output MUST be a valid JSON object matching exactly this schema and nothing
   "rules": [
     {"keywords": "comma,separated,keywords", "response": "English response string", "sinhala_response": "Refined, natural Sinhala translation of the response."}
   ],
-  "greeting": "A short polite WhatsApp welcome message introducing the AI assistant: ` + req.BotName + ` (Include both an English and Sinhala greeting in the string)"
+  "bot_personality": "A short, helpful persona instruction for the AI (e.g. You are a friendly sales assistant for ` + req.BotName + `). Keep it concise."
 }`
 
 	requestBody := map[string]interface{}{
@@ -135,8 +135,8 @@ Your output MUST be a valid JSON object matching exactly this schema and nothing
 	tx := database.DB.Begin()
 
 	business.BotName = req.BotName
-	if seedData.Greeting != "" {
-		business.GreetingMessage = seedData.Greeting
+	if seedData.BotPersonality != "" {
+		business.BotPersonality = seedData.BotPersonality
 	}
 	tx.Save(&business)
 
@@ -190,7 +190,7 @@ type SeedTemplatesRequest struct {
 	Industry        string   `json:"industry"`
 	SelectedRuleIDs []string `json:"selected_rule_ids"`
 	BotName         string   `json:"bot_name"`
-	Greeting        string   `json:"greeting"`
+	BotPersonality  string   `json:"bot_personality"`
 	OperatingHours  string   `json:"operating_hours"`
 	DeliveryPolicy  string   `json:"delivery_policy"`
 }
@@ -228,7 +228,7 @@ func SeedOnboardingTemplates(c *gin.Context) {
 	tx := database.DB.Begin()
 
 	business.BotName = req.BotName
-	business.GreetingMessage = req.Greeting
+	business.BotPersonality = req.BotPersonality
 	business.OperatingHours = req.OperatingHours
 	business.DeliveryPolicy = req.DeliveryPolicy
 	business.OnboardingComplete = true

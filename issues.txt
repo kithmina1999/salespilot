@@ -13,12 +13,13 @@ done 6: it say thatcurrent paln i on trial but say ai offline we need to get int
 12: ssytem logs in /settings need to be optimized so in year so huge logs not to be cause troubles
 13: Make AI replaceable
 14: Make queue pluggable
+15: Proposal: Move Bot Personality into a dedicated settings tab with pre-made templates and testing preview.
 
 --- RULE MANAGEMENT V2 ---
-15: [x] Slice 1: Database Foundation & Template Library (Add Category to Rule, create RuleTemplate model, build /api/rules/clone-template endpoint)
-16: [ ] Slice 2: The Rules Inbox Data Table (Rip out accordions, implement shadcn Data Table with search, pagination, category sidebar)
-17: [ ] Slice 3: Knowledge Gaps / Unanswered Questions (Add UnmatchedMessage tab, Create Rule button to plug gaps)
-18: [ ] Slice 4: Bilingual Badges & Single Rule Auto-Translate (Table language badges, /api/rules/translate endpoint, Magic Wand UI button)
-19: [ ] Slice 5: Bulk Review-and-Approve Translation (Translate All Missing button, Side-by-side Review Modal)
-20: [ ] Slice 6: Multi-Rule LLM Synthesis & Premium Billing (Update pipeline to synthesize top 3 rules using Gemini, flag as AI message)
-21: [ ] Slice 7: The Sandbox Simulator (Build /api/business/simulate endpoint, Chat UI simulator next to rules table)
+16: [x] Slice 1: Database Foundation & Template Library (Add Category to Rule, create RuleTemplate model, build /api/rules/clone-template endpoint)
+17: [ ] Slice 2: The Rules Inbox Data Table (Rip out accordions, implement shadcn Data Table with search, pagination, category sidebar)
+18: [ ] Slice 3: Knowledge Gaps / Unanswered Questions (Add UnmatchedMessage tab, Create Rule button to plug gaps)
+19: [ ] Slice 4: Bilingual Badges & Single Rule Auto-Translate (Table language badges, /api/rules/translate endpoint, Magic Wand UI button)
+20: [ ] Slice 5: Bulk Review-and-Approve Translation (Translate All Missing button, Side-by-side Review Modal)
+21: [ ] Slice 6: Multi-Rule LLM Synthesis & Premium Billing (Update pipeline to synthesize top 3 rules using Gemini, flag as AI message)
+22: [ ] Slice 7: The Sandbox Simulator (Build /api/business/simulate endpoint, Chat UI simulator next to rules table)
