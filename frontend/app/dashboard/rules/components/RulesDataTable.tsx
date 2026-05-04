@@ -1,0 +1,222 @@
+import { useState, useMemo } from 'react';
+import {
+  ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  getFilteredRowModel,
+  useReactTable,
+} from '@tanstack/react-table';
+import { RuleEntry } from '@/hooks/useRulesPage';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Edit2, Trash2, Search, Power, PowerOff } from 'lucide-react';
+
+interface RulesDataTableProps {
+  data: RuleEntry[];
+  onEdit: (rule: RuleEntry) => void;
+  onDelete: (id: number) => void;
+  onToggleStatus: (rule: RuleEntry) => void;
+  selectedCategory: string | null;
+  botReplyLang: string;
+}
+
+export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selectedCategory, botReplyLang }: RulesDataTableProps) {
+  const [globalFilter, setGlobalFilter] = useState('');
+
+  const filteredData = useMemo(() => {
+    if (!selectedCategory || selectedCategory === 'All') return data;
+    return data.filter(rule => (rule.category || 'General') === selectedCategory);
+  }, [data, selectedCategory]);
+
+  const columns: ColumnDef<RuleEntry>[] = [
+    {
+      accessorKey: 'keywords',
+      header: 'Trigger Keywords',
+      cell: ({ row }) => {
+        const kws = (row.getValue('keywords') as string).split(',').map(k => k.trim());
+        return (
+          <div className="flex flex-wrap gap-1 max-w-[300px]">
+            {kws.slice(0, 3).map((kw, i) => (
+              <Badge key={i} variant="outline" className="text-xs font-mono bg-zinc-900 border-zinc-800 text-zinc-300">
+                {kw}
+              </Badge>
+            ))}
+            {kws.length > 3 && (
+              <Badge variant="outline" className="text-xs font-mono bg-zinc-900 border-zinc-800 text-zinc-500">
+                +{kws.length - 3}
+              </Badge>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'responses',
+      header: 'Response Preview',
+      cell: ({ row }) => {
+        const rule = row.original;
+        let parsed: Record<string, string> = {};
+        try {
+          parsed = JSON.parse(rule.responses || '{}');
+        } catch {}
+        
+        const previewText = parsed[botReplyLang] || parsed['en'] || rule.response || rule.sinhala_response || 'No response configured';
+        
+        return (
+          <div className="max-w-[400px] truncate text-sm text-zinc-400">
+            {previewText}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'usage_count',
+      header: 'Hits',
+      cell: ({ row }) => <span className="font-mono text-zinc-400">{row.getValue('usage_count') || 0}</span>,
+    },
+    {
+      accessorKey: 'is_active',
+      header: 'Status',
+      cell: ({ row }) => {
+        const isActive = row.getValue('is_active') as boolean;
+        return (
+          <Badge variant="outline" className={isActive ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}>
+            {isActive ? 'Active' : 'Paused'}
+          </Badge>
+        );
+      },
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => {
+        const rule = row.original;
+        return (
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={() => onToggleStatus(rule)} className="h-8 w-8 text-zinc-400 hover:text-white" title={rule.is_active ? 'Pause Rule' : 'Activate Rule'}>
+              {rule.is_active ? <PowerOff size={14} /> : <Power size={14} />}
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => onEdit(rule)} className="h-8 w-8 text-zinc-400 hover:text-white" title="Edit Rule">
+              <Edit2 size={14} />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => onDelete(rule.ID)} className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-400/10" title="Delete Rule">
+              <Trash2 size={14} />
+            </Button>
+          </div>
+        );
+      },
+    },
+  ];
+
+  const table = useReactTable({
+    data: filteredData,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    state: {
+      globalFilter,
+    },
+    onGlobalFilterChange: setGlobalFilter,
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="relative w-72">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-zinc-500" />
+          <Input
+            placeholder="Search rules..."
+            value={globalFilter ?? ''}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            className="pl-8 bg-zinc-900 border-zinc-800 focus-visible:ring-1 focus-visible:ring-zinc-700 h-9"
+          />
+        </div>
+      </div>
+      
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950 overflow-hidden">
+        <Table>
+          <TableHeader className="bg-zinc-900/50">
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id} className="border-zinc-800 hover:bg-transparent">
+                {headerGroup.headers.map((header) => {
+                  return (
+                    <TableHead key={header.id} className="text-zinc-400 font-medium h-10">
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
+                  )
+                })}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                  className="border-zinc-800 hover:bg-zinc-900/50 transition-colors"
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id} className="py-3">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-32 text-center text-zinc-500">
+                  No rules found.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      
+      <div className="flex items-center justify-between">
+        <div className="text-xs text-zinc-500">
+          Showing {table.getRowModel().rows.length} rules
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+            className="border-zinc-800 bg-zinc-900 text-zinc-300 hover:bg-zinc-800 hover:text-white h-8"
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+            className="border-zinc-800 bg-zinc-900 text-zinc-300 hover:bg-zinc-800 hover:text-white h-8"
+          >
+            Next
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

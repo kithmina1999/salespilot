@@ -11,8 +11,9 @@ import { LANG_META } from '../types';
 
 interface RuleModalProps {
   mode: 'create' | 'edit_custom' | 'clone_common';
-  form: { keywords: string; responses: Record<string, string>; is_active: boolean };
+  form: { category: string; keywords: string; responses: Record<string, string>; is_active: boolean };
   setForm: React.Dispatch<React.SetStateAction<{
+    category: string;
     keywords: string;
     responses: Record<string, string>;
     is_active: boolean;
@@ -94,21 +95,33 @@ export function RuleModal({
             </div>
           )}
 
-          {/* Keywords input */}
-          <div>
-            <label className="block text-sm mb-1.5 text-zinc-300 font-medium">
-              Trigger Keywords{' '}
-              <span className="text-xs text-zinc-500 font-normal italic ml-2">(Comma separated)</span>
-            </label>
-            <input
-              required
-              autoFocus
-              type="text"
-              value={form.keywords}
-              onChange={e => setForm({ ...form, keywords: e.target.value })}
-              placeholder={seedOriginalLine ? "Type or click 'Generalize & Draft'..." : 'e.g. delivery, shipping, how long'}
-              className="w-full px-4 py-2.5 bg-zinc-950 border rounded-xl text-sm outline-none focus:border-zinc-500 border-zinc-800 transition-colors text-white placeholder:text-zinc-600"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="md:col-span-1">
+              <label className="block text-sm mb-1.5 text-zinc-300 font-medium">Category</label>
+              <input
+                required
+                type="text"
+                value={form.category}
+                onChange={e => setForm({ ...form, category: e.target.value })}
+                placeholder="e.g. Shipping"
+                className="w-full px-4 py-2.5 bg-zinc-950 border rounded-xl text-sm outline-none focus:border-zinc-500 border-zinc-800 transition-colors text-white placeholder:text-zinc-600"
+              />
+            </div>
+            <div className="md:col-span-3">
+              <label className="block text-sm mb-1.5 text-zinc-300 font-medium">
+                Trigger Keywords{' '}
+                <span className="text-xs text-zinc-500 font-normal italic ml-2">(Comma separated)</span>
+              </label>
+              <input
+                required
+                autoFocus
+                type="text"
+                value={form.keywords}
+                onChange={e => setForm({ ...form, keywords: e.target.value })}
+                placeholder={seedOriginalLine ? "Type or click 'Generalize & Draft'..." : 'e.g. delivery, shipping, how long'}
+                className="w-full px-4 py-2.5 bg-zinc-950 border rounded-xl text-sm outline-none focus:border-zinc-500 border-zinc-800 transition-colors text-white placeholder:text-zinc-600"
+              />
+            </div>
           </div>
 
           {/* Multi-language response editor */}

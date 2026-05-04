@@ -17,7 +17,7 @@ done 6: it say thatcurrent paln i on trial but say ai offline we need to get int
 
 --- RULE MANAGEMENT V2 ---
 16: [x] Slice 1: Database Foundation & Template Library (Add Category to Rule, create RuleTemplate model, build /api/rules/clone-template endpoint)
-17: [ ] Slice 2: The Rules Inbox Data Table (Rip out accordions, implement shadcn Data Table with search, pagination, category sidebar)
+17: [x] Slice 2: The Rules Inbox Data Table (Rip out accordions, implement shadcn Data Table with search, pagination, category sidebar)
 18: [ ] Slice 3: Knowledge Gaps / Unanswered Questions (Add UnmatchedMessage tab, Create Rule button to plug gaps)
 19: [ ] Slice 4: Bilingual Badges & Single Rule Auto-Translate (Table language badges, /api/rules/translate endpoint, Magic Wand UI button)
 20: [ ] Slice 5: Bulk Review-and-Approve Translation (Translate All Missing button, Side-by-side Review Modal)

@@ -2,17 +2,18 @@
 import { useState, useEffect, Suspense } from 'react';
 import {
   Plus, Search, BookOpen, Cpu, BarChart3, AlertTriangle,
-  Sparkles, ShieldAlert, Edit2, Lock as LockIcon,
+  Sparkles, ShieldAlert, Edit2, Lock as LockIcon, Library, MessageSquare
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import UpgradeBanner from '@/components/UpgradeBanner';
 import { toast } from 'sonner';
 import { useLocale } from '@/lib/locale';
 import { useRulesPage } from '@/hooks/useRulesPage';
 
 import { Rule, parseResponses } from './types';
-import RuleCard from './components/RuleCard';
 import { RuleModal, AIGenerateModal } from './components/RuleModal';
+import { RulesDataTable } from './components/RulesDataTable';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main content (wrapped in Suspense for useSearchParams)
@@ -31,9 +32,10 @@ function RulesContent() {
   } = useRulesPage();
 
   // ── UI toggles ────────────────────────────────────────────────────────────
-  const [showDefaults, setShowDefaults] = useState(false);
-  const [showMissing,  setShowMissing]  = useState(true);
   const [upgradeMessage, setUpgradeMessage] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+
+  const categories = ['All', ...Array.from(new Set(customRules.map(r => r.category || 'General')))];
 
   // Card preview language — driven by botReplyLang
   const [cardPreviewLang, setCardPreviewLang] = useState<string>('si');
@@ -44,6 +46,7 @@ function RulesContent() {
   const [editTargetId, setEditTargetId] = useState<number | null>(null);
 
   const [form, setForm] = useState({
+    category: 'General',
     keywords: '',
     responses: {} as Record<string, string>,
     is_active: true,
@@ -58,7 +61,7 @@ function RulesContent() {
   // Seed from URL — open create modal pre-filled
   useEffect(() => {
     if (seed) {
-      setForm(prev => ({ ...prev, keywords: seed || '' }));
+      setForm(prev => ({ ...prev, keywords: seed || '', category: 'General' }));
       setModalMode('create');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -67,7 +70,7 @@ function RulesContent() {
   // ── Modal helpers ─────────────────────────────────────────────────────────
   function openCreateModal() {
     setEditTargetId(null);
-    setForm({ keywords: '', responses: {}, is_active: true });
+    setForm({ category: 'General', keywords: '', responses: {}, is_active: true });
     setSeedOriginalLine('');
     setGeneralizedIntent('');
     setModalMode('create');
@@ -76,7 +79,7 @@ function RulesContent() {
   function openEditModal(r: Rule, isCommon: boolean) {
     setEditTargetId(r.ID);
     const responses = parseResponses(r.responses, r.response, r.sinhala_response);
-    setForm({ keywords: r.keywords, responses, is_active: r.is_active });
+    setForm({ category: r.category || 'General', keywords: r.keywords, responses, is_active: r.is_active });
     setSeedOriginalLine('');
     setGeneralizedIntent('');
     setModalMode(isCommon ? 'clone_common' : 'edit_custom');
@@ -101,6 +104,7 @@ function RulesContent() {
         method,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
+          category: form.category,
           keywords: form.keywords,
           responses: form.responses,
           response: form.responses['en'] || '',
@@ -135,7 +139,7 @@ function RulesContent() {
         const generatedMap: Record<string, string> = data.responses || {};
         if (!generatedMap['en'] && data.response)          generatedMap['en'] = data.response;
         if (!generatedMap['si'] && data.sinhala_response) generatedMap['si'] = data.sinhala_response;
-        setForm({ keywords: data.keywords, responses: generatedMap, is_active: true });
+        setForm({ category: 'General', keywords: data.keywords, responses: generatedMap, is_active: true });
         setGenerateIntent('');
         setModalMode('create');
         revalidate(); // refresh rule_generation_count from server
@@ -299,10 +303,9 @@ function RulesContent() {
         {/* ── Missing Knowledge Inbox ── */}
         {stats.top_unmatched?.length > 0 && (
           <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 relative pt-2">
-            <div
-              className={`flex items-center justify-between cursor-pointer p-4 rounded-xl border transition-colors ${showMissing ? 'bg-amber-500/10 border-amber-500/20' : 'bg-transparent border-zinc-800 hover:bg-amber-500/5 hover:border-amber-500/20'}`}
-              onClick={() => setShowMissing(!showMissing)}
-            >
+              <div
+                className={`flex items-center justify-between p-4 rounded-xl border border-amber-500/20 bg-amber-500/10`}
+              >
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <ShieldAlert size={18} className="text-amber-500" />
@@ -315,12 +318,6 @@ function RulesContent() {
                   Your bot failed to answer these questions recently. Convert them to rules to guarantee 24/7 resolution.
                 </p>
               </div>
-              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 transition-transform duration-300 shrink-0" style={{ rotate: showMissing ? '180deg' : '0deg' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
-              </div>
-            </div>
-
-            {showMissing && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto max-h-[280px] pr-2 custom-scrollbar">
                 {stats.top_unmatched.map((um, idx) => (
                   <div key={idx} className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-5 flex flex-col justify-between shadow-lg relative group">
@@ -333,7 +330,7 @@ function RulesContent() {
                     </div>
                     <button
                       onClick={() => {
-                        setForm({ keywords: '', responses: {}, is_active: true });
+                        setForm({ category: 'General', keywords: '', responses: {}, is_active: true });
                         setEditTargetId(null);
                         setSeedOriginalLine(um.message);
                         setGeneralizedIntent('');
@@ -346,82 +343,73 @@ function RulesContent() {
                   </div>
                 ))}
               </div>
-            )}
+              </div>
           </div>
         )}
 
-        {/* ── Custom Rules ── */}
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Cpu size={18} className="text-white" />
-            <h2 className="text-lg font-medium">Your Custom Rules</h2>
-          </div>
-          <p className="text-sm text-gray-400 mb-2">
-            Rules strictly applied to your bot. These override System Defaults if keywords match.
-          </p>
+        {/* ── Main Rules Engine UI (Tabs) ── */}
+        <Tabs defaultValue="your-rules" className="w-full">
+          <TabsList className="bg-zinc-900 border-zinc-800 w-full justify-start p-1 mb-6 rounded-xl">
+            <TabsTrigger value="your-rules" className="data-[state=active]:bg-zinc-800 rounded-lg px-6 py-2">
+              <MessageSquare size={16} className="mr-2" />
+              Your Rules
+              <span className="ml-2 bg-zinc-700 text-xs px-2 py-0.5 rounded-full">{customRules.length}</span>
+            </TabsTrigger>
+            <TabsTrigger value="templates" className="data-[state=active]:bg-zinc-800 rounded-lg px-6 py-2">
+              <Library size={16} className="mr-2" />
+              Template Library
+              <span className="ml-2 bg-zinc-700 text-xs px-2 py-0.5 rounded-full">{commonRules.length}</span>
+            </TabsTrigger>
+          </TabsList>
 
-          {loading ? (
-            <div className="p-8 text-center text-sm border rounded-xl border-zinc-800 text-zinc-400">{t('common.loading')}…</div>
-          ) : customRules.length === 0 ? (
-            <div className="dash-empty">
-              <BookOpen size={32} className="text-emerald-400" />
-              <div>
-                <p className="dash-empty-title">{t('rules.no_rules')}</p>
-                <p className="dash-empty-copy mt-1">{t('rules.no_rules_hint')}</p>
+          <TabsContent value="your-rules" className="mt-0">
+            <div className="flex flex-col md:flex-row gap-6">
+              {/* Category Sidebar */}
+              <div className="w-full md:w-64 shrink-0">
+                <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 sticky top-6">
+                  <h3 className="text-sm font-semibold text-zinc-400 mb-4 px-2 uppercase tracking-wider">Categories</h3>
+                  <div className="flex flex-col gap-1">
+                    {categories.map(cat => (
+                      <button
+                        key={cat}
+                        onClick={() => setSelectedCategory(cat)}
+                        className={`text-left px-3 py-2 rounded-lg text-sm transition-colors ${selectedCategory === cat ? 'bg-zinc-800 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'}`}
+                      >
+                        {cat}
+                        <span className="float-right text-xs bg-zinc-800 px-2 py-0.5 rounded-full text-zinc-500">
+                          {cat === 'All' ? customRules.length : customRules.filter(r => (r.category || 'General') === cat).length}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <button onClick={openCreateModal} className="dash-primary-action">
-                <Plus size={15} /> {t('rules.add_rule')}
-              </button>
+
+              {/* Data Table */}
+              <div className="flex-1">
+                {loading ? (
+                  <div className="p-12 text-center border rounded-xl border-zinc-800 text-zinc-500 bg-zinc-950">Loading rules...</div>
+                ) : (
+                  <RulesDataTable
+                    data={customRules}
+                    onEdit={(r) => openEditModal(r as any, false)}
+                    onDelete={handleDelete}
+                    onToggleStatus={handleToggleStatus as any}
+                    selectedCategory={selectedCategory}
+                    botReplyLang={cardPreviewLang}
+                  />
+                )}
+              </div>
             </div>
-          ) : (
+          </TabsContent>
+
+          <TabsContent value="templates" className="mt-0">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {customRules.map(r => (
-                <RuleCard
-                  key={r.ID}
-                  rule={r}
-                  overridesCommon={commonRules.some(cr => cr.keywords === r.keywords)}
-                  botLangs={botLangs}
-                  cardPreviewLang={cardPreviewLang}
-                  onPreviewLangChange={setCardPreviewLang}
-                  onEdit={() => openEditModal(r, false)}
-                  onDelete={() => handleDelete(r.ID)}
-                  onToggleStatus={() => handleToggleStatus(r)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        <hr className="border-t border-dashed opacity-50 my-2 border-zinc-800" />
-
-        {/* ── System Defaults ── */}
-        <div className="flex flex-col gap-4">
-          <div
-            className={`flex items-center justify-between cursor-pointer p-4 rounded-xl border transition-colors ${showDefaults ? 'bg-zinc-900/50 border-zinc-800' : 'bg-transparent border-zinc-800 hover:bg-zinc-900/30'}`}
-            onClick={() => setShowDefaults(!showDefaults)}
-          >
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <ShieldAlert size={18} className="text-gray-400" />
-                <h2 className="text-lg font-medium text-gray-300">System Defaults</h2>
-                <span className="px-2 py-0.5 rounded-full bg-white/10 text-xs text-gray-400 ml-2">{commonRules.length}</span>
-              </div>
-              <p className="text-sm text-gray-500">
-                Global rules provided by the platform. You can override these to create your own isolated response.
-              </p>
-            </div>
-            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-white/5 text-gray-400 transition-transform duration-300" style={{ rotate: showDefaults ? '180deg' : '0deg' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
-            </div>
-          </div>
-
-          {showDefaults && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-4 duration-300 mt-2">
               {loading ? (
                 <div className="p-8 text-center text-sm border rounded-xl opacity-50 col-span-full border-zinc-800">Loading...</div>
               ) : commonRules.length === 0 ? (
                 <div className="p-10 border border-dashed rounded-xl flex items-center justify-center opacity-50 col-span-full border-zinc-800">
-                  <p className="text-sm">No global rules configured.</p>
+                  <p className="text-sm">No templates available yet.</p>
                 </div>
               ) : commonRules.map(r => {
                 const isOverridden = customRules.some(cr => cr.keywords === r.keywords);
@@ -437,13 +425,13 @@ function RulesContent() {
                       </div>
                       {!isOverridden ? (
                         <button
-                          onClick={() => openEditModal(r, true)}
+                          onClick={() => openEditModal(r as any, true)}
                           className="flex items-center gap-1.5 text-[11px] text-white border px-2 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors border-zinc-700"
                         >
-                          <Edit2 size={12} /> Override
+                          <Edit2 size={12} /> Clone
                         </button>
                       ) : (
-                        <span className="text-[10px] uppercase font-bold text-gray-500">Overridden</span>
+                        <span className="text-[10px] uppercase font-bold text-gray-500">Cloned</span>
                       )}
                     </div>
                     <div className="text-sm text-gray-400 leading-relaxed bg-black/20 p-3 rounded-lg border border-transparent mt-2 whitespace-pre-wrap">
@@ -456,8 +444,8 @@ function RulesContent() {
                 );
               })}
             </div>
-          )}
-        </div>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* ── Modals ── */}
