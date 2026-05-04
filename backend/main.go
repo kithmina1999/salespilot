@@ -185,6 +185,7 @@ func main() {
 		dash.DELETE("/rules/:id", handlers.DeleteRule)
 		dash.POST("/faqs/draft", handlers.DraftFAQ)
 		dash.POST("/rules/generate", handlers.GenerateRule) // Pro: AI-generates keywords + EN + SIN from intent
+		dash.POST("/rules/translate", handlers.TranslateRule) // Single field auto-translate
 
 		// Dashboard Chats (CRM) Management
 		dash.GET("/chats", handlers.ListChats)

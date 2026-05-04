@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -82,11 +83,80 @@ func CloneTemplate(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Template cloned successfully", "rule": rule})
 }
 
+// TranslateRule handles single-field auto-translation
+func TranslateRule(c *gin.Context) {
+	businessID := c.GetUint("business_id")
+	if businessID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req struct {
+		Text       string `json:"text" binding:"required"`
+		TargetLang string `json:"target_lang" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	prompt := fmt.Sprintf(`Translate the following text into natural, conversational %s suitable for a WhatsApp business bot.
+Preserve any formatting like *bold* or emojis. Do not add any introductory text, just return the translated string.
+
+Text:
+%s`, req.TargetLang, req.Text)
+
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey
+
+	body := map[string]interface{}{
+		"contents": []map[string]interface{}{
+			{
+				"role":  "user",
+				"parts": []map[string]interface{}{{"text": prompt}},
+			},
+		},
+	}
+
+	importBytes, _ := json.Marshal(body)
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(importBytes))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to call Gemini API"})
+		return
+	}
+	defer resp.Body.Close()
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse API response"})
+		return
+	}
+
+	var reply string
+	if candidates, ok := result["candidates"].([]interface{}); ok && len(candidates) > 0 {
+		if content, ok := candidates[0].(map[string]interface{})["content"].(map[string]interface{}); ok {
+			if parts, ok := content["parts"].([]interface{}); ok && len(parts) > 0 {
+				if text, ok := parts[0].(map[string]interface{})["text"].(string); ok {
+					reply = text
+				}
+			}
+		}
+	}
+
+	if reply == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gemini returned empty response"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"translated_text": strings.TrimSpace(reply)})
+}
+
 // CreateRule creates a new Custom rule for the tenant
 func CreateRule(c *gin.Context) {
 	businessID := c.GetUint("business_id")
 
 	var req struct {
+		Category        string            `json:"category"`
 		Keywords        string            `json:"keywords" binding:"required"`
 		Response        string            `json:"response"`         // legacy English field
 		SinhalaResponse string            `json:"sinhala_response"` // legacy Sinhala field
@@ -129,6 +199,7 @@ func CreateRule(c *gin.Context) {
 
 	rule := models.Rule{
 		BusinessID:      &businessID,
+		Category:        req.Category,
 		Keywords:        req.Keywords,
 		Response:        req.Response,
 		SinhalaResponse: req.SinhalaResponse,
@@ -191,6 +262,7 @@ func UpdateRule(c *gin.Context) {
 
 	// Use a typed struct so we can handle responses map properly
 	var req struct {
+		Category        *string           `json:"category"`
 		Keywords        *string           `json:"keywords"`
 		Response        *string           `json:"response"`
 		SinhalaResponse *string           `json:"sinhala_response"`
@@ -204,6 +276,7 @@ func UpdateRule(c *gin.Context) {
 	}
 
 	// Apply scalar fields
+	if req.Category != nil        { rule.Category = *req.Category }
 	if req.Keywords != nil        { rule.Keywords = *req.Keywords }
 	if req.Response != nil        { rule.Response = *req.Response; rule.SetResponse("en", *req.Response) }
 	if req.SinhalaResponse != nil { rule.SinhalaResponse = *req.SinhalaResponse; rule.SetResponse("si", *req.SinhalaResponse) }

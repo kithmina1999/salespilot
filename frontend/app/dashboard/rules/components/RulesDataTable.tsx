@@ -71,11 +71,19 @@ export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selecte
           parsed = JSON.parse(rule.responses || '{}');
         } catch {}
         
+        const hasEn = !!parsed['en'] || !!rule.response;
+        const hasSi = !!parsed['si'] || !!rule.sinhala_response;
         const previewText = parsed[botReplyLang] || parsed['en'] || rule.response || rule.sinhala_response || 'No response configured';
         
         return (
-          <div className="max-w-[400px] truncate text-sm text-zinc-400">
-            {previewText}
+          <div className="flex items-center gap-2">
+            <div className="max-w-[350px] truncate text-sm text-zinc-400">
+              {previewText}
+            </div>
+            <div className="flex gap-1 shrink-0">
+              {hasEn && <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 bg-blue-500/10 text-blue-400 border-blue-500/20 font-bold uppercase tracking-wider">EN</Badge>}
+              {hasSi && <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 bg-green-500/10 text-green-400 border-green-500/20 font-bold uppercase tracking-wider">SI</Badge>}
+            </div>
           </div>
         );
       },

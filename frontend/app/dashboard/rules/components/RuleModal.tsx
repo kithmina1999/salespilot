@@ -35,6 +35,39 @@ export function RuleModal({
 }: RuleModalProps) {
   const [activeResponseLang, setActiveResponseLang] = useState<string>(botLangs[0] || 'en');
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [translating, setTranslating] = useState(false);
+
+  const handleTranslate = async () => {
+    const enText = form.responses['en'];
+    if (!enText) {
+      import('sonner').then(m => m.toast.error('Please fill the English response first to translate.'));
+      return;
+    }
+    
+    setTranslating(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/v1/rules/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          text: enText,
+          target_lang: LANG_META[activeResponseLang]?.label || activeResponseLang,
+        }),
+      });
+      if (!res.ok) throw new Error('Translation failed');
+      const data = await res.json();
+      setForm(prev => ({
+        ...prev,
+        responses: { ...prev.responses, [activeResponseLang]: data.translated_text }
+      }));
+      import('sonner').then(m => m.toast.success('Translated successfully ✨'));
+    } catch (err: any) {
+      import('sonner').then(m => m.toast.error(err.message));
+    } finally {
+      setTranslating(false);
+    }
+  };
 
   const activeMeta = LANG_META[activeResponseLang] ?? {
     label: activeResponseLang, nativeLabel: '', flag: '', color: 'text-zinc-400', placeholder: '',
@@ -206,25 +239,37 @@ export function RuleModal({
               )}
             </div>
 
-            {/* Response textarea */}
-            <textarea
-              rows={8}
-              required={activeResponseLang === 'en'}
-              disabled={!isEnabled}
-              value={form.responses[activeResponseLang] || ''}
-              onChange={e => setForm(prev => ({
-                ...prev,
-                responses: { ...prev.responses, [activeResponseLang]: e.target.value },
-              }))}
-              placeholder={activeMeta.placeholder || 'Type the bot response...'}
-              className={`w-full px-4 py-3 bg-zinc-950 border rounded-xl text-sm outline-none transition-colors resize-y leading-relaxed ${
-                !isEnabled
-                  ? 'opacity-40 cursor-not-allowed text-zinc-500 border-zinc-800'
-                  : form.responses[activeResponseLang]?.trim()
-                  ? 'text-zinc-200 border-zinc-700 focus:border-zinc-500'
-                  : 'text-zinc-200 border-amber-500/30 focus:border-amber-500/60'
-              }`}
-            />
+            <div className="relative">
+              <textarea
+                rows={8}
+                required={activeResponseLang === 'en'}
+                disabled={!isEnabled}
+                value={form.responses[activeResponseLang] || ''}
+                onChange={e => setForm(prev => ({
+                  ...prev,
+                  responses: { ...prev.responses, [activeResponseLang]: e.target.value },
+                }))}
+                placeholder={activeMeta.placeholder || 'Type the bot response...'}
+                className={`w-full px-4 py-3 bg-zinc-950 border rounded-xl text-sm outline-none transition-colors resize-y leading-relaxed ${
+                  !isEnabled
+                    ? 'opacity-40 cursor-not-allowed text-zinc-500 border-zinc-800'
+                    : form.responses[activeResponseLang]?.trim()
+                    ? 'text-zinc-200 border-zinc-700 focus:border-zinc-500'
+                    : 'text-zinc-200 border-amber-500/30 focus:border-amber-500/60'
+                }`}
+              />
+              {activeResponseLang !== 'en' && isEnabled && (
+                <button
+                  type="button"
+                  onClick={handleTranslate}
+                  disabled={translating || !form.responses['en']}
+                  className="absolute bottom-3 right-3 text-[10px] px-2.5 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded-lg font-bold transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {translating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                  {translating ? 'Translating...' : 'Auto-Translate'}
+                </button>
+              )}
+            </div>
             {missingEnabled.length > 0 && (
               <p className="text-[10px] text-amber-400/80 mt-1.5 flex items-center gap-1">
                 <AlertTriangle size={10} />
