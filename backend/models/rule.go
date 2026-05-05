@@ -24,12 +24,23 @@ type Rule struct {
 
 	IsActive        bool   `json:"is_active" gorm:"default:true"`
 	UsageCount      uint   `json:"usage_count" gorm:"default:0"`
+	
+	// Action Tier (critical, intent, casual) defines allowed actions
+	ActionTier      string `json:"action_tier" gorm:"default:'intent'"`
+	
 	// Tier 1: Hard silent drop — no reply sent, no token consumed, no log created
+	// Must be combined with ActionTier == "critical" to actually drop
 	IsDropRule      bool   `json:"is_drop_rule" gorm:"default:false"`
 	// Tier 2: Context bridge — check last bot message; re-prompt if it was a question, else silent drop
 	IsContextBridge bool   `json:"is_context_bridge" gorm:"default:false"`
 	Embedding       []byte `json:"-" gorm:"type:bytea"` // JSON-encoded float64 vector, not exposed in API
 }
+
+const (
+	TierCritical = "critical" // abuse, spam, blacklist
+	TierIntent   = "intent"   // pricing, order, support
+	TierCasual   = "casual"   // greetings, jokes, hehe
+)
 
 // GetResponse returns the best available response text for the given ISO 639-1 language code.
 // Priority: exact lang match → "en" fallback → first non-empty value → legacy Response field.

@@ -7,14 +7,11 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/adrg/strutil"
-	"github.com/adrg/strutil/metrics"
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
 	"github.com/kithmina1999/salespilot/utils"
@@ -287,101 +284,123 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 		return
 	}
 
-	// --- LAYER 4: FAQ / Rules Matching (Confidence-Gated) ---
-	// High confidence â†’ fire FAQ directly (short, intent-focused message)
-	// Medium confidence â†’ inject as hint into Gemini (long message, incidental keyword)
-	// Pre-check: pure emoji/symbol messages normalize to empty string — silently drop
-	// before reaching matchFAQ, semantic match, or Gemini to avoid wasted AI tokens.
-	if strings.TrimSpace(NormalizeMessage(text)) == "" {
+	// --- LAYER 4: FAQ / Rules Matching (Scoring Engine v2) ---
+	cleanMsg := CleanMessage(text)
+	reducedMsg := ReduceMessage(cleanMsg)
+
+	if cleanMsg == "" {
 		log.Printf("🔇 [%s] Pure emoji/symbol message — silently terminating for %s (raw: %q)", business.Name, from, text)
 		return
 	}
 
-	rule, confidence := matchFAQ(business.ID, text)
+	detSignals := GetDeterministicSignals(business.ID, cleanMsg)
+	sortedDetSignals := AggregateSignals(detSignals)
 
-	if rule != nil && confidence == "high" {
-		// Tier 1: Hard DROP — silence completely
-		if rule.IsDropRule {
-			log.Printf("🔇 [%s] Hard DROP rule (keyword/high) — silently terminating for %s", business.Name, from)
-			return
-		}
-		// Tier 2: Context Bridge — check last bot message
-		if rule.IsContextBridge {
-			p.handleContextBridge(business, from, fromRaw)
-			return
-		}
-		detectedLang := DetectMessageLanguage(text)
-		replyText := selectReply(rule, detectedLang, business)
-		log.Printf("✅ [%s] FAQ HIGH-CONFIDENCE match — replying to %s (lang=%s)", business.Name, from, detectedLang)
-		enrichAndSend(business, from, fromRaw, replyText, text)
-		if !isSandbox {
-			database.DB.Model(&models.Rule{}).Where("id = ?", rule.ID).UpdateColumn("usage_count", database.DB.Raw("usage_count + 1"))
-			database.DB.Model(business).UpdateColumn("faq_reply_count", database.DB.Raw("faq_reply_count + 1"))
-		}
-		return
-	}
-
-	// --- LAYER 5: Fallback to Semantic Embedding Match ---
 	var faqHint string
-	if rule != nil && confidence == "medium" {
-		// Tier 1: Hard DROP protection (Confidence-based Action Gating)
-		// Medium confidence should NEVER trigger a destructive action like a hard drop.
-		if rule.IsDropRule {
-			log.Printf("🛡️ [%s] Safety Gate: Medium confidence fuzzy match on Drop Rule — ignoring action for %s", business.Name, from)
-			rule = nil // Un-match the rule so it falls through to Semantic/Gemini
-			goto FallbackSemantic
-		}
-		// Tier 2: Context Bridge at medium confidence
-		if rule.IsContextBridge {
-			p.handleContextBridge(business, from, fromRaw)
-			return
-		}
-		log.Printf("💡 [%s] Keyword MEDIUM match — injecting as hint to Gemini", business.Name)
-		faqHint = rule.Response
-		if !isSandbox {
-			database.DB.Model(&models.Rule{}).Where("id = ?", rule.ID).UpdateColumn("usage_count", database.DB.Raw("usage_count + 1"))
-		}
-	}
+	var bestDet *MatchSignal
 
-FallbackSemantic:
-	if rule == nil || confidence != "medium" {
-		// No keyword match at all — try semantic
-		semRules, semConf := semanticMatch(business.ID, text)
-		if len(semRules) > 0 {
-			bestRule := semRules[0]
-			// Tier 1 + 2: Check DROP/Bridge on semantic match results too
-			if bestRule.IsDropRule {
-				log.Printf("🔇 [%s] Hard DROP rule (semantic) — silently terminating for %s", business.Name, from)
+	// 1. Evaluate Deterministic Signals
+	if len(sortedDetSignals) > 0 {
+		best := sortedDetSignals[0]
+		isMatch, confidence, canDrop := EvaluateRule(business.Name, from, best)
+
+		if isMatch {
+			bestDet = &best
+			// Log observability for best signal
+			log.Printf("📊 [%s] Det Signal: Rule=%d MatchType=%s Tokens=%d RawConf=%.2f -> Cap=%.2f | Final=%.2f", 
+				business.Name, best.Rule.ID, best.MatchType, best.MatchedTokens, 
+				best.Debug.RawConfidence, best.Debug.AfterCaps, best.Confidence)
+
+			if canDrop {
+				log.Printf("🔇 [%s] Hard DROP rule (%s/high) — silently terminating for %s", business.Name, best.MatchType, from)
 				return
 			}
-			if bestRule.IsContextBridge {
+			if best.Rule.IsContextBridge {
 				p.handleContextBridge(business, from, fromRaw)
 				return
 			}
-			log.Printf("🧠 [%s] Semantic match: conf=%s best_rule=%d total_matched=%d", business.Name, semConf, bestRule.ID, len(semRules))
-			
-			// If high confidence and ONLY one rule matched, reply directly
-			if semConf == "high" && len(semRules) == 1 {
+
+			if confidence == "high" {
+				// Deterministic HIGH -> direct reply
 				detectedLang := DetectMessageLanguage(text)
-				replyText := selectReply(&bestRule, detectedLang, business)
-				log.Printf("📤 [%s] Semantic FAQ reply sent to %s (lang=%s)", business.Name, from, detectedLang)
+				replyText := selectReply(best.Rule, detectedLang, business)
+				log.Printf("✅ [%s] FAQ HIGH-CONFIDENCE match (%s) — replying to %s (lang=%s)", business.Name, best.MatchType, from, detectedLang)
 				enrichAndSend(business, from, fromRaw, replyText, text)
 				if !isSandbox {
-					database.DB.Model(&models.Rule{}).Where("id = ?", bestRule.ID).UpdateColumn("usage_count", database.DB.Raw("usage_count + 1"))
+					database.DB.Model(&models.Rule{}).Where("id = ?", best.Rule.ID).UpdateColumn("usage_count", database.DB.Raw("usage_count + 1"))
 					database.DB.Model(business).UpdateColumn("faq_reply_count", database.DB.Raw("faq_reply_count + 1"))
 				}
 				return
 			}
-			
-			// Multi-Rule Synthesis: synthesize top rules using Gemini
+
+			// Deterministic MEDIUM -> prepare Gemini hint
+			log.Printf("💡 [%s] Det MEDIUM match — synthesizing via Gemini", business.Name)
+			detectedLang := DetectMessageLanguage(text)
 			var hints []string
-			for _, r := range semRules {
-				hints = append(hints, r.Response)
-				if !isSandbox {
-					database.DB.Model(&models.Rule{}).Where("id = ?", r.ID).UpdateColumn("usage_count", database.DB.Raw("usage_count + 1"))
+			count := 0
+			for _, s := range sortedDetSignals {
+				if s.Confidence >= 0.75 {
+					hints = append(hints, selectReply(s.Rule, detectedLang, business))
+					if !isSandbox {
+						database.DB.Model(&models.Rule{}).Where("id = ?", s.Rule.ID).UpdateColumn("usage_count", database.DB.Raw("usage_count + 1"))
+					}
+					count++
+					if count >= 3 {
+						break
+					}
 				}
 			}
 			faqHint = strings.Join(hints, "\n\n---\n\n")
+		} else {
+			log.Printf("📉 [%s] Top Det rule %d scored %.2f (LOW) — moving to semantic", business.Name, best.Rule.ID, best.Confidence)
+		}
+	}
+
+	// 2. Evaluate Semantic Signals (ONLY if deterministic is LOW/fails)
+	if bestDet == nil {
+		semSignals := GetSemanticSignals(business.ID, reducedMsg)
+		
+		// Attempt Semantic Direct shortcut first
+		if winner, ok := EvaluateSemanticDirectCandidate(semSignals, reducedMsg); ok {
+			detectedLang := DetectMessageLanguage(text)
+			replyText := selectReply(winner.Rule, detectedLang, business)
+			if strings.TrimSpace(replyText) == "" {
+				log.Printf("⚠️ [%s] Semantic Direct match had empty response — falling back to Gemini", business.Name)
+			} else {
+				log.Printf("🚀 [%s] Semantic Direct match (Raw=%.2f) — bypassing Gemini for %s", business.Name, winner.RawConfidence, from)
+				enrichAndSend(business, from, fromRaw, replyText, text)
+				if !isSandbox {
+					database.DB.Model(&models.Rule{}).Where("id = ?", winner.Rule.ID).UpdateColumn("usage_count", database.DB.Raw("usage_count + 1"))
+					database.DB.Model(business).UpdateColumn("faq_reply_count", database.DB.Raw("faq_reply_count + 1"))
+				}
+				return
+			}
+		}
+
+		// Fallback to Semantic Hint logic
+		sortedSemSignals := AggregateSignals(semSignals)
+		if len(sortedSemSignals) > 0 {
+			bestSem := sortedSemSignals[0]
+			isMatch, _, _ := EvaluateRule(business.Name, from, bestSem)
+			if isMatch { // >= 0.60 threshold
+				log.Printf("🧠 [%s] Semantic Hint (Final=%.2f) — synthesizing via Gemini for %s", business.Name, bestSem.Confidence, from)
+				detectedLang := DetectMessageLanguage(text)
+				var hints []string
+				count := 0
+				for _, s := range sortedSemSignals {
+					if s.Confidence >= 0.60 {
+						hints = append(hints, selectReply(s.Rule, detectedLang, business))
+						if !isSandbox {
+							database.DB.Model(&models.Rule{}).Where("id = ?", s.Rule.ID).UpdateColumn("usage_count", database.DB.Raw("usage_count + 1"))
+						}
+						count++
+						if count >= 3 {
+							break
+						}
+					}
+				}
+				faqHint = strings.Join(hints, "\n\n---\n\n")
+			}
 		}
 	}
 
@@ -498,155 +517,6 @@ FallbackSemantic:
 
 	p.callGemini(business, from, fromRaw, text, faqHint, isStale)
 
-}
-
-// matchFAQ returns the best matching rule and a confidence level.
-//
-// Keyword format (comma-separated entries in Rule.Keywords):
-//
-//	Single:  "delivery,courier"        -> OR logic, any entry triggers
-//	Combo:   "keda+price"              -> AND logic, ALL '+'-split parts must appear
-//	Mixed:   "keda,keda oil,keda+price"
-//
-// Priority (highest specificity first):
-//
-//	1A. AND-combination entries (more '+' parts wins)
-//	1B. Single-keyword exact word-boundary match
-//	2.  Fuzzy match (typo tolerance) - always medium confidence
-//
-// Stage 1 Constraints (precision-first):
-//
-//	Direct reply (high confidence) only fires when the message is SHORT (<=5 words)
-//	or the keyword-to-message word ratio is >= 0.40. Longer complex messages
-//	with incidental keyword hits only get medium confidence (hint only).
-//
-// Confidence:
-//
-//	"high"   -> message <=5 words OR keyword-word-ratio >= 40%, auto-reply FAQ
-//	"medium" -> longer/complex message or fuzzy match, hint Gemini only
-func matchFAQ(businessID uint, msg string) (*models.Rule, string) {
-	normalizedMsg := NormalizeMessage(msg)
-	rules := Cache.GetRules(businessID)
-
-	log.Printf("INFO matchFAQ: biz=%d normalized='%s' rules=%d", businessID, normalizedMsg, len(rules))
-
-	jw := metrics.NewJaroWinkler()
-	msgWords := strings.Fields(normalizedMsg)
-	msgWordCount := len(msgWords)
-
-	wbMatch := func(text, term string) bool {
-		if !strings.Contains(text, term) {
-			return false
-		}
-		pat := `(?i)(?:^|[^\pL\pN])` + regexp.QuoteMeta(term) + `(?:[^\pL\pN]|$)`
-		ok, _ := regexp.MatchString(pat, text)
-		return ok
-	}
-
-	// Precision-first confidence gate:
-	// Only reply directly (high) when message is short OR keyword coverage is dense.
-	gateConf := func(kwEntry string) string {
-		parts := strings.Split(kwEntry, "+")
-		kwWords := 0
-		for _, p := range parts {
-			kwWords += len(strings.Fields(strings.TrimSpace(p)))
-		}
-		if msgWordCount <= 5 || float64(kwWords)/float64(msgWordCount) >= 0.40 {
-			return "high"
-		}
-		return "medium"
-	}
-
-	// Stage 1A: AND-combination keyword entries (highest specificity)
-	type comboHit struct {
-		rule  models.Rule
-		entry string
-		parts int
-	}
-	var hits []comboHit
-
-	for _, cr := range rules {
-		for _, entry := range strings.Split(cr.Rule.Keywords, ",") {
-			entry = strings.TrimSpace(entry)
-			if !strings.Contains(entry, "+") {
-				continue
-			}
-			parts := strings.Split(entry, "+")
-			allOk := true
-			for _, p := range parts {
-				if !wbMatch(normalizedMsg, strings.TrimSpace(p)) {
-					allOk = false
-					break
-				}
-			}
-			if allOk {
-				hits = append(hits, comboHit{cr.Rule, entry, len(parts)})
-			}
-		}
-	}
-
-	if len(hits) > 0 {
-		best := hits[0]
-		for _, h := range hits[1:] {
-			if h.parts > best.parts {
-				best = h
-			}
-		}
-		c := gateConf(best.entry)
-		log.Printf("COMBO Stage 1A match! entry='%s' confidence=%s", best.entry, c)
-		return &best.rule, c
-	}
-
-	// Stage 1B: Single-keyword exact word-boundary match
-	for _, cr := range rules {
-		for _, entry := range strings.Split(cr.Rule.Keywords, ",") {
-			entry = strings.TrimSpace(entry)
-			if strings.Contains(entry, "+") {
-				continue
-			}
-			if wbMatch(normalizedMsg, entry) {
-				c := gateConf(entry)
-				log.Printf("EXACT Stage 1B match! kw='%s' confidence=%s", entry, c)
-				ruleCopy := cr.Rule
-				return &ruleCopy, c
-			}
-		}
-	}
-
-	// Fuzzy match — always medium confidence, prevents false-positive direct replies
-	for _, cr := range rules {
-		for _, entry := range strings.Split(cr.Rule.Keywords, ",") {
-			entry = strings.TrimSpace(entry)
-			if strings.Contains(entry, "+") {
-				continue
-			}
-			// 1. Short Keyword Protection: Disable fuzzy matching for keywords < 5 chars
-			if len(entry) < 5 {
-				continue
-			}
-
-			for _, word := range msgWords {
-				// 1b. Short Word Protection: Disable fuzzy matching for input words < 5 chars
-				if len(word) < 5 {
-					continue
-				}
-
-				// 2. Length Difference Penalty: Words must be similar in length
-				lenDiff := len(word) - len(entry)
-				if lenDiff < -1 || lenDiff > 1 {
-					continue
-				}
-
-				if score := strutil.Similarity(word, entry, jw); score > 0.85 {
-					log.Printf("FUZZY match! word='%s' ~ kw='%s' score=%.2f", word, entry, score)
-					ruleCopy := cr.Rule
-					return &ruleCopy, "medium"
-				}
-			}
-		}
-	}
-
-	return nil, ""
 }
 
 // selectReply picks the correct language response for a rule based on the
@@ -829,73 +699,6 @@ func isLikelyGibberish(normalized string) bool {
 	return false
 }
 
-func semanticMatch(businessID uint, msg string) ([]models.Rule, string) {
-	rules := Cache.GetRules(businessID)
-
-	// Filter to only rules that have embeddings
-	embedded := make([]CachedRule, 0, len(rules))
-	for _, cr := range rules {
-		if len(cr.Embedding) > 0 {
-			embedded = append(embedded, cr)
-		}
-	}
-
-	if len(embedded) == 0 {
-		return nil, ""
-	}
-
-	// Embed the incoming message
-	msgVec, err := EmbedText(msg)
-	if err != nil {
-		log.Printf("⚠️ semanticMatch: embed failed: %v — skipping semantic layer", err)
-		return nil, ""
-	}
-
-	type scoredRule struct {
-		Rule  models.Rule
-		Score float64
-	}
-	var scored []scoredRule
-
-	for i := range embedded {
-		score := CosineSimilarity(msgVec, embedded[i].Embedding)
-		if score >= 0.68 {
-			scored = append(scored, scoredRule{Rule: embedded[i].Rule, Score: score})
-		}
-	}
-
-	if len(scored) == 0 {
-		return nil, ""
-	}
-
-	// Sort descending
-	for i := 0; i < len(scored)-1; i++ {
-		for j := i + 1; j < len(scored); j++ {
-			if scored[j].Score > scored[i].Score {
-				scored[i], scored[j] = scored[j], scored[i]
-			}
-		}
-	}
-
-	bestScore := scored[0].Score
-	
-	limit := 3
-	if len(scored) < limit {
-		limit = len(scored)
-	}
-
-	var bestRules []models.Rule
-	for i := 0; i < limit; i++ {
-		bestRules = append(bestRules, scored[i].Rule)
-	}
-
-	log.Printf("🧠 semanticMatch: biz=%d best_score=%.3f rules_found=%d", businessID, bestScore, len(bestRules))
-
-	if bestScore >= 0.87 {
-		return bestRules, "high"
-	}
-	return bestRules, "medium"
-}
 
 func (p *Pipeline) callGemini(business *models.Business, phone string, fromPhone string, text string, faqHint string, isStale bool) {
 	// ── PromptShield: sanitize before ANYTHING touches Gemini ────────────────

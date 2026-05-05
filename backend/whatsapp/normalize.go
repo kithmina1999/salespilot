@@ -146,13 +146,9 @@ var sinhalaMap = map[string]string{
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-// NormalizeMessage performs a multi-stage cleanup pipeline for Sri Lankan customer
-// WhatsApp conversations. It handles Sinhala script, romanised Sinhala (Singlish),
-// emojis, punctuation noise, filler words and common typos.
-//
-// The output is a lowercase English string with canonical domain terms that the
-// FAQ matching and Gemini prompt layers can rely on.
-func NormalizeMessage(msg string) string {
+// CleanMessage prepares the message for deterministic matching (exact, combo, fuzzy).
+// It canonicalizes text but strictly avoids dropping any words to prevent context loss.
+func CleanMessage(msg string) string {
 	if msg == "" {
 		return ""
 	}
@@ -168,25 +164,45 @@ func NormalizeMessage(msg string) string {
 	// 3. Strip emojis
 	msg = emojiRe.ReplaceAllString(msg, " ")
 
-	// 4. Strip punctuation noise  (keep alphanumerics, spaces, apostrophes in contractions)
+	// 4. Strip punctuation noise
 	msg = punctCleanRe.ReplaceAllString(msg, " ")
 
-	// 5. Strip leading filler words (greeting openers Sri Lankans use before the real question)
-	for _, filler := range fillerWords {
-		if strings.HasPrefix(msg, filler) {
-			msg = strings.TrimSpace(msg[len(filler):])
-		}
-	}
-
-	// 6. Apply Singlish regex rules (word-bounded, precompiled)
+	// 5. Apply Singlish regex rules (canonical domain terms)
 	for _, rule := range normRules {
 		msg = rule.re.ReplaceAllString(msg, rule.replacement)
 	}
 
-	// 7. Collapse multi-whitespace
+	// 6. Collapse multi-whitespace
 	msg = multiSpaceRe.ReplaceAllString(msg, " ")
 
 	return strings.TrimSpace(msg)
+}
+
+// ReduceMessage prepares the message for Semantic Matching and Gemini fallback.
+// It applies aggressive filler-word stripping which shouldn't be used in exact/fuzzy matches.
+func ReduceMessage(cleanMsg string) string {
+	msg := cleanMsg
+	
+	// Strip leading filler words (greeting openers Sri Lankans use before the real question)
+	for _, filler := range fillerWords {
+		// Clean the filler word just like we cleaned the message (to match correctly)
+		cleanFiller := strings.TrimSpace(punctCleanRe.ReplaceAllString(filler, "")) + " "
+		if strings.HasPrefix(msg, cleanFiller) {
+			msg = strings.TrimSpace(msg[len(cleanFiller):])
+		}
+		// Also check exact match (if the whole message was just the filler word)
+		if msg == strings.TrimSpace(cleanFiller) {
+			msg = ""
+		}
+	}
+
+	return msg
+}
+
+// NormalizeMessage is kept for backward compatibility with other layers.
+// It runs the full Clean + Reduce pipeline.
+func NormalizeMessage(msg string) string {
+	return ReduceMessage(CleanMessage(msg))
 }
 
 // IsSinhala checks whether the text contains any native Sinhala Unicode characters.

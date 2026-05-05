@@ -5,7 +5,7 @@ done 3: regardign the bot pause button in chat page: it soemtime glsich out noly
 done 4: product update not working need to take a look.
 done 5: currently in /billing : when we have 0 more days left we need to udpate or current paln sectio ndispaly tiem from hours then to minutes whe n0 hours and 0 minutes left we need to udpate or current paln section status to canceld and disable all buttons. and di
 done 6: it say thatcurrent paln i on trial but say ai offline we need to get into conssitense whether we are on free paln or trial plan; after trial expired 
-7: need to add some ads about subscrbtion beenfits and lets tenants make susbcribe form free paln to paid
+doen need checks: 7: need to add some ads about subscrbtion beenfits and lets tenants make susbcribe form free paln to paid
 8 : in /setting genral tab: we need to add drop down to add selected bot langauges to let tenant enter cusotm greeting in all languages otherwise use default faq if the langauge is availble for them.
 9: add remaing half implemented features in /settings tabs
 10: update Report tab to logs 
@@ -23,3 +23,5 @@ done 6: it say thatcurrent paln i on trial but say ai offline we need to get int
 20: [x] Slice 5: Bulk Review-and-Approve Translation (Translate All Missing button, Side-by-side Review Modal)
 21: [x] Slice 6: Multi-Rule LLM Synthesis & Premium Billing (Update pipeline to synthesize top 3 rules using Gemini, flag as AI message)
 22: [x] Slice 7: The Sandbox Simulator (Build /api/business/simulate endpoint, Chat UI simulator next to rules table)
+23: [ ] Feature: Message Origin Observability (Add SourceType to messages, UI badges in simulator to show FAQ/AI origins)
+24: [x] Slice 8: FAQ Matching Engine v2 (3-stage input pipeline, MatchSignal scoring with weights/caps, Rule Tiers, Action Gating, Observability — see scoring_engine_spec.md)
