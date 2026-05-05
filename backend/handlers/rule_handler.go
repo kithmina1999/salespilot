@@ -46,7 +46,7 @@ func ListRules(c *gin.Context) {
 // CloneTemplate copies a RuleTemplate into the business's custom rules
 func CloneTemplate(c *gin.Context) {
 	businessID := c.GetUint("business_id")
-	
+
 	var req struct {
 		TemplateID uint `json:"template_id" binding:"required"`
 	}
@@ -277,20 +277,38 @@ func UpdateRule(c *gin.Context) {
 	}
 
 	// Apply scalar fields
-	if req.Category != nil        { rule.Category = *req.Category }
-	if req.Keywords != nil        { rule.Keywords = *req.Keywords }
-	if req.Response != nil        { rule.Response = *req.Response; rule.SetResponse("en", *req.Response) }
-	if req.SinhalaResponse != nil { rule.SinhalaResponse = *req.SinhalaResponse; rule.SetResponse("si", *req.SinhalaResponse) }
-	if req.IsActive != nil        { rule.IsActive = *req.IsActive }
-	if req.IsDropRule != nil      { rule.IsDropRule = *req.IsDropRule }
+	if req.Category != nil {
+		rule.Category = *req.Category
+	}
+	if req.Keywords != nil {
+		rule.Keywords = *req.Keywords
+	}
+	if req.Response != nil {
+		rule.Response = *req.Response
+		rule.SetResponse("en", *req.Response)
+	}
+	if req.SinhalaResponse != nil {
+		rule.SinhalaResponse = *req.SinhalaResponse
+		rule.SetResponse("si", *req.SinhalaResponse)
+	}
+	if req.IsActive != nil {
+		rule.IsActive = *req.IsActive
+	}
+	if req.IsDropRule != nil {
+		rule.IsDropRule = *req.IsDropRule
+	}
 
 	// Apply multi-language responses map (highest priority)
 	if len(req.Responses) > 0 {
 		for lang, text := range req.Responses {
 			rule.SetResponse(lang, text)
 			// Keep legacy scalar fields in sync for backward compat
-			if lang == "en" { rule.Response = text }
-			if lang == "si" { rule.SinhalaResponse = text }
+			if lang == "en" {
+				rule.Response = text
+			}
+			if lang == "si" {
+				rule.SinhalaResponse = text
+			}
 		}
 	}
 
@@ -306,7 +324,9 @@ func UpdateRule(c *gin.Context) {
 	LogActivity(businessID, "user", c.GetUint("user_id"), "rule_updated", "rule", strconv.FormatUint(uint64(id), 10), map[string]interface{}{
 		"languages_updated": func() []string {
 			langs := []string{}
-			for l := range req.Responses { langs = append(langs, l) }
+			for l := range req.Responses {
+				langs = append(langs, l)
+			}
 			return langs
 		}(),
 	}, c.ClientIP(), "low", bizName, bizPlan)
@@ -526,8 +546,12 @@ Return ONLY a raw JSON object (no markdown, no code fences):
 		}
 		// Build responses map for new multi-lang rule editor
 		responsesMap := map[string]string{}
-		if drafted.Response != "" { responsesMap["en"] = drafted.Response }
-		if drafted.SinhalaResponse != "" { responsesMap["si"] = drafted.SinhalaResponse }
+		if drafted.Response != "" {
+			responsesMap["en"] = drafted.Response
+		}
+		if drafted.SinhalaResponse != "" {
+			responsesMap["si"] = drafted.SinhalaResponse
+		}
 		c.JSON(http.StatusOK, gin.H{
 			"generalized_intent": drafted.GeneralizedIntent,
 			"keywords":           drafted.Keywords,
@@ -547,8 +571,12 @@ Return ONLY a raw JSON object (no markdown, no code fences):
 		}
 		// Build responses map for new multi-lang rule editor
 		responsesMap := map[string]string{}
-		if drafted.Response != "" { responsesMap["en"] = drafted.Response }
-		if drafted.SinhalaResponse != "" { responsesMap["si"] = drafted.SinhalaResponse }
+		if drafted.Response != "" {
+			responsesMap["en"] = drafted.Response
+		}
+		if drafted.SinhalaResponse != "" {
+			responsesMap["si"] = drafted.SinhalaResponse
+		}
 		c.JSON(http.StatusOK, gin.H{
 			"response":         drafted.Response,
 			"sinhala_response": drafted.SinhalaResponse,

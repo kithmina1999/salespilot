@@ -46,10 +46,16 @@ func OverrideBusinessPlan(c *gin.Context) {
 		Plan          string     `json:"plan" binding:"required"`
 		BillingCycle  string     `json:"billing_cycle"`
 		PlanExpiresAt *time.Time `json:"plan_expires_at"`
-		Reason        string     `json:"reason"`
+		Reason        string     `json:"reason" binding:"required"`
+		Confirm       string     `json:"confirm"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	if err := ValidateHighRiskAction(req.Reason, req.Confirm, "FORCE PLAN"); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 

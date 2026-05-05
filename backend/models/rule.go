@@ -12,7 +12,7 @@ import (
 type Rule struct {
 	gorm.Model
 	BusinessID *uint  `json:"business_id" gorm:"index"`
-	Category   string `json:"category" gorm:"index"` // e.g., "Shipping", "General"
+	Category   string `json:"category" gorm:"index"`     // e.g., "Shipping", "General"
 	Keywords   string `json:"keywords" gorm:"type:text"` // comma-separated keywords
 
 	// New: extensible per-language response map, e.g. {"en": "...", "si": "...", "ta": "..."}
@@ -22,15 +22,15 @@ type Rule struct {
 	Response        string `json:"response,omitempty"`
 	SinhalaResponse string `json:"sinhala_response,omitempty" gorm:"type:text"`
 
-	IsActive        bool   `json:"is_active" gorm:"default:true"`
-	UsageCount      uint   `json:"usage_count" gorm:"default:0"`
-	
+	IsActive   bool `json:"is_active" gorm:"default:true"`
+	UsageCount uint `json:"usage_count" gorm:"default:0"`
+
 	// Action Tier (critical, intent, casual) defines allowed actions
-	ActionTier      string `json:"action_tier" gorm:"default:'intent'"`
-	
+	ActionTier string `json:"action_tier" gorm:"default:'intent'"`
+
 	// Tier 1: Hard silent drop — no reply sent, no token consumed, no log created
 	// Must be combined with ActionTier == "critical" to actually drop
-	IsDropRule      bool   `json:"is_drop_rule" gorm:"default:false"`
+	IsDropRule bool `json:"is_drop_rule" gorm:"default:false"`
 	// Tier 2: Context bridge — check last bot message; re-prompt if it was a question, else silent drop
 	IsContextBridge bool   `json:"is_context_bridge" gorm:"default:false"`
 	Embedding       []byte `json:"-" gorm:"type:bytea"` // JSON-encoded float64 vector, not exposed in API

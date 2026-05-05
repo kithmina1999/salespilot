@@ -8,19 +8,19 @@ import (
 )
 
 type Config struct {
-	Port             string
-	DatabaseURL      string // PostgreSQL connection string (main app DB)
-	WASessionsDBPath string // SQLite path for whatsmeow sessions only
-	APIKey           string
-	OwnerPhone       string
-	ServerURL        string
-	MasterAPIKey     string
-	GeminiAPIKey     string
-	GinMode          string // "debug" | "release"
-	FrontendURL      string
-	R2AccountID      string
-	R2AccessKey      string
-	R2SecretKey      string
+	Port                string
+	DatabaseURL         string // PostgreSQL connection string (main app DB)
+	WASessionsDBPath    string // SQLite path for whatsmeow sessions only
+	APIKey              string
+	OwnerPhone          string
+	ServerURL           string
+	MasterAPIKey        string
+	GeminiAPIKey        string
+	GinMode             string // "debug" | "release"
+	FrontendURL         string
+	R2AccountID         string
+	R2AccessKey         string
+	R2SecretKey         string
 	R2Bucket            string
 	ResendAPIKey        string
 	ResendFromEmail     string // Sender address shown in transactional emails (RESEND_FROM_EMAIL)
@@ -42,18 +42,18 @@ func Load() *Config {
 	godotenv.Load()
 
 	cfg := &Config{
-		Port:             getEnv("PORT", "8080"),
-		DatabaseURL:      os.Getenv("DATABASE_URL"),
-		WASessionsDBPath: getEnv("WA_SESSIONS_DB_PATH", "whatsapp_sessions.db"),
-		APIKey:           os.Getenv("API_KEY"),
-		OwnerPhone:       getEnv("OWNER_PHONE", "+94771234567"),
-		ServerURL:        getEnv("SERVER_URL", "http://localhost:8080"),
-		MasterAPIKey:     os.Getenv("MASTER_API_KEY"),
-		GeminiAPIKey:     os.Getenv("GEMINI_API_KEY"),
-		GinMode:          getEnv("GIN_MODE", "debug"),
-		FrontendURL:      getEnv("FRONTEND_URL", "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001"),
-		R2AccountID:      os.Getenv("R2_ACCOUNT_ID"),
-		R2AccessKey:      os.Getenv("R2_ACCESS_KEY_ID"),
+		Port:                getEnv("PORT", "8080"),
+		DatabaseURL:         os.Getenv("DATABASE_URL"),
+		WASessionsDBPath:    getEnv("WA_SESSIONS_DB_PATH", "whatsapp_sessions.db"),
+		APIKey:              os.Getenv("API_KEY"),
+		OwnerPhone:          getEnv("OWNER_PHONE", "+94771234567"),
+		ServerURL:           getEnv("SERVER_URL", "http://localhost:8080"),
+		MasterAPIKey:        os.Getenv("MASTER_API_KEY"),
+		GeminiAPIKey:        os.Getenv("GEMINI_API_KEY"),
+		GinMode:             getEnv("GIN_MODE", "debug"),
+		FrontendURL:         getEnv("FRONTEND_URL", "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001"),
+		R2AccountID:         os.Getenv("R2_ACCOUNT_ID"),
+		R2AccessKey:         os.Getenv("R2_ACCESS_KEY_ID"),
 		R2SecretKey:         os.Getenv("R2_SECRET_ACCESS_KEY"),
 		R2Bucket:            os.Getenv("R2_BUCKET_NAME"),
 		ResendAPIKey:        os.Getenv("RESEND_API_KEY"),

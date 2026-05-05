@@ -365,8 +365,8 @@ func initAddressValidator() {
 // Uses embedding cosine similarity when the validator is ready (cost: ~$0.000001).
 // Falls back to the keyword/entropy looksLikeAddress() heuristic otherwise.
 //
-//   isValid     = true if the input looks like a real address
-//   confidence  = score difference between valid and invalid centroids (0.0–1.0)
+//	isValid     = true if the input looks like a real address
+//	confidence  = score difference between valid and invalid centroids (0.0–1.0)
 func IsLikelyAddress(addr string) (bool, float64) {
 	classifierMu.RLock()
 	ready := addrValidatorReady
@@ -397,4 +397,3 @@ func IsLikelyAddress(addr string) (bool, float64) {
 	// Fallback: keyword + entropy heuristic (zero cost)
 	return looksLikeAddress(addr), 0.5
 }
-

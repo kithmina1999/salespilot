@@ -19,7 +19,6 @@ import (
 // e164Re matches a valid E.164 phone number: + followed by 7–15 digits.
 var e164Re = regexp.MustCompile(`^\+[1-9]\d{6,14}$`)
 
-
 type LoginInput struct {
 	Identifier string `json:"identifier" binding:"required"` // Can be Email or Phone
 	Password   string `json:"password" binding:"required"`

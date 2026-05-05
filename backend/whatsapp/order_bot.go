@@ -35,7 +35,6 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-
 // ─── DB Tracking Wrappers ───────────────────────────────────────────────────────
 
 func botSendText(business *models.Business, phone, body string) error {
@@ -61,6 +60,7 @@ func botSendList(business *models.Business, phone, body, label string, sections 
 	}
 	return err
 }
+
 // ─── Public Entry Point ─────────────────────────────────────────────────────────
 
 // handleCartMessage is the main entry point called from the pipeline BEFORE FAQ/Gemini.
@@ -530,7 +530,7 @@ func askPaymentMethod(business *models.Business, cart *models.Cart, fromRaw stri
 		buttons = append(buttons, Button{ID: "pay:cod", Title: "💵 Cash on Delivery"})
 	}
 	buttons = append(buttons, Button{ID: "pay:bank_transfer", Title: "🏦 Bank Transfer"})
-	
+
 	botSendButtons(business, fromRaw, "How would you like to pay?", buttons)
 }
 
@@ -687,7 +687,7 @@ func showProductList(business *models.Business, fromRaw string) {
 		if len([]rune(title)) > 24 {
 			title = string([]rune(title)[:23]) + "…"
 		}
-		
+
 		desc := fmt.Sprintf("Rs. %.0f%s", p.Price, extra)
 		if len([]rune(desc)) > 72 {
 			desc = string([]rune(desc)[:71]) + "…"

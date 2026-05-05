@@ -146,7 +146,7 @@ func ApproveOrderProof(c *gin.Context) {
 		proof.ID, order.BusinessOrderNum, businessID)
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Payment approved ✅",
+		"message":  "Payment approved ✅",
 		"proof_id": proof.ID,
 		"order_id": order.ID,
 	})

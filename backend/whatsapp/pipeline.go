@@ -93,7 +93,7 @@ func (p *Pipeline) handleContextBridge(business *models.Business, from, fromRaw 
 	if strings.Contains(lastBotMsg.Content, "?") {
 		nudge := "Just to confirm — " + lastBotMsg.Content
 		log.Printf("🔄 [%s] Context bridge — re-prompting %s with last question", business.Name, from)
-		SendText(business.WAPhoneNumberID,business.WAAccessToken, fromRaw, nudge)
+		SendText(business.WAPhoneNumberID, business.WAAccessToken, fromRaw, nudge)
 	} else {
 		log.Printf("🔇 [%s] Context bridge — prior msg had no question, silently dropping", business.Name)
 	}
@@ -120,6 +120,19 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 
 	isSandbox := from == "99900000000"
 
+	var pLog *models.PipelineLog
+	shouldLog := isSandbox || (business.DebugMode && business.DebugModeUntil != nil && business.DebugModeUntil.After(time.Now()))
+	if shouldLog {
+		pLog = &models.PipelineLog{
+			BusinessID: business.ID,
+			Phone:      from,
+			RawMessage: text,
+			IsSandbox:  isSandbox,
+			DebugMode:  business.DebugMode,
+		}
+		defer PersistPipelineLog(pLog)
+	}
+
 	// ── Layer B: Proactive delivery check (deferred goroutine) ──────────────
 	// Fired AFTER HandleIncomingMessage returns so the main reply lands first.
 	// Only sends a button if customer has a shipped order >1 day old and hasn't been asked.
@@ -127,6 +140,17 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 		bizCopy := *business
 		go ScheduleDeliveryCheck(&bizCopy, from, fromRaw)
 	}()
+
+	// --- SUSPENSION CHECK ---
+	if business.SuspendedAt != nil {
+		if business.SuspensionType == models.SuspensionAbuse || business.SuspensionType == models.SuspensionPolicy {
+			log.Printf("🛑 [%s] Blocked message: Business suspended due to %s", business.Name, business.SuspensionType)
+			return // silent drop
+		}
+		log.Printf("🛑 [%s] Blocked message: Business temporarily suspended", business.Name)
+		botSendText(business, fromRaw, "Sorry, this service is temporarily unavailable right now. Please try again later.")
+		return
+	}
 
 	// --- LAYER 1: Safety Check - Blacklist ---
 	var blacklist models.BlacklistedNumber
@@ -288,13 +312,26 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 	cleanMsg := CleanMessage(text)
 	reducedMsg := ReduceMessage(cleanMsg)
 
+	if pLog != nil {
+		pLog.CleanMessage = cleanMsg
+		pLog.ReducedMessage = reducedMsg
+	}
+
 	if cleanMsg == "" {
+		if pLog != nil {
+			pLog.RouteTaken = "drop"
+			pLog.ActionTaken = "dropped_empty"
+		}
 		log.Printf("🔇 [%s] Pure emoji/symbol message — silently terminating for %s (raw: %q)", business.Name, from, text)
 		return
 	}
 
 	detSignals := GetDeterministicSignals(business.ID, cleanMsg)
 	sortedDetSignals := AggregateSignals(detSignals)
+
+	if pLog != nil {
+		populatePipelineSignals(pLog, sortedDetSignals)
+	}
 
 	var faqHint string
 	var bestDet *MatchSignal
@@ -307,7 +344,7 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 		if isMatch {
 			bestDet = &best
 			// Log observability for best signal
-			log.Printf("📊 [%s] Det Signal: Rule=%d MatchType=%s Entry=%q Strength=%s Tokens=%d Words=%d Density=%.2f RawConf=%.2f -> Cap=%.2f | Final=%.2f", 
+			log.Printf("📊 [%s] Det Signal: Rule=%d MatchType=%s Entry=%q Strength=%s Tokens=%d Words=%d Density=%.2f RawConf=%.2f -> Cap=%.2f | Final=%.2f",
 				business.Name, best.Rule.ID, best.MatchType, best.MatchedEntry, best.KeywordStrength, best.MatchedTokens, best.MsgWordCount, best.Density,
 				best.Debug.RawConfidence, best.Debug.AfterCaps, best.Confidence)
 
@@ -330,6 +367,14 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 					database.DB.Model(&models.Rule{}).Where("id = ?", best.Rule.ID).UpdateColumn("usage_count", database.DB.Raw("usage_count + 1"))
 					database.DB.Model(business).UpdateColumn("faq_reply_count", database.DB.Raw("faq_reply_count + 1"))
 				}
+				if pLog != nil {
+					pLog.RouteTaken = "faq_high"
+					pLog.ActionTaken = "replied"
+					pLog.SelectedRuleID = &best.Rule.ID
+					pLog.SelectedMatchType = best.MatchType
+					pLog.SelectedConfidence = best.Confidence
+					pLog.SelectedRawConfidence = best.Debug.RawConfidence
+				}
 				return
 			}
 
@@ -351,6 +396,15 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 				}
 			}
 			faqHint = strings.Join(hints, "\n\n---\n\n")
+			if pLog != nil {
+				pLog.FAQHintUsed = true
+				if bestDet != nil {
+					pLog.SelectedRuleID = &bestDet.Rule.ID
+					pLog.SelectedMatchType = bestDet.MatchType
+					pLog.SelectedConfidence = bestDet.Confidence
+					pLog.SelectedRawConfidence = bestDet.Debug.RawConfidence
+				}
+			}
 		} else {
 			log.Printf("📉 [%s] Top Det rule %d scored %.2f (LOW) — moving to semantic", business.Name, best.Rule.ID, best.Confidence)
 		}
@@ -359,7 +413,11 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 	// 2. Evaluate Semantic Signals (ONLY if deterministic is LOW/fails)
 	if bestDet == nil {
 		semSignals := GetSemanticSignals(business.ID, reducedMsg)
-		
+
+		if pLog != nil {
+			populatePipelineSignals(pLog, AggregateSignals(semSignals))
+		}
+
 		// Attempt Semantic Direct shortcut first
 		if winner, ok := EvaluateSemanticDirectCandidate(semSignals, reducedMsg); ok {
 			detectedLang := DetectMessageLanguage(text)
@@ -372,6 +430,14 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 				if !isSandbox {
 					database.DB.Model(&models.Rule{}).Where("id = ?", winner.Rule.ID).UpdateColumn("usage_count", database.DB.Raw("usage_count + 1"))
 					database.DB.Model(business).UpdateColumn("faq_reply_count", database.DB.Raw("faq_reply_count + 1"))
+				}
+				if pLog != nil {
+					pLog.RouteTaken = "semantic_direct"
+					pLog.ActionTaken = "replied"
+					pLog.SelectedRuleID = &winner.Rule.ID
+					pLog.SelectedMatchType = "semantic"
+					pLog.SelectedConfidence = winner.Confidence
+					pLog.SelectedRawConfidence = winner.RawConfidence
 				}
 				return
 			}
@@ -400,6 +466,13 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 					}
 				}
 				faqHint = strings.Join(hints, "\n\n---\n\n")
+				if pLog != nil {
+					pLog.FAQHintUsed = true
+					pLog.SelectedRuleID = &bestSem.Rule.ID
+					pLog.SelectedMatchType = "semantic"
+					pLog.SelectedConfidence = bestSem.Confidence
+					pLog.SelectedRawConfidence = bestSem.RawConfidence
+				}
 			}
 		}
 	}
@@ -407,6 +480,10 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 	// Gibberish Guard: if the normalized message contains no vowels and no Sinhala script,
 	// it's likely random keyboard mashing (e.g., "dfgfzsef"). Drop silently — no UnmatchedMessage, no Gemini token.
 	if isLikelyGibberish(NormalizeMessage(text)) {
+		if pLog != nil {
+			pLog.RouteTaken = "gibberish"
+			pLog.ActionTaken = "dropped"
+		}
 		log.Printf("🔇 [%s] Gibberish message detected — silently terminating for %s (raw: %q)", business.Name, from, text)
 		return
 	}
@@ -500,6 +577,10 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 		log.Printf("⚠️ [%s] AI Message Limit Hit (%d). AI Bot Disabled for %s.", business.Name, maxAI, from)
 		botSendText(business, fromRaw,
 			"I am currently receiving too many complex questions. Please wait for a human representative.")
+		if pLog != nil {
+			pLog.RouteTaken = "system_limit"
+			pLog.ActionTaken = "replied"
+		}
 		return
 	}
 
@@ -511,10 +592,22 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 		} else {
 			log.Printf("🛒 [%s] Sent native catalog message to %s", business.Name, fromRaw)
 			database.DB.Create(&models.Message{BusinessID: business.ID, Phone: from, Role: "model", Content: "[Native WhatsApp Catalog sent]"})
+			if pLog != nil {
+				pLog.RouteTaken = "catalog"
+				pLog.ActionTaken = "replied"
+			}
 			return
 		}
 	}
 
+	if pLog != nil {
+		pLog.RouteTaken = "gemini_raw"
+		if faqHint != "" {
+			pLog.RouteTaken = "semantic_hint"
+		}
+		pLog.ActionTaken = "replied"
+		pLog.AIUsed = true
+	}
 	p.callGemini(business, from, fromRaw, text, faqHint, isStale)
 
 }
@@ -698,7 +791,6 @@ func isLikelyGibberish(normalized string) bool {
 
 	return false
 }
-
 
 func (p *Pipeline) callGemini(business *models.Business, phone string, fromPhone string, text string, faqHint string, isStale bool) {
 	// ── PromptShield: sanitize before ANYTHING touches Gemini ────────────────
@@ -949,3 +1041,39 @@ func tryNativeCatalog(business *models.Business, to, text string) error {
 	return SendCatalogMessage(business.WAPhoneNumberID, business.WAAccessToken, to, business.MetaCatalogID, "")
 }
 
+func populatePipelineSignals(pLog *models.PipelineLog, signals []MatchSignal) {
+	if pLog == nil {
+		return
+	}
+	for i, s := range signals {
+		pLog.SignalLogs = append(pLog.SignalLogs, models.PipelineSignalLog{
+			RuleID:          s.Rule.ID,
+			MatchType:       s.MatchType,
+			MatchedEntry:    s.MatchedEntry,
+			KeywordStrength: string(s.KeywordStrength),
+			RawConfidence:   s.RawConfidence,
+			FinalConfidence: s.Confidence,
+			MatchedTokens:   s.MatchedTokens,
+			MsgWordCount:    s.MsgWordCount,
+			Density:         s.Density,
+			AfterWeight:     s.Debug.AfterWeight,
+			AfterModifiers:  s.Debug.AfterModifiers,
+			AfterCaps:       s.Debug.AfterCaps,
+			Rank:            i + 1,
+		})
+	}
+}
+
+func PersistPipelineLog(pLog *models.PipelineLog) {
+	if pLog == nil {
+		return
+	}
+	// Limit signals to avoid excessive DB writes (top 5 max for UI)
+	if len(pLog.SignalLogs) > 10 {
+		pLog.SignalLogs = pLog.SignalLogs[:10]
+	}
+	// Run async to avoid blocking the webhook
+	go func(log models.PipelineLog) {
+		database.DB.Create(&log)
+	}(*pLog)
+}

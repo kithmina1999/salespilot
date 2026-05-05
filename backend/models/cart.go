@@ -6,22 +6,22 @@ import "time"
 const (
 	CartStateBrowsing             = "browsing"               // initial: showing product list
 	CartStateItemSelected         = "item_selected"          // product chosen, showing details
-	CartStatePendingSize          = "pending_size"            // awaiting size/variant selection
-	CartStatePendingQty           = "pending_qty"             // awaiting quantity
-	CartStateAddMore              = "add_more"                // item added, offer to add more or checkout
-	CartStatePendingAddress       = "pending_address"         // awaiting delivery address
-	CartStatePendingNotes         = "pending_notes"           // awaiting optional order note
-	CartStatePendingPaymentMethod = "pending_payment_method"  // awaiting payment method selection
-	CartStatePendingConfirm       = "pending_confirm"         // showing summary, awaiting CONFIRM
-	CartStatePlaced               = "placed"                  // order created in DB
-	CartStateAbandoned            = "abandoned"               // expired / customer left
+	CartStatePendingSize          = "pending_size"           // awaiting size/variant selection
+	CartStatePendingQty           = "pending_qty"            // awaiting quantity
+	CartStateAddMore              = "add_more"               // item added, offer to add more or checkout
+	CartStatePendingAddress       = "pending_address"        // awaiting delivery address
+	CartStatePendingNotes         = "pending_notes"          // awaiting optional order note
+	CartStatePendingPaymentMethod = "pending_payment_method" // awaiting payment method selection
+	CartStatePendingConfirm       = "pending_confirm"        // showing summary, awaiting CONFIRM
+	CartStatePlaced               = "placed"                 // order created in DB
+	CartStateAbandoned            = "abandoned"              // expired / customer left
 )
 
 // Cart holds an in-progress order session for one customer.
 // Persists for 24 hours. Abandoned carts trigger reminder messages (Pro).
 type Cart struct {
-	ID        uint   `json:"id"         gorm:"primaryKey"`
-	BusinessID uint  `json:"business_id" gorm:"index;not null"`
+	ID         uint   `json:"id"         gorm:"primaryKey"`
+	BusinessID uint   `json:"business_id" gorm:"index;not null"`
 	Phone      string `json:"phone"      gorm:"index;not null"`
 
 	// Conversation state
@@ -73,8 +73,8 @@ type SavedAddress struct {
 	BusinessID uint   `json:"business_id" gorm:"index;not null"`
 	Phone      string `json:"phone"       gorm:"index;not null"`
 
-	Label     string `json:"label"`      // "🏠 Home", "🏢 Office"
-	Address   string `json:"address"`    // full address text
+	Label     string `json:"label"`   // "🏠 Home", "🏢 Office"
+	Address   string `json:"address"` // full address text
 	IsDefault bool   `json:"is_default" gorm:"default:false"`
 
 	CreatedAt time.Time `json:"created_at"`

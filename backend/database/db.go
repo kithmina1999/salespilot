@@ -49,6 +49,8 @@ func Init(dsn string) {
 			&models.UnmatchedMessage{}, &models.User{}, &models.AuditLog{},
 			&models.BlacklistedNumber{}, &models.ActivationCode{},
 			&models.Cart{}, &models.SavedAddress{},
+			&models.SuperAdminUser{}, &models.SuperAdminSession{},
+			&models.PipelineLog{}, &models.PipelineSignalLog{},
 		)
 	}
 
@@ -58,16 +60,20 @@ func Init(dsn string) {
 		&models.Customer{}, &models.Rule{}, &models.RuleTemplate{}, &models.Message{},
 		&models.UnmatchedMessage{}, &models.AuditLog{},
 		&models.BlacklistedNumber{}, &models.ActivationCode{},
-		&models.PasswordResetToken{},        // WhatsApp OTP password reset
+		&models.PasswordResetToken{}, // WhatsApp OTP password reset
 		&models.EmailVerificationToken{},
-		&models.PaymentProof{},              // Bank transfer proof submissions
-		&models.TeamInvite{},                // Multi-user RBAC invitations
-		&models.MonthlyReport{},             // AI-generated monthly business intelligence reports
-		&models.Cart{},                      // In-progress customer order sessions
-		&models.SavedAddress{},              // Customer saved delivery addresses
-		&models.PasswordChangeToken{},       // Authenticated email-OTP password change flow
-		&models.UserSession{},               // Login session tracking (active sessions + login history)
-		&models.OrderPaymentProof{},         // Customer bank-transfer receipt submissions (Slice 3)
+		&models.PaymentProof{},        // Bank transfer proof submissions
+		&models.TeamInvite{},          // Multi-user RBAC invitations
+		&models.MonthlyReport{},       // AI-generated monthly business intelligence reports
+		&models.Cart{},                // In-progress customer order sessions
+		&models.SavedAddress{},        // Customer saved delivery addresses
+		&models.PasswordChangeToken{}, // Authenticated email-OTP password change flow
+		&models.UserSession{},         // Login session tracking (active sessions + login history)
+		&models.OrderPaymentProof{},   // Customer bank-transfer receipt submissions (Slice 3)
+		&models.SuperAdminUser{},
+		&models.SuperAdminSession{},
+		&models.PipelineLog{},
+		&models.PipelineSignalLog{},
 	)
 	if err != nil {
 		log.Fatalf("❌ Failed to migrate database: %v", err)
@@ -77,6 +83,25 @@ func Init(dsn string) {
 
 	if os.Getenv("SEED_DB") == "true" {
 		seedDemoData()
+	}
+
+	// Auto-seed super admin fallback
+	var adminCount int64
+	DB.Model(&models.SuperAdminUser{}).Count(&adminCount)
+	if adminCount == 0 && os.Getenv("SUPER_ADMIN_EMAIL") != "" {
+		email := os.Getenv("SUPER_ADMIN_EMAIL")
+		password := os.Getenv("SUPER_ADMIN_INITIAL_PASSWORD")
+		if password != "" {
+			hashed, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+			DB.Create(&models.SuperAdminUser{
+				Name:         "Super Admin",
+				Email:        email,
+				PasswordHash: string(hashed),
+				Role:         models.SuperRoleOwner,
+				IsActive:     true,
+			})
+			log.Println("⚠️ Auto-seeded super admin — change password immediately")
+		}
 	}
 }
 
@@ -103,7 +128,7 @@ func seedDemoData() {
 		DB.Create(&models.User{
 			BusinessID:      defaultBiz.ID,
 			Email:           "admin@byteshift.lk", // TODO: REPLACE BEFORE PRODUCTION
-			Phone:           "+94771234567",        // TODO: REPLACE BEFORE PRODUCTION
+			Phone:           "+94771234567",       // TODO: REPLACE BEFORE PRODUCTION
 			PasswordHash:    string(hashed),
 			Role:            "admin",
 			IsEmailVerified: true, // skip email verification for demo account
@@ -289,13 +314,13 @@ func seedDemoData() {
 		// ── RULE TEMPLATES (SaaS-wide) ───────────────────────────────────────────
 		templates := []models.RuleTemplate{
 			{
-				Category: "Shipping",
-				Keywords: "shipping,delivery,courier,postage",
+				Category:  "Shipping",
+				Keywords:  "shipping,delivery,courier,postage",
 				Responses: `{"en": "We offer island-wide delivery within 2-4 working days. Delivery fee starts at Rs. 350."}`,
 			},
 			{
-				Category: "Payments",
-				Keywords: "payment,pay,bank transfer,cod",
+				Category:  "Payments",
+				Keywords:  "payment,pay,bank transfer,cod",
 				Responses: `{"en": "We accept Bank Transfer and Cash on Delivery (COD)."}`,
 			},
 		}

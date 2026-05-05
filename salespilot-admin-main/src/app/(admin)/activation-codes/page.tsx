@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { fetchApi } from "@/lib/api";
+import { useState } from "react";
+import useSWR from "swr";
+import { api } from "@/lib/api";
 import {
   KeyRound, Copy, CheckCircle, Plus, Search, Trash2,
   Clock, Shield, MessageCircle, RefreshCw, AlertTriangle,
@@ -92,55 +93,45 @@ function SendWhatsApp({ phone, code, plan, days }: { phone: string; code: string
 }
 
 export default function ActivationCodesPage() {
-  const [codes, setCodes] = useState<ActivationCode[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ total: 0, used: 0, available: 0 });
+  const { data, isLoading: loading, mutate } = useSWR(
+    "/system/activation-codes",
+    (url: string) => api.get(url).then((res) => res.data)
+  );
+  const codes: ActivationCode[] = data?.codes || [];
+  const stats = {
+    total: data?.total || 0,
+    used: data?.used || 0,
+    available: data?.available || 0,
+  };
+
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
 
-  // Create form state
   const [newPlan, setNewPlan]           = useState("starter");
   const [newCycle, setNewCycle]         = useState("quarterly");
   const [newDays, setNewDays]           = useState(90);
   const [newNote, setNewNote]           = useState("");
   const [newPhone, setNewPhone]         = useState("");
 
-  async function loadCodes() {
-    try {
-      const data = await fetchApi("/system/activation-codes");
-      setCodes(data.codes || []);
-      setStats({ total: data.total, used: data.used, available: data.available });
-    } catch (err) {
-      console.error("Failed to load codes:", err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => { loadCodes(); }, []);
-
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setCreating(true);
     setCreateError("");
     try {
-      await fetchApi("/system/activation-codes", {
-        method: "POST",
-        body: JSON.stringify({
-          plan: newPlan,
-          billing_cycle: newCycle,
-          duration_days: Number(newDays),
-          note: newNote,
-          target_phone: newPhone,
-        }),
+      await api.post("/system/activation-codes", {
+        plan: newPlan,
+        billing_cycle: newCycle,
+        duration_days: Number(newDays),
+        note: newNote,
+        target_phone: newPhone,
       });
       setShowCreate(false);
       setNewNote(""); setNewPhone("");
-      await loadCodes();
+      mutate();
     } catch (err: any) {
-      setCreateError(err.message);
+      setCreateError(err.response?.data?.error || err.message);
     } finally {
       setCreating(false);
     }
@@ -149,10 +140,10 @@ export default function ActivationCodesPage() {
   async function handleRevoke(code: string) {
     if (!confirm(`Revoke code ${code}? This cannot be undone.`)) return;
     try {
-      await fetchApi(`/system/activation-codes/${code}`, { method: "DELETE" });
-      await loadCodes();
+      await api.delete(`/system/activation-codes/${code}`);
+      mutate();
     } catch (err: any) {
-      alert("Failed to revoke: " + err.message);
+      alert("Failed to revoke: " + (err.response?.data?.error || err.message));
     }
   }
 
@@ -195,7 +186,7 @@ export default function ActivationCodesPage() {
             />
           </div>
           {/* Reload */}
-          <button onClick={loadCodes} style={{ padding: "0.5rem", background: "var(--surface)", border: "1px solid var(--border-2)", borderRadius: "0.625rem", color: "var(--muted)", cursor: "pointer", display: "flex", alignItems: "center" }}>
+          <button onClick={() => mutate()} style={{ padding: "0.5rem", background: "var(--surface)", border: "1px solid var(--border-2)", borderRadius: "0.625rem", color: "var(--muted)", cursor: "pointer", display: "flex", alignItems: "center" }}>
             <RefreshCw size={15} />
           </button>
           {/* Create */}

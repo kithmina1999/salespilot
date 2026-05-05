@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { fetchApi } from "@/lib/api";
+import { api } from "@/lib/api";
 import {
   ScrollText,
   Search,
@@ -183,8 +183,8 @@ export default function AuditLogsPage() {
 
   // Fetch businesses list for dropdown
   useEffect(() => {
-    fetchApi("/system/businesses")
-      .then((d) => setBusinesses(d.businesses || []))
+    api.get("/system/businesses")
+      .then((d) => setBusinesses(d.data.businesses || []))
       .catch(() => {});
   }, []);
 
@@ -203,9 +203,9 @@ export default function AuditLogsPage() {
     if (showRefresh) setRefreshing(true); else setLoading(true);
     try {
       setExpandedIds(new Set());
-      const data = await fetchApi(buildUrl());
-      setLogs(data.logs || []);
-      setStats(data.stats || { high: 0, medium: 0, low: 0 });
+      const res = await api.get(buildUrl());
+      setLogs(res.data.logs || []);
+      setStats(res.data.stats || { high: 0, medium: 0, low: 0 });
     } catch {
       setLogs([]);
     } finally {
@@ -216,22 +216,28 @@ export default function AuditLogsPage() {
 
   useEffect(() => { loadLogs(); }, [loadLogs]);
 
-  function handleExport() {
-    const key = sessionStorage.getItem("master_key") || "";
-    const params = new URLSearchParams();
-    if (selectedDate) { params.set("from", selectedDate); params.set("to", selectedDate); }
-    if (risk)         params.set("risk", risk);
-    if (category)     params.set("category", category);
-    if (actorType)    params.set("actor_type", actorType);
-    if (businessId)   params.set("business_id", businessId);
-    if (search)       params.set("search", search);
-    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-    const url  = `${base}/system/audit-logs/download?${params.toString()}`;
-    const a    = document.createElement("a");
-    a.href = url;
-    a.setAttribute("data-x-master-key", key);
-    // Open in new tab — server returns with Content-Disposition: attachment
-    window.open(`${url}&master_key=${encodeURIComponent(key)}`);
+  async function handleExport() {
+    try {
+      const params = new URLSearchParams();
+      if (selectedDate) { params.set("from", selectedDate); params.set("to", selectedDate); }
+      if (risk)         params.set("risk", risk);
+      if (category)     params.set("category", category);
+      if (actorType)    params.set("actor_type", actorType);
+      if (businessId)   params.set("business_id", businessId);
+      if (search)       params.set("search", search);
+      
+      const res = await api.get(`/system/audit-logs/download?${params.toString()}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `audit_logs_${selectedDate || "all"}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Failed to export logs", e);
+    }
   }
 
   const quickDates = [

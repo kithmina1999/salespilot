@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { fetchApi } from "@/lib/api";
+import useSWR from "swr";
+import { api } from "@/lib/api";
 import {
   Zap, Bot, Users, Activity, MessageSquare,
   TrendingUp, Server, ArrowUpRight,
@@ -12,16 +12,37 @@ import {
 } from "recharts";
 
 type MetricsData = {
-  total_businesses: number;
-  free_plan: number;
-  active_paid: number;
-  growth_plan: number;
-  pro_plan: number;
-  active_trials: number;
-  total_messages_this_month: number;
-  total_ai_messages_this_month: number;
-  total_faq_replies_this_month: number;
-  new_businesses_last_30d: number;
+  businesses: {
+    total: number;
+    free: number;
+    starter: number;
+    pro: number;
+    active_trials: number;
+    expired_plans: number;
+  };
+  whatsapp: {
+    connected: number;
+    disconnected: number;
+    not_connected: number;
+  };
+  usage: {
+    ai_messages: number;
+    faq_replies: number;
+    system_messages: number;
+    rule_generations: number;
+    simulation_messages: number;
+  };
+  revenue: {
+    estimated_mrr: number;
+    estimated_arr: number;
+    currency: string;
+    is_estimate: boolean;
+  };
+  risk: {
+    near_ai_limit_count: number;
+    near_simulation_limit_count: number;
+    expired_paid_count: number;
+  };
 };
 
 function StatCard({
@@ -90,14 +111,10 @@ const PLAN_COLORS = {
 };
 
 export default function DashboardPage() {
-  const [metrics, setMetrics] = useState<MetricsData | null>(null);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    fetchApi("/system/metrics")
-      .then(setMetrics)
-      .catch((err) => setError(err.message));
-  }, []);
+  const { data: metrics, error } = useSWR<MetricsData>(
+    "/system/metrics",
+    (url: string) => api.get(url).then((res) => res.data)
+  );
 
   if (error) {
     return (
@@ -111,7 +128,7 @@ export default function DashboardPage() {
         }}
       >
         <p style={{ fontWeight: 700 }}>Error loading metrics</p>
-        <p style={{ fontSize: "0.875rem", marginTop: "0.25rem", opacity: 0.8 }}>{error}</p>
+        <p style={{ fontSize: "0.875rem", marginTop: "0.25rem", opacity: 0.8 }}>{error.message || "Failed to load metrics"}</p>
       </div>
     );
   }
@@ -134,18 +151,19 @@ export default function DashboardPage() {
   }
 
   const planData = [
-    { name: "Free",   value: metrics.free_plan,    color: PLAN_COLORS.Free },
-    { name: "Growth", value: metrics.growth_plan,  color: PLAN_COLORS.Growth },
-    { name: "Pro",    value: metrics.pro_plan,      color: PLAN_COLORS.Pro },
+    { name: "Free",    value: metrics.businesses.free,    color: PLAN_COLORS.Free },
+    { name: "Starter", value: metrics.businesses.starter, color: PLAN_COLORS.Growth },
+    { name: "Pro",     value: metrics.businesses.pro,     color: PLAN_COLORS.Pro },
   ];
 
   const usageData = [
-    { name: "Inbound",   messages: metrics.total_messages_this_month },
-    { name: "FAQ",       messages: metrics.total_faq_replies_this_month },
-    { name: "AI",        messages: metrics.total_ai_messages_this_month },
+    { name: "Inbound",   messages: metrics.usage.system_messages },
+    { name: "FAQ",       messages: metrics.usage.faq_replies },
+    { name: "AI",        messages: metrics.usage.ai_messages },
   ];
 
-  const conversionRate = ((metrics.active_paid / (metrics.total_businesses || 1)) * 100).toFixed(1);
+  const activePaid = metrics.businesses.starter + metrics.businesses.pro;
+  const conversionRate = ((activePaid / (metrics.businesses.total || 1)) * 100).toFixed(1);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }} className="animate-fade-up">
@@ -179,15 +197,15 @@ export default function DashboardPage() {
         <StatCard
           icon={<Users size={16} />}
           label="Total Tenants"
-          value={metrics.total_businesses}
-          sub={`+${metrics.new_businesses_last_30d} this month`}
+          value={metrics.businesses.total}
+          sub={`${metrics.businesses.active_trials} active trials`}
           accent="#6366f1"
           delay={0}
         />
         <StatCard
           icon={<Activity size={16} />}
-          label="Paid Plans"
-          value={metrics.active_paid}
+          label="Estimated MRR"
+          value={`${metrics.revenue.currency} ${metrics.revenue.estimated_mrr.toLocaleString()}`}
           sub={`${conversionRate}% conversion rate`}
           accent="#22c55e"
           delay={60}
@@ -195,16 +213,16 @@ export default function DashboardPage() {
         <StatCard
           icon={<Bot size={16} />}
           label="AI Messages"
-          value={metrics.total_ai_messages_this_month.toLocaleString()}
+          value={metrics.usage.ai_messages.toLocaleString()}
           sub="Gemini API calls this month"
           accent="#8b5cf6"
           delay={120}
         />
         <StatCard
           icon={<MessageSquare size={16} />}
-          label="Total Inbound"
-          value={metrics.total_messages_this_month.toLocaleString()}
-          sub="Raw WhatsApp messages"
+          label="Connected WA"
+          value={metrics.whatsapp.connected}
+          sub={`Out of ${metrics.businesses.total} tenants`}
           accent="#3b82f6"
           delay={180}
         />
@@ -331,17 +349,17 @@ export default function DashboardPage() {
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <Server size={14} style={{ color: "var(--accent)" }} />
           <span style={{ fontSize: "0.8125rem", color: "var(--muted)", fontWeight: 500 }}>Active Trials:</span>
-          <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text)" }}>{metrics.active_trials}</span>
+          <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text)" }}>{metrics.businesses.active_trials}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <Zap size={14} style={{ color: "#f59e0b" }} />
           <span style={{ fontSize: "0.8125rem", color: "var(--muted)", fontWeight: 500 }}>FAQ Replies:</span>
-          <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text)" }}>{metrics.total_faq_replies_this_month.toLocaleString()}</span>
+          <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text)" }}>{metrics.usage.faq_replies.toLocaleString()}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <ArrowUpRight size={14} style={{ color: "#22c55e" }} />
-          <span style={{ fontSize: "0.8125rem", color: "var(--muted)", fontWeight: 500 }}>New Tenants (30d):</span>
-          <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text)" }}>{metrics.new_businesses_last_30d}</span>
+          <ArrowUpRight size={14} style={{ color: "#ef4444" }} />
+          <span style={{ fontSize: "0.8125rem", color: "var(--muted)", fontWeight: 500 }}>Near AI Limit:</span>
+          <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text)" }}>{metrics.risk.near_ai_limit_count}</span>
         </div>
       </div>
     </div>

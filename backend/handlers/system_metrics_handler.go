@@ -8,44 +8,76 @@ import (
 	"github.com/kithmina1999/salespilot/models"
 )
 
-// GetSystemMetrics returns platform-wide usage and business statistics
+// GetSystemMetrics returns platform-wide Tier 1 usage and business statistics
 func GetSystemMetrics(c *gin.Context) {
-	var totalBusinesses int64
-	var freePlanCount int64
-	var growthPlanCount int64
-	var proPlanCount int64
-	var activeTrials int64
+	var totalBusinesses, freePlanCount, starterPlanCount, proPlanCount, activeTrials, expiredPlans int64
+	var waConnected, waDisconnected, waNotConnected int64
+	var nearAiLimit, nearSimLimit, expiredPaid int64
 
+	// Business Plan & Status
 	database.DB.Model(&models.Business{}).Count(&totalBusinesses)
 	database.DB.Model(&models.Business{}).Where("plan = ?", models.PlanFree).Count(&freePlanCount)
-	database.DB.Model(&models.Business{}).Where("plan = ?", models.PlanStarter).Count(&growthPlanCount)
+	database.DB.Model(&models.Business{}).Where("plan = ?", models.PlanStarter).Count(&starterPlanCount)
 	database.DB.Model(&models.Business{}).Where("plan = ?", models.PlanPro).Count(&proPlanCount)
 	database.DB.Model(&models.Business{}).Where("trial_expires_at > DATETIME('now')").Count(&activeTrials)
+	database.DB.Model(&models.Business{}).Where("plan != ? AND plan_expires_at < DATETIME('now')", models.PlanFree).Count(&expiredPlans)
 
-	// Sum of message usage across all businesses
+	// WhatsApp Status
+	database.DB.Model(&models.Business{}).Where("wa_status = ?", "connected").Count(&waConnected)
+	database.DB.Model(&models.Business{}).Where("wa_status = ?", "disconnected").Count(&waDisconnected)
+	database.DB.Model(&models.Business{}).Where("wa_status = ?", "not_connected").Count(&waNotConnected)
+
+	// Global Usage
 	type UsageSum struct {
-		TotalSystem int `gorm:"column:total_system"`
-		TotalAI     int `gorm:"column:total_ai"`
-		TotalFaq    int `gorm:"column:total_faq"`
+		TotalSystem     int `gorm:"column:total_system"`
+		TotalAI         int `gorm:"column:total_ai"`
+		TotalFaq        int `gorm:"column:total_faq"`
+		TotalRuleGen    int `gorm:"column:total_rule_gen"`
+		TotalSimulation int `gorm:"column:total_sim"`
 	}
 	var usage UsageSum
+	database.DB.Model(&models.Business{}).Select("IFNULL(SUM(system_message_count), 0) as total_system, IFNULL(SUM(ai_message_count), 0) as total_ai, IFNULL(SUM(faq_reply_count), 0) as total_faq, IFNULL(SUM(rule_generation_count), 0) as total_rule_gen, IFNULL(SUM(simulation_count), 0) as total_sim").Scan(&usage)
 
-	database.DB.Model(&models.Business{}).Select("IFNULL(SUM(system_message_count), 0) as total_system, IFNULL(SUM(ai_message_count), 0) as total_ai, IFNULL(SUM(faq_reply_count), 0) as total_faq").Scan(&usage)
+	// Risk Alerts
+	database.DB.Model(&models.Business{}).Where("ai_message_limit > 0 AND CAST(ai_message_count AS FLOAT) / CAST(ai_message_limit AS FLOAT) >= 0.8").Count(&nearAiLimit)
+	database.DB.Model(&models.Business{}).Where("simulation_limit > 0 AND CAST(simulation_count AS FLOAT) / CAST(simulation_limit AS FLOAT) >= 0.8").Count(&nearSimLimit)
+	database.DB.Model(&models.Business{}).Where("plan != ? AND plan_expires_at < DATETIME('now')", models.PlanFree).Count(&expiredPaid)
 
-	// New businesses in last 30 days
-	var newBusinesses30d int64
-	database.DB.Model(&models.Business{}).Where("created_at >= DATETIME('now', '-30 days')").Count(&newBusinesses30d)
+	// MRR Estimate (Very simple: 1490 for starter, 3490 for pro)
+	mrr := (starterPlanCount * 1490) + (proPlanCount * 3490)
+	arr := mrr * 12
 
 	c.JSON(http.StatusOK, gin.H{
-		"total_businesses":             totalBusinesses,
-		"free_plan":                    freePlanCount,
-		"active_paid":                  growthPlanCount + proPlanCount,
-		"growth_plan":                  growthPlanCount,
-		"pro_plan":                     proPlanCount,
-		"active_trials":                activeTrials,
-		"total_messages_this_month":    usage.TotalSystem,
-		"total_ai_messages_this_month": usage.TotalAI,
-		"total_faq_replies_this_month": usage.TotalFaq,
-		"new_businesses_last_30d":      newBusinesses30d,
+		"businesses": gin.H{
+			"total":         totalBusinesses,
+			"free":          freePlanCount,
+			"starter":       starterPlanCount,
+			"pro":           proPlanCount,
+			"active_trials": activeTrials,
+			"expired_plans": expiredPlans,
+		},
+		"whatsapp": gin.H{
+			"connected":     waConnected,
+			"disconnected":  waDisconnected,
+			"not_connected": waNotConnected,
+		},
+		"usage": gin.H{
+			"ai_messages":         usage.TotalAI,
+			"faq_replies":         usage.TotalFaq,
+			"system_messages":     usage.TotalSystem,
+			"rule_generations":    usage.TotalRuleGen,
+			"simulation_messages": usage.TotalSimulation,
+		},
+		"revenue": gin.H{
+			"estimated_mrr": mrr,
+			"estimated_arr": arr,
+			"currency":      "LKR",
+			"is_estimate":   true,
+		},
+		"risk": gin.H{
+			"near_ai_limit_count":         nearAiLimit,
+			"near_simulation_limit_count": nearSimLimit,
+			"expired_paid_count":          expiredPaid,
+		},
 	})
 }

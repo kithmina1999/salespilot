@@ -79,7 +79,7 @@ func SendMultiProductMessage(phoneNumberID, accessToken, to, catalogID, headerTe
 			})
 		}
 		waSections = append(waSections, map[string]interface{}{
-			"title":    s.Title,
+			"title":         s.Title,
 			"product_items": rows,
 		})
 	}

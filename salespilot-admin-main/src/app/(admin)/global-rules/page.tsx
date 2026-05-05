@@ -1,8 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Plus, Trash2, RefreshCw, VolumeX, GitBranch, BookOpen, Loader2 } from "lucide-react";
-
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+import useSWR from "swr";
+import { api } from "@/lib/api";
 
 interface GlobalRule {
   ID: number;
@@ -42,25 +42,13 @@ function RuleBadge({ type }: { type: RuleType }) {
 }
 
 export default function GlobalRulesPage() {
-  const [rules, setRules] = useState<GlobalRule[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: rules, error, mutate, isLoading } = useSWR<GlobalRule[]>(
+    "/system/global-rules",
+    (url:string) => api.get(url).then((res) => res.data)
+  );
   const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ keywords: "", response: "", sinhala_response: "", is_active: true, ruleType: "faq" as RuleType });
-
-  function getMasterKey() {
-    return typeof window !== "undefined" ? sessionStorage.getItem("master_key") ?? "" : "";
-  }
-
-  async function fetchRules() {
-    setLoading(true);
-    try {
-      const res = await fetch(`${BASE}/system/global-rules`, { headers: { "X-Master-Key": getMasterKey() } });
-      if (res.ok) setRules(await res.json());
-    } finally { setLoading(false); }
-  }
-
-  useEffect(() => { fetchRules(); }, []);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -74,20 +62,23 @@ export default function GlobalRulesPage() {
         is_drop_rule: form.ruleType === "drop",
         is_context_bridge: form.ruleType === "bridge",
       };
-      const res = await fetch(`${BASE}/system/global-rules`, { method: "POST", headers: { "Content-Type": "application/json", "X-Master-Key": getMasterKey() }, body: JSON.stringify(body) });
-      if (res.ok) { setShowCreate(false); setForm({ keywords: "", response: "", sinhala_response: "", is_active: true, ruleType: "faq" }); fetchRules(); }
+      await api.post("/system/global-rules", body);
+      setShowCreate(false);
+      setForm({ keywords: "", response: "", sinhala_response: "", is_active: true, ruleType: "faq" });
+      mutate();
     } finally { setCreating(false); }
   }
 
   async function handleDelete(id: number) {
     if (!confirm("Delete this global rule? It affects all tenants immediately.")) return;
-    await fetch(`${BASE}/system/global-rules/${id}`, { method: "DELETE", headers: { "X-Master-Key": getMasterKey() } });
-    fetchRules();
+    await api.delete(`/system/global-rules/${id}`);
+    mutate();
   }
 
-  const dropRules   = rules.filter(r => r.is_drop_rule);
-  const bridgeRules = rules.filter(r => r.is_context_bridge);
-  const faqRules    = rules.filter(r => !r.is_drop_rule && !r.is_context_bridge);
+  const safeRules = rules || [];
+  const dropRules   = safeRules.filter(r => r.is_drop_rule);
+  const bridgeRules = safeRules.filter(r => r.is_context_bridge);
+  const faqRules    = safeRules.filter(r => !r.is_drop_rule && !r.is_context_bridge);
 
   return (
     <div style={{ padding: "2rem", maxWidth: "1100px", margin: "0 auto" }}>
@@ -100,8 +91,8 @@ export default function GlobalRulesPage() {
           </p>
         </div>
         <div style={{ display: "flex", gap: "0.5rem" }}>
-          <button onClick={fetchRules} style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.45rem 0.9rem", fontSize: "0.8rem", borderRadius: "0.5rem", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--muted)", cursor: "pointer" }}>
-            <RefreshCw size={13} /> Refresh
+          <button onClick={() => mutate()} style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.45rem 0.9rem", fontSize: "0.8rem", borderRadius: "0.5rem", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--muted)", cursor: "pointer" }}>
+            <RefreshCw size={13} className={!rules && !error ? "animate-spin" : ""} /> Refresh
           </button>
           <button onClick={() => setShowCreate(true)} style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.45rem 0.9rem", fontSize: "0.8rem", fontWeight: 600, borderRadius: "0.5rem", border: "none", background: "var(--accent)", color: "#000", cursor: "pointer" }}>
             <Plus size={13} /> New Global Rule
@@ -172,11 +163,13 @@ export default function GlobalRulesPage() {
       )}
 
       {/* Rule Table */}
-      {loading ? (
+      {isLoading ? (
         <div style={{ textAlign: "center", padding: "3rem", color: "var(--muted)" }}><Loader2 size={24} className="animate-spin" style={{ margin: "0 auto" }} /></div>
+      ) : error ? (
+        <div style={{ textAlign: "center", padding: "3rem", color: "var(--danger)" }}>Failed to load rules</div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-          {rules.map(rule => (
+          {safeRules.map(rule => (
             <div key={rule.ID} style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "0.9rem 1.1rem", borderRadius: "0.75rem", background: "var(--surface)", border: "1px solid var(--border)" }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
@@ -193,7 +186,7 @@ export default function GlobalRulesPage() {
               </button>
             </div>
           ))}
-          {rules.length === 0 && (
+          {safeRules.length === 0 && (
             <div style={{ textAlign: "center", padding: "3rem", color: "var(--muted)", fontSize: "0.85rem" }}>No global rules yet. Create your first one above.</div>
           )}
         </div>

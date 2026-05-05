@@ -104,9 +104,9 @@ func GetChatProfile(c *gin.Context) {
 
 	// Build the response payload
 	c.JSON(http.StatusOK, gin.H{
-		"messages": messages,
-		"customer": customer, // If ID is 0, it means no profile exists yet
-		"orders":   orders,
+		"messages":         messages,
+		"customer":         customer, // If ID is 0, it means no profile exists yet
+		"orders":           orders,
 		"simulation_count": b.SimulationCount,
 		"simulation_limit": b.SimulationLimit,
 	})

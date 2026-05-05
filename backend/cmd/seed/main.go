@@ -108,7 +108,7 @@ func main() {
 			WABAID:               fmt.Sprintf("waba_id_%d", i+1),
 			WAAccessToken:        "EAA_dummy_token_for_screenshot",
 			BotName:              "AI Assistant",
-			BotPersonality:      fmt.Sprintf("You are a friendly and polite AI sales assistant for %s. Keep your answers short and helpful.", b.Name),
+			BotPersonality:       fmt.Sprintf("You are a friendly and polite AI sales assistant for %s. Keep your answers short and helpful.", b.Name),
 			AllowCOD:             !b.ServicesMode, // Services usually don't do COD
 			AllowTransfer:        true,
 			MonthlyReportEnabled: true,
@@ -156,13 +156,13 @@ func main() {
 
 		// 5. Add Orders
 		statuses := []string{models.OrderStatusNew, models.OrderStatusConfirmed, models.OrderStatusShipped, models.OrderStatusDelivered}
-		
+
 		for j := 1; j <= 5; j++ {
 			c := customer1
 			if j%2 == 0 {
 				c = customer2
 			}
-			
+
 			status := statuses[rand.Intn(len(statuses))]
 			paymentStatus := "pending"
 			if status == models.OrderStatusDelivered || status == models.OrderStatusShipped {

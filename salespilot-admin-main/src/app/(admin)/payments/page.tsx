@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { fetchApi } from "@/lib/api";
+import { useState, useEffect } from "react";
+import useSWR from "swr";
+import { api } from "@/lib/api";
 import {
   Banknote, Clock, CheckCircle, XCircle, Search,
   RefreshCw, ZoomIn, X, AlertTriangle, ChevronDown,
@@ -43,13 +44,17 @@ function fmtDate(s: string) {
 }
 
 export default function PaymentsPage() {
-  const [proofs, setProofs] = useState<PaymentProof[]>([]);
+  const { data, isLoading: loading, mutate } = useSWR(
+    "/system/payments",
+    (url: string) => api.get(url).then((res) => res.data)
+  );
+  const proofs: PaymentProof[] = data?.proofs || [];
+  const pendingCount = data?.pending_count || 0;
+  const approvedCount = data?.approved_count || 0;
+
   const [filtered, setFiltered] = useState<PaymentProof[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProofStatus | "all">("all");
-  const [pendingCount, setPendingCount] = useState(0);
-  const [approvedCount, setApprovedCount] = useState(0);
 
   // Lightbox state
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
@@ -62,22 +67,6 @@ export default function PaymentsPage() {
   const [rejecting, setRejecting] = useState<PaymentProof | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectLoading, setRejectLoading] = useState(false);
-
-  const loadProofs = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await fetchApi<any>("/system/payments");
-      setProofs(data.proofs || []);
-      setPendingCount(data.pending_count ?? 0);
-      setApprovedCount(data.approved_count ?? 0);
-    } catch (err) {
-      console.error("Failed to load payments:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { loadProofs(); }, [loadProofs]);
 
   // Filter logic
   useEffect(() => {
@@ -98,11 +87,11 @@ export default function PaymentsPage() {
   async function handleApprove(proof: PaymentProof) {
     setApproveLoading(true);
     try {
-      await fetchApi(`/system/payments/${proof.id}/approve`, { method: "POST" });
+      await api.post(`/system/payments/${proof.id}/approve`);
       setApproving(null);
-      await loadProofs();
+      mutate();
     } catch (err: any) {
-      alert("Failed to approve: " + err.message);
+      alert("Failed to approve: " + (err.response?.data?.error || err.message));
     } finally {
       setApproveLoading(false);
     }
@@ -112,15 +101,12 @@ export default function PaymentsPage() {
     if (!rejecting || !rejectReason.trim()) return;
     setRejectLoading(true);
     try {
-      await fetchApi(`/system/payments/${rejecting.id}/reject`, {
-        method: "POST",
-        body: JSON.stringify({ reason: rejectReason.trim() }),
-      });
+      await api.post(`/system/payments/${rejecting.id}/reject`, { reason: rejectReason.trim() });
       setRejecting(null);
       setRejectReason("");
-      await loadProofs();
+      mutate();
     } catch (err: any) {
-      alert("Failed to reject: " + err.message);
+      alert("Failed to reject: " + (err.response?.data?.error || err.message));
     } finally {
       setRejectLoading(false);
     }
@@ -151,7 +137,7 @@ export default function PaymentsPage() {
               Review bank transfer screenshots and issue activation codes
             </p>
           </div>
-          <button onClick={loadProofs} style={{ padding: "0.5rem", background: "var(--surface)", border: "1px solid var(--border-2)", borderRadius: "0.625rem", color: "var(--muted)", cursor: "pointer", display: "flex", alignItems: "center" }}>
+          <button onClick={() => mutate()} style={{ padding: "0.5rem", background: "var(--surface)", border: "1px solid var(--border-2)", borderRadius: "0.625rem", color: "var(--muted)", cursor: "pointer", display: "flex", alignItems: "center" }}>
             <RefreshCw size={15} />
           </button>
         </div>

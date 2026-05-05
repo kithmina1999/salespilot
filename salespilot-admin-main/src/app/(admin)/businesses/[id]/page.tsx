@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { fetchApi } from "@/lib/api";
+import useSWR from "swr";
+import { api } from "@/lib/api";
 import {
   ArrowLeft, Save, ShieldAlert, Activity, MessageSquare, Bot,
   Calendar, Phone, Hash,
@@ -29,54 +30,101 @@ export default function BusinessDetailPage() {
   const { id } = useParams();
   const router = useRouter();
 
-  const [b, setB] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading: loading, mutate } = useSWR(
+    id ? `/system/businesses/${id}` : null,
+    (url: string) => api.get(url).then((res) => res.data)
+  );
+  const b = data?.business;
+
   const [activeTab, setActiveTab] = useState<TabKey>("usage");
 
   const [plan, setPlan]     = useState("");
   const [cycle, setCycle]   = useState("");
   const [expiry, setExpiry] = useState("");
   const [reason, setReason] = useState("");
+  const [confirmAction, setConfirmAction] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
+  const [suspendType, setSuspendType] = useState("manual");
+  const [suspendReason, setSuspendReason] = useState("");
+  const [suspendConfirm, setSuspendConfirm] = useState("");
+  const [suspending, setSuspending] = useState(false);
+  const [suspendMessage, setSuspendMessage] = useState("");
+
   useEffect(() => {
-    fetchApi(`/system/businesses/${id}`)
-      .then((data) => {
-        setB(data.business);
-        setPlan(data.business.plan || "free");
-        setCycle(data.business.billing_cycle || "");
-        setExpiry(
-          data.business.plan_expires_at
-            ? new Date(data.business.plan_expires_at).toISOString().split("T")[0]
-            : ""
-        );
-        setLoading(false);
-      })
-      .catch(console.error);
-  }, [id]);
+    if (b) {
+      setPlan(b.plan || "free");
+      setCycle(b.billing_cycle || "");
+      setExpiry(
+        b.plan_expires_at
+          ? new Date(b.plan_expires_at).toISOString().split("T")[0]
+          : ""
+      );
+    }
+  }, [b]);
 
   const handleOverride = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setMessage("");
     try {
-      const res = await fetchApi(`/system/businesses/${id}/plan`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          plan,
-          billing_cycle: cycle,
-          plan_expires_at: expiry ? new Date(expiry).toISOString() : null,
-          reason,
-        }),
+      await api.patch(`/system/businesses/${id}/plan`, {
+        plan,
+        billing_cycle: cycle,
+        plan_expires_at: expiry ? new Date(expiry).toISOString() : null,
+        reason,
+        confirm: confirmAction,
       });
       setMessage("Plan overridden successfully!");
-      setB(res.business);
+      mutate();
       setReason("");
+      setConfirmAction("");
     } catch (err: any) {
-      setMessage(`Error: ${err.message}`);
+      setMessage(`Error: ${err.response?.data?.error || err.message}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSuspend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSuspending(true);
+    setSuspendMessage("");
+    try {
+      await api.post(`/system/businesses/${id}/suspend`, {
+        type: suspendType,
+        reason: suspendReason,
+        confirm: suspendConfirm,
+      });
+      setSuspendMessage("Business suspended successfully!");
+      mutate();
+      setSuspendReason("");
+      setSuspendConfirm("");
+    } catch (err: any) {
+      setSuspendMessage(`Error: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setSuspending(false);
+    }
+  };
+
+  const handleUnsuspend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSuspending(true);
+    setSuspendMessage("");
+    try {
+      await api.post(`/system/businesses/${id}/unsuspend`, {
+        reason: suspendReason,
+        confirm: suspendConfirm,
+      });
+      setSuspendMessage("Business unsuspended successfully!");
+      mutate();
+      setSuspendReason("");
+      setSuspendConfirm("");
+    } catch (err: any) {
+      setSuspendMessage(`Error: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setSuspending(false);
     }
   };
 
@@ -224,6 +272,7 @@ export default function BusinessDetailPage() {
 
       {/* Override Tab */}
       {activeTab === "override" && (
+        <>
         <div
           style={{
             background: "var(--surface)",
@@ -307,7 +356,22 @@ export default function BusinessDetailPage() {
               />
               <p style={{ fontSize: "0.75rem", color: "var(--muted-2)" }}>Required for audit log. Be descriptive.</p>
             </div>
-
+            {/* Confirm */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
+              <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}>
+                Confirm Override <span style={{ color: "#f87171", fontWeight: 700 }}>*</span>
+              </label>
+              <input
+                required
+                type="text"
+                placeholder="Type FORCE PLAN to confirm"
+                value={confirmAction}
+                onChange={(e) => setConfirmAction(e.target.value)}
+                style={inputStyle}
+                onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
+                onBlur={(e) => (e.target.style.borderColor = "var(--border-2)")}
+              />
+            </div>
             <button
               type="submit"
               disabled={saving || !reason}
@@ -357,6 +421,133 @@ export default function BusinessDetailPage() {
             )}
           </form>
         </div>
+
+        {/* Suspend Account Block */}
+        <div
+          style={{
+            background: "var(--surface)",
+            border: "1px solid rgba(239,68,68,0.15)",
+            borderRadius: "1rem",
+            padding: "1.75rem",
+            maxWidth: "520px",
+            marginTop: "1.5rem",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", marginBottom: "0.375rem" }}>
+            <ShieldAlert size={18} color="#f87171" />
+            <h3 style={{ fontSize: "1rem", fontWeight: 700, color: "#f87171" }}>
+              {b.suspended_at ? "Unsuspend Business" : "Suspend Business"}
+            </h3>
+          </div>
+          <p style={{ fontSize: "0.8375rem", color: "var(--muted)", marginBottom: "1.5rem" }}>
+            {b.suspended_at
+              ? "Reactivate this account. Their bot and dashboard will be unlocked."
+              : "Suspend this account. Their bot will stop answering, and their dashboard will go into read-only mode."}
+          </p>
+
+          <form onSubmit={b.suspended_at ? handleUnsuspend : handleSuspend} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {/* Type */}
+            {!b.suspended_at && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
+                <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}>Suspension Type</label>
+                <select
+                  value={suspendType}
+                  onChange={(e) => setSuspendType(e.target.value)}
+                  style={selectStyle}
+                  onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
+                  onBlur={(e) => (e.target.style.borderColor = "var(--border-2)")}
+                >
+                  <option value="billing">Billing/Payment Expired</option>
+                  <option value="abuse">Policy/Abuse Violation</option>
+                  <option value="manual">Manual Admin Decision</option>
+                </select>
+              </div>
+            )}
+
+            {/* Reason */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
+              <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}>
+                Reason <span style={{ color: "#f87171", fontWeight: 700 }}>*</span>
+              </label>
+              <input
+                required
+                type="text"
+                placeholder={b.suspended_at ? "e.g. Paid via bank transfer" : "e.g. Overdue invoice"}
+                value={suspendReason}
+                onChange={(e) => setSuspendReason(e.target.value)}
+                style={inputStyle}
+                onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
+                onBlur={(e) => (e.target.style.borderColor = "var(--border-2)")}
+              />
+            </div>
+
+            {/* Confirm */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
+              <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}>
+                Confirm Action <span style={{ color: "#f87171", fontWeight: 700 }}>*</span>
+              </label>
+              <input
+                required
+                type="text"
+                placeholder={`Type ${b.suspended_at ? "UNSUSPEND" : "SUSPEND"} to confirm`}
+                value={suspendConfirm}
+                onChange={(e) => setSuspendConfirm(e.target.value)}
+                style={inputStyle}
+                onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
+                onBlur={(e) => (e.target.style.borderColor = "var(--border-2)")}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={suspending || !suspendReason || !suspendConfirm}
+              style={{
+                width: "100%",
+                padding: "0.75rem",
+                background: suspending || !suspendReason || !suspendConfirm ? "rgba(239,68,68,0.1)" : "rgba(239,68,68,0.15)",
+                border: "1px solid rgba(239,68,68,0.3)",
+                borderRadius: "0.625rem",
+                color: suspending || !suspendReason || !suspendConfirm ? "#9ca3af" : "#f87171",
+                fontSize: "0.9rem",
+                fontWeight: 700,
+                cursor: suspending || !suspendReason || !suspendConfirm ? "not-allowed" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.5rem",
+                fontFamily: "inherit",
+                transition: "background 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                if (!suspending && suspendReason && suspendConfirm) {
+                  e.currentTarget.style.background = "rgba(239,68,68,0.25)";
+                  e.currentTarget.style.color = "#fff";
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(239,68,68,0.15)";
+                e.currentTarget.style.color = "#f87171";
+              }}
+            >
+              <ShieldAlert size={15} />
+              {suspending ? "Applying..." : (b.suspended_at ? "Unsuspend Business" : "Suspend Business")}
+            </button>
+
+            {suspendMessage && (
+              <p
+                style={{
+                  textAlign: "center",
+                  fontSize: "0.875rem",
+                  fontWeight: 700,
+                  color: suspendMessage.includes("Error") ? "var(--danger)" : "#4ade80",
+                }}
+              >
+                {suspendMessage}
+              </p>
+            )}
+          </form>
+        </div>
+      </>
       )}
     </div>
   );

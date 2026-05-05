@@ -9,10 +9,10 @@ import (
 // ─── Precompiled Regex Patterns ────────────────────────────────────────────────
 
 var (
-	emojiRe       = regexp.MustCompile(`[\x{1F000}-\x{1FFFF}]|[\x{2600}-\x{27FF}]|[\x{FE00}-\x{FE0F}]|[\x{1F300}-\x{1F9FF}]`)
-	punctCleanRe  = regexp.MustCompile(`[!?.,:;""''()\[\]{}<>*_~]`)
-	multiSpaceRe  = regexp.MustCompile(`\s+`)
-	normRules     []*normRule
+	emojiRe      = regexp.MustCompile(`[\x{1F000}-\x{1FFFF}]|[\x{2600}-\x{27FF}]|[\x{FE00}-\x{FE0F}]|[\x{1F300}-\x{1F9FF}]`)
+	punctCleanRe = regexp.MustCompile(`[!?.,:;""''()\[\]{}<>*_~]`)
+	multiSpaceRe = regexp.MustCompile(`\s+`)
+	normRules    []*normRule
 )
 
 type normRule struct {
@@ -100,48 +100,48 @@ func init() {
 // These cannot use \b (ASCII word-boundary), so we use exact string replacement.
 var sinhalaMap = map[string]string{
 	// Price
-	"මිල":       "price",
-	"කීයද":      "price",
-	"ගාණ":       "price",
-	"ගාණ කීයද":  "price",
-	"මිලක්":     "price",
-	"ගෙවිය":     "price",
+	"මිල":      "price",
+	"කීයද":     "price",
+	"ගාණ":      "price",
+	"ගාණ කීයද": "price",
+	"මිලක්":    "price",
+	"ගෙවිය":    "price",
 
 	// Delivery
-	"ඩිලිවරි":   "delivery",
-	"ගෙනෙනවා":   "delivery",
-	"යවනවා":     "delivery",
+	"ඩිලිවරි": "delivery",
+	"ගෙනෙනවා": "delivery",
+	"යවනවා":   "delivery",
 
 	// Order
-	"ඕඩර්":      "order",
-	"ගන්නවා":    "order",
-	"ගන්නකොල":   "order",
-	"ගන්නේ":     "order",
+	"ඕඩර්":    "order",
+	"ගන්නවා":  "order",
+	"ගන්නකොල": "order",
+	"ගන්නේ":   "order",
 
 	// Payment
-	"ගෙවනවා":    "payment",
-	"ගෙවිම":     "payment",
-	"ගෙවල":      "payment",
-	"බැංකු":     "payment",
+	"ගෙවනවා": "payment",
+	"ගෙවිම":  "payment",
+	"ගෙවල":   "payment",
+	"බැංකු":  "payment",
 
 	// Location
-	"ස්ථානය":    "location",
-	"කොහෙද":     "location",
-	"ලිපිනය":    "location",
+	"ස්ථානය": "location",
+	"කොහෙද":  "location",
+	"ලිපිනය": "location",
 
 	// Availability
-	"තියෙනවාද":  "availability",
-	"ස්ටොක්":    "availability",
-	"ඇද්ද":      "availability",
+	"තියෙනවාද": "availability",
+	"ස්ටොක්":   "availability",
+	"ඇද්ද":     "availability",
 
 	// Size/Colour
 	"ප්‍රමාණය": "size",
-	"රඟ":        "colour",
-	"වර්ණය":     "colour",
+	"රඟ":       "colour",
+	"වර්ණය":    "colour",
 
 	// Greeting
-	"ආයුබෝවන්":  "greeting",
-	"කොහොමද":    "greeting",
+	"ආයුබෝවන්": "greeting",
+	"කොහොමද":   "greeting",
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -182,7 +182,7 @@ func CleanMessage(msg string) string {
 // It applies aggressive filler-word stripping which shouldn't be used in exact/fuzzy matches.
 func ReduceMessage(cleanMsg string) string {
 	msg := cleanMsg
-	
+
 	// Strip leading filler words (greeting openers Sri Lankans use before the real question)
 	for _, filler := range fillerWords {
 		// Clean the filler word just like we cleaned the message (to match correctly)

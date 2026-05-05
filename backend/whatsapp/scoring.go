@@ -51,7 +51,7 @@ func ClassifyKeywordStrength(entry string) KeywordStrength {
 
 type MatchSignal struct {
 	Rule            *models.Rule
-	MatchType       string // "exact" | "combo" | "fuzzy" | "semantic"
+	MatchType       string  // "exact" | "combo" | "fuzzy" | "semantic"
 	Confidence      float64 // 0.0–1.0 (final score)
 	RawConfidence   float64 // 0.0–1.0 (before modifiers)
 	MatchedTokens   int     // number of DISTINCT input tokens contributing to the match
@@ -130,7 +130,7 @@ func ComputeFinalScore(rawScore float64, matchType string, matchedTokens int, is
 		if msgWordCount > 0 {
 			density = float64(matchedTokens) / float64(msgWordCount)
 		}
-		
+
 		switch keywordStrength {
 		case KeywordStopGeneric:
 			if score > 0.74 {
@@ -307,7 +307,7 @@ func EvaluateSemanticDirectCandidate(signals []MatchSignal, reducedMsg string) (
 		if second.RawConfidence >= 0.90 {
 			return nil, false // Not exactly one winner
 		}
-		
+
 		margin := top.RawConfidence - second.RawConfidence
 		if margin < 0.08 {
 			return nil, false
@@ -412,7 +412,7 @@ func GetDeterministicSignals(businessID uint, cleanMsg string) []MatchSignal {
 			kwStrength := ClassifyKeywordStrength(bestMatchedEntry)
 
 			finalScore, debug := ComputeFinalScore(bestRaw, bestType, bestTokens, isPhraseMatch, rule.ActionTier, msgWordCount, kwStrength)
-			
+
 			// Invariant 2: At most one MatchSignal per rule
 			signals = append(signals, MatchSignal{
 				Rule:            &rule,

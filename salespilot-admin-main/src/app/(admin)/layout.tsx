@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import { RequireAuth } from "@/components/auth/require-auth";
+import { useAuth } from "@/lib/auth-context";
+import { api } from "@/lib/api";
 import {
   LayoutDashboard,
   Building2,
@@ -30,9 +33,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const router = useRouter();
   const [showLogout, setShowLogout] = useState(false);
+  const { logout, admin } = useAuth();
 
-  function handleLogout() {
-    sessionStorage.removeItem("master_key");
+  async function handleLogout() {
+    try {
+      await api.post("/system/auth/logout");
+    } catch (e) {
+      // Ignore if network error
+    }
+    logout();
     router.push("/");
   }
 
@@ -85,8 +94,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg)" }}>
-      {/* Sidebar */}
+    <RequireAuth>
+      <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg)" }}>
+        {/* Sidebar */}
       <aside
         style={{
           width: "220px",
@@ -104,29 +114,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       >
         {/* Logo */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", padding: "0 0.375rem", marginBottom: "1.75rem" }}>
-          <div
-            style={{
-              width: "30px",
-              height: "30px",
-              borderRadius: "8px",
-              background: "linear-gradient(135deg, var(--accent-dim), var(--accent))",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 4px 12px var(--accent-glow2)",
-              flexShrink: 0,
-            }}
-          >
-            <Shield size={15} color="#fff" strokeWidth={2.5} />
-          </div>
-          <div>
-            <div style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text)", lineHeight: 1.2, letterSpacing: "-0.01em" }}>
-              SalesPilot
-            </div>
-            <div style={{ fontSize: "0.65rem", color: "var(--accent)", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-              Super Admin
-            </div>
-          </div>
+              <div
+                style={{
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "10px",
+                  background: "linear-gradient(135deg, var(--accent), var(--accent-dim))",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#fff",
+                  fontSize: "0.875rem",
+                  fontWeight: 600,
+                  flexShrink: 0,
+                }}
+              >
+                SA
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {admin?.name || "Super Admin"}
+                </p>
+                <p style={{ fontSize: "0.75rem", color: "var(--muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {admin?.email || "admin@salespilot.lk"}
+                </p>
+              </div>
         </div>
 
         {/* Main Nav */}
@@ -310,5 +322,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       )}
     </div>
+    </RequireAuth>
   );
 }

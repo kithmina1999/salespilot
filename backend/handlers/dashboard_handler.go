@@ -21,7 +21,7 @@ type TopUnmatched struct {
 }
 
 type DailyRevenue struct {
-	Date   string  `json:"date"`
+	Date    string  `json:"date"`
 	Revenue float64 `json:"revenue"`
 	Orders  int     `json:"orders"`
 }
@@ -41,17 +41,17 @@ func GetDashboardStats(c *gin.Context) {
 	// Current month
 	thisMonthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 	// Previous month
-	lastMonthEnd   := thisMonthStart.Add(-time.Second)
+	lastMonthEnd := thisMonthStart.Add(-time.Second)
 	lastMonthStart := time.Date(lastMonthEnd.Year(), lastMonthEnd.Month(), 1, 0, 0, 0, 0, now.Location())
 	// Today & Yesterday
-	todayStart     := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	yesterdayStart := todayStart.Add(-24 * time.Hour)
 	// This week / last week
-	thisWeekStart  := now.Add(-7 * 24 * time.Hour)
-	lastWeekStart  := now.Add(-14 * 24 * time.Hour)
+	thisWeekStart := now.Add(-7 * 24 * time.Hour)
+	lastWeekStart := now.Add(-14 * 24 * time.Hour)
 	// 30-day window
-	thirtyDaysAgo  := now.Add(-30 * 24 * time.Hour)
-	sevenDaysAgo   := now.Add(-7 * 24 * time.Hour)
+	thirtyDaysAgo := now.Add(-30 * 24 * time.Hour)
+	sevenDaysAgo := now.Add(-7 * 24 * time.Hour)
 
 	// ── 1. Total Unique Customers (all time) ─────────────────────────────────
 	var totalCustomers int64

@@ -57,19 +57,26 @@ func CreateActivationCode(c *gin.Context) {
 		DurationDays int    `json:"duration_days" binding:"required"`
 		Note         string `json:"note"`
 		TargetPhone  string `json:"target_phone"` // optional: lock code to a specific tenant phone
+		Reason       string `json:"reason" binding:"required"`
+		Confirm      string `json:"confirm"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "plan, billing_cycle, and duration_days are required: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "plan, billing_cycle, duration_days, and reason are required: " + err.Error()})
+		return
+	}
+
+	if err := ValidateHighRiskAction(req.Reason, req.Confirm, "GENERATE CODE"); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	// Validate plan
 	planNorm := strings.ToLower(req.Plan)
 	validPlans := map[string]bool{
-    "starter": true,
-    "pro":     true,
-    "free":    true,
-}
+		"starter": true,
+		"pro":     true,
+		"free":    true,
+	}
 	if !validPlans[planNorm] {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid plan. Use: starter, pro, or free"})
 		return
@@ -151,6 +158,20 @@ func ListActivationCodes(c *gin.Context) {
 // ─────────────────────────────────────────────────────────────────
 func RevokeActivationCode(c *gin.Context) {
 	codeStr := c.Param("code")
+
+	var req struct {
+		Reason  string `json:"reason" binding:"required"`
+		Confirm string `json:"confirm"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "reason is required: " + err.Error()})
+		return
+	}
+
+	if err := ValidateHighRiskAction(req.Reason, req.Confirm, "REVOKE CODE"); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	var code models.ActivationCode
 	if err := database.DB.Where("code = ?", codeStr).First(&code).Error; err != nil {

@@ -3,34 +3,44 @@
 import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Shield, Loader2, Eye, EyeOff, Zap } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { api } from "@/lib/api";
 
 export default function LoginPage() {
-  const [key, setKey] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [showKey, setShowKey] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
+  const { login, isAuthenticated } = useAuth();
 
   useEffect(() => {
     setMounted(true);
-    if (sessionStorage.getItem("master_key")) {
+    if (isAuthenticated) {
       router.push("/dashboard");
     }
-  }, [router]);
+  }, [router, isAuthenticated]);
 
-  const handleLogin = (e: FormEvent) => {
+  const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!key.trim()) {
-      setError("Admin key is required.");
+    if (!email.trim() || !password) {
+      setError("Email and password are required.");
       return;
     }
     setLoading(true);
-    setTimeout(() => {
-      sessionStorage.setItem("master_key", key.trim());
+    
+    try {
+      const res = await api.post('/system/auth/login', { email: email.trim(), password });
+      
+      login(res.data.access_token, res.data.admin);
       router.push("/dashboard");
-    }, 600);
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Invalid credentials");
+      setLoading(false);
+    }
   };
 
   return (
@@ -122,27 +132,58 @@ export default function LoginPage() {
             SalesPilot Admin
           </h1>
           <p style={{ fontSize: "0.8125rem", color: "var(--muted)", textAlign: "center" }}>
-            Super admin access only. Enter your master key to continue.
+            Super admin access only.
           </p>
         </div>
 
         {/* Form */}
         <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-            <label
-              htmlFor="admin-key"
-              style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}
-            >
-              Admin Master Key
+            <label htmlFor="email" style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}>
+              Email Address
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@salespilot.lk"
+              autoComplete="email"
+              style={{
+                width: "100%",
+                padding: "0.6875rem 0.875rem",
+                background: "var(--bg)",
+                border: `1px solid ${error ? "var(--danger)" : "var(--border-2)"}`,
+                borderRadius: "0.625rem",
+                color: "var(--text)",
+                fontSize: "0.875rem",
+                outline: "none",
+                transition: "border-color 0.15s, box-shadow 0.15s",
+                fontFamily: "inherit",
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = "var(--accent)";
+                e.target.style.boxShadow = "0 0 0 3px var(--accent-glow)";
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = error ? "var(--danger)" : "var(--border-2)";
+                e.target.style.boxShadow = "none";
+              }}
+            />
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
+            <label htmlFor="password" style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}>
+              Password
             </label>
             <div style={{ position: "relative" }}>
               <input
-                id="admin-key"
-                type={showKey ? "text" : "password"}
-                value={key}
-                onChange={(e) => setKey(e.target.value)}
-                placeholder="sk-admin-••••••••••••••••"
-                autoComplete="off"
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="current-password"
                 style={{
                   width: "100%",
                   padding: "0.6875rem 2.75rem 0.6875rem 0.875rem",
@@ -166,7 +207,7 @@ export default function LoginPage() {
               />
               <button
                 type="button"
-                onClick={() => setShowKey(!showKey)}
+                onClick={() => setShowPassword(!showPassword)}
                 style={{
                   position: "absolute",
                   right: "0.75rem",
@@ -181,7 +222,7 @@ export default function LoginPage() {
                   padding: "0",
                 }}
               >
-                {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
             {error && (
@@ -210,6 +251,7 @@ export default function LoginPage() {
               boxShadow: loading ? "none" : "0 4px 20px var(--accent-glow2)",
               fontFamily: "inherit",
               letterSpacing: "-0.01em",
+              marginTop: "0.5rem"
             }}
             onMouseEnter={(e) => { if (!loading) e.currentTarget.style.opacity = "0.9"; }}
             onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
@@ -222,7 +264,7 @@ export default function LoginPage() {
             ) : (
               <>
                 <Zap size={16} />
-                Authenticate
+                Sign In
               </>
             )}
           </button>

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { fetchApi } from "@/lib/api";
+import useSWR from "swr";
+import { api } from "@/lib/api";
 import { Search, ChevronRight, Building2, ExternalLink } from "lucide-react";
 
 type Business = {
@@ -12,6 +13,11 @@ type Business = {
   plan: string;
   plan_expires_at: string | null;
   created_at: string;
+  wa_status: string;
+  suspended_at: string | null;
+  ai_message_count: number;
+  ai_message_limit: number;
+  trial_expires_at: string | null;
 };
 
 function PlanBadge({ plan }: { plan: string }) {
@@ -42,18 +48,12 @@ function PlanBadge({ plan }: { plan: string }) {
 }
 
 export default function BusinessesPage() {
-  const [businesses, setBusinesses] = useState<Business[]>([]);
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchApi("/system/businesses")
-      .then((data) => {
-        setBusinesses(data.businesses || []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
+  const { data, isLoading: loading } = useSWR<{ businesses: Business[] }>(
+    "/system/businesses",
+    (url:string) => api.get(url).then((res) => res.data)
+  );
+  const businesses = data?.businesses || [];
 
   const filtered = businesses.filter(
     (b) =>
@@ -126,13 +126,13 @@ export default function BusinessesPage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "2fr 1.5fr 1fr 1fr 80px",
+            gridTemplateColumns: "2fr 1.5fr 1fr 1fr 1fr 1.5fr 80px",
             padding: "0.75rem 1.25rem",
             background: "rgba(255,255,255,0.02)",
             borderBottom: "1px solid var(--border)",
           }}
         >
-          {["ID / Name", "Phone", "Plan", "Joined", ""].map((h) => (
+          {["ID / Name", "Phone", "Plan", "WA", "Usage", "Status/Joined", ""].map((h) => (
             <span key={h} style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", letterSpacing: "0.04em", textTransform: "uppercase" }}>
               {h}
             </span>
@@ -168,7 +168,7 @@ export default function BusinessesPage() {
               key={b.id}
               style={{
                 display: "grid",
-                gridTemplateColumns: "2fr 1.5fr 1fr 1fr 80px",
+                gridTemplateColumns: "2fr 1.5fr 1fr 1fr 1fr 1.5fr 80px",
                 padding: "0.875rem 1.25rem",
                 borderBottom: idx < filtered.length - 1 ? "1px solid var(--border)" : "none",
                 alignItems: "center",
@@ -189,10 +189,27 @@ export default function BusinessesPage() {
               {/* Plan */}
               <div><PlanBadge plan={b.plan} /></div>
 
-              {/* Date */}
-              <span style={{ fontSize: "0.8125rem", color: "var(--muted-2)" }}>
-                {new Date(b.created_at).toLocaleDateString()}
+              {/* WA Status */}
+              <span style={{ fontSize: "0.8125rem", color: b.wa_status === "connected" ? "#4ade80" : "var(--muted-2)", textTransform: "capitalize" }}>
+                {b.wa_status ? b.wa_status.replace("_", " ") : "Not Connected"}
               </span>
+
+              {/* AI Usage % */}
+              <span style={{ fontSize: "0.8125rem", color: "var(--text)" }}>
+                {b.ai_message_limit > 0 ? `${((b.ai_message_count / b.ai_message_limit) * 100).toFixed(1)}%` : "N/A"}
+              </span>
+
+              {/* Status & Joined */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+                {b.suspended_at && (
+                  <span style={{ fontSize: "0.7rem", color: "#ef4444", fontWeight: 600, background: "rgba(239,68,68,0.1)", padding: "0.1rem 0.4rem", borderRadius: "4px", width: "fit-content" }}>
+                    SUSPENDED
+                  </span>
+                )}
+                <span style={{ fontSize: "0.8125rem", color: "var(--muted-2)" }}>
+                  {new Date(b.created_at).toLocaleDateString()}
+                </span>
+              </div>
 
               {/* Action */}
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
