@@ -10,13 +10,56 @@ import (
 	"github.com/kithmina1999/salespilot/models"
 )
 
+type KeywordStrength string
+
+const (
+	KeywordStrong        KeywordStrength = "strong"
+	KeywordStopGeneric   KeywordStrength = "stop_generic"
+	KeywordDomainGeneric KeywordStrength = "domain_generic"
+)
+
+var stopGenericKeywords = map[string]bool{
+	"have": true, "has": true, "want": true, "need": true,
+	"get": true, "give": true, "send": true, "do": true,
+	"can": true, "please": true, "tell": true,
+}
+
+var domainGenericKeywords = map[string]bool{
+	"order": true, "buy": true, "price": true, "delivery": true,
+	"payment": true, "available": true, "stock": true,
+	"contact": true, "location": true,
+}
+
+func ClassifyKeywordStrength(entry string) KeywordStrength {
+	entry = strings.ToLower(strings.TrimSpace(entry))
+
+	// Combo and multi-word phrases are strong by default
+	if strings.Contains(entry, "+") || len(strings.Fields(entry)) >= 2 {
+		return KeywordStrong
+	}
+
+	if stopGenericKeywords[entry] {
+		return KeywordStopGeneric
+	}
+
+	if domainGenericKeywords[entry] {
+		return KeywordDomainGeneric
+	}
+
+	return KeywordStrong
+}
+
 type MatchSignal struct {
-	Rule          *models.Rule
-	MatchType     string  // "exact" | "combo" | "fuzzy" | "semantic"
-	Confidence    float64 // 0.0–1.0 (final score)
-	RawConfidence float64 // 0.0–1.0 (before modifiers)
-	MatchedTokens int     // number of DISTINCT input tokens contributing to the match
-	Debug         ScoreDebug
+	Rule            *models.Rule
+	MatchType       string // "exact" | "combo" | "fuzzy" | "semantic"
+	Confidence      float64 // 0.0–1.0 (final score)
+	RawConfidence   float64 // 0.0–1.0 (before modifiers)
+	MatchedTokens   int     // number of DISTINCT input tokens contributing to the match
+	MatchedEntry    string
+	KeywordStrength KeywordStrength
+	MsgWordCount    int
+	Density         float64
+	Debug           ScoreDebug
 }
 
 // ScoreDebug holds the intermediate scoring values for observability
@@ -29,7 +72,7 @@ type ScoreDebug struct {
 
 // ComputeFinalScore calculates the final confidence for a given signal based on the spec.
 // Returns the final score and a ScoreDebug struct for observability.
-func ComputeFinalScore(rawScore float64, matchType string, matchedTokens int, isPhraseMatch bool, ruleTier string) (float64, ScoreDebug) {
+func ComputeFinalScore(rawScore float64, matchType string, matchedTokens int, isPhraseMatch bool, ruleTier string, msgWordCount int, keywordStrength KeywordStrength) (float64, ScoreDebug) {
 	var baseWeight float64
 	switch matchType {
 	case "exact":
@@ -78,6 +121,25 @@ func ComputeFinalScore(rawScore float64, matchType string, matchedTokens int, is
 	if matchedTokens == 1 && matchType != "exact" {
 		if score > 0.88 {
 			score = 0.88
+		}
+	}
+
+	// Exact Keyword Strength / Density Caps
+	if matchType == "exact" && matchedTokens == 1 && msgWordCount >= 3 {
+		density := 1.0
+		if msgWordCount > 0 {
+			density = float64(matchedTokens) / float64(msgWordCount)
+		}
+		
+		switch keywordStrength {
+		case KeywordStopGeneric:
+			if score > 0.74 {
+				score = 0.74
+			}
+		case KeywordDomainGeneric:
+			if density < 0.35 && score > 0.74 {
+				score = 0.74
+			}
 		}
 	}
 
@@ -277,6 +339,7 @@ func GetDeterministicSignals(businessID uint, cleanMsg string) []MatchSignal {
 		bestRaw := 0.0
 		bestType := ""
 		bestTokens := 0
+		bestMatchedEntry := ""
 
 		for _, entry := range strings.Split(rule.Keywords, ",") {
 			entry = strings.TrimSpace(entry)
@@ -299,6 +362,7 @@ func GetDeterministicSignals(businessID uint, cleanMsg string) []MatchSignal {
 						bestRaw = 1.0
 						bestType = "combo"
 						bestTokens = len(parts)
+						bestMatchedEntry = entry
 					}
 				}
 			} else {
@@ -308,6 +372,7 @@ func GetDeterministicSignals(businessID uint, cleanMsg string) []MatchSignal {
 						bestRaw = 1.0
 						bestType = "exact"
 						bestTokens = len(strings.Fields(entry))
+						bestMatchedEntry = entry
 					}
 				} else {
 					// Fuzzy
@@ -328,6 +393,7 @@ func GetDeterministicSignals(businessID uint, cleanMsg string) []MatchSignal {
 								bestRaw = score
 								bestType = "fuzzy"
 								bestTokens = 1
+								bestMatchedEntry = entry
 							}
 						}
 					}
@@ -338,16 +404,27 @@ func GetDeterministicSignals(businessID uint, cleanMsg string) []MatchSignal {
 		if bestRaw > 0 {
 			// Compute final score
 			isPhraseMatch := bestTokens > 1 && (bestType == "exact")
-			finalScore, debug := ComputeFinalScore(bestRaw, bestType, bestTokens, isPhraseMatch, rule.ActionTier)
+			msgWordCount := len(msgWords)
+			if msgWordCount == 0 {
+				msgWordCount = 1
+			}
+			density := float64(bestTokens) / float64(msgWordCount)
+			kwStrength := ClassifyKeywordStrength(bestMatchedEntry)
+
+			finalScore, debug := ComputeFinalScore(bestRaw, bestType, bestTokens, isPhraseMatch, rule.ActionTier, msgWordCount, kwStrength)
 			
 			// Invariant 2: At most one MatchSignal per rule
 			signals = append(signals, MatchSignal{
-				Rule:          &rule,
-				MatchType:     bestType,
-				Confidence:    finalScore,
-				RawConfidence: bestRaw,
-				MatchedTokens: bestTokens,
-				Debug:         debug,
+				Rule:            &rule,
+				MatchType:       bestType,
+				Confidence:      finalScore,
+				RawConfidence:   bestRaw,
+				MatchedTokens:   bestTokens,
+				MatchedEntry:    bestMatchedEntry,
+				KeywordStrength: kwStrength,
+				MsgWordCount:    msgWordCount,
+				Density:         density,
+				Debug:           debug,
 			})
 		}
 	}
@@ -386,14 +463,18 @@ func GetSemanticSignals(businessID uint, reducedMsg string) []MatchSignal {
 		if score >= 0.60 {
 			rule := cr.Rule
 			isPhraseMatch := msgTokens > 1
-			finalScore, debug := ComputeFinalScore(score, "semantic", msgTokens, isPhraseMatch, rule.ActionTier)
+			finalScore, debug := ComputeFinalScore(score, "semantic", msgTokens, isPhraseMatch, rule.ActionTier, msgTokens, KeywordStrong)
 			signals = append(signals, MatchSignal{
-				Rule:          &rule,
-				MatchType:     "semantic",
-				Confidence:    finalScore,
-				RawConfidence: score,
-				MatchedTokens: msgTokens,
-				Debug:         debug,
+				Rule:            &rule,
+				MatchType:       "semantic",
+				Confidence:      finalScore,
+				RawConfidence:   score,
+				MatchedTokens:   msgTokens,
+				MatchedEntry:    "",
+				KeywordStrength: KeywordStrong,
+				MsgWordCount:    msgTokens,
+				Density:         1.0,
+				Debug:           debug,
 			})
 		}
 	}

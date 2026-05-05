@@ -307,8 +307,8 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 		if isMatch {
 			bestDet = &best
 			// Log observability for best signal
-			log.Printf("📊 [%s] Det Signal: Rule=%d MatchType=%s Tokens=%d RawConf=%.2f -> Cap=%.2f | Final=%.2f", 
-				business.Name, best.Rule.ID, best.MatchType, best.MatchedTokens, 
+			log.Printf("📊 [%s] Det Signal: Rule=%d MatchType=%s Entry=%q Strength=%s Tokens=%d Words=%d Density=%.2f RawConf=%.2f -> Cap=%.2f | Final=%.2f", 
+				business.Name, best.Rule.ID, best.MatchType, best.MatchedEntry, best.KeywordStrength, best.MatchedTokens, best.MsgWordCount, best.Density,
 				best.Debug.RawConfidence, best.Debug.AfterCaps, best.Confidence)
 
 			if canDrop {
