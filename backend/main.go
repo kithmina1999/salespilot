@@ -217,6 +217,7 @@ func main() {
 		// Dashboard Settings & Audit
 		dash.GET("/settings/business", handlers.GetBusinessSettings)
 		dash.PUT("/settings/business", handlers.UpdateBusinessSettings)
+		dash.POST("/business/simulate", handlers.SimulateMessage) // Sandbox simulator
 		dash.PUT("/settings/language", handlers.UpdateLanguageSettings) // ← independent dashboard + bot language
 		dash.GET("/settings/usage", handlers.GetUsageStats)
 

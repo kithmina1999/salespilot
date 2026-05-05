@@ -16,6 +16,7 @@ import { Rule, parseResponses } from './types';
 import { RuleModal, AIGenerateModal } from './components/RuleModal';
 import { RulesDataTable } from './components/RulesDataTable';
 import { BulkTranslateModal } from './components/BulkTranslateModal';
+import { SandboxSimulator } from './components/SandboxSimulator';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main content (wrapped in Suspense for useSearchParams)
@@ -393,42 +394,49 @@ function RulesContent() {
           </TabsList>
 
           <TabsContent value="your-rules" className="mt-0">
-            <div className="flex flex-col md:flex-row gap-6">
-              {/* Category Sidebar */}
-              <div className="w-full md:w-64 shrink-0">
-                <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 sticky top-6">
-                  <h3 className="text-sm font-semibold text-zinc-400 mb-4 px-2 uppercase tracking-wider">Categories</h3>
-                  <div className="flex flex-col gap-1">
-                    {categories.map(cat => (
-                      <button
-                        key={cat}
-                        onClick={() => setSelectedCategory(cat)}
-                        className={`text-left px-3 py-2 rounded-lg text-sm transition-colors ${selectedCategory === cat ? 'bg-zinc-800 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'}`}
-                      >
-                        {cat}
-                        <span className="float-right text-xs bg-zinc-800 px-2 py-0.5 rounded-full text-zinc-500">
-                          {cat === 'All' ? customRules.length : customRules.filter(r => (r.category || 'General') === cat).length}
-                        </span>
-                      </button>
-                    ))}
+            <div className="flex flex-col xl:flex-row gap-6 items-start">
+              <div className="flex flex-col md:flex-row gap-6 flex-1 w-full">
+                {/* Category Sidebar */}
+                <div className="w-full md:w-56 shrink-0">
+                  <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 sticky top-6">
+                    <h3 className="text-sm font-semibold text-zinc-400 mb-4 px-2 uppercase tracking-wider">Categories</h3>
+                    <div className="flex flex-col gap-1">
+                      {categories.map(cat => (
+                        <button
+                          key={cat}
+                          onClick={() => setSelectedCategory(cat)}
+                          className={`text-left px-3 py-2 rounded-lg text-sm transition-colors ${selectedCategory === cat ? 'bg-zinc-800 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'}`}
+                        >
+                          {cat}
+                          <span className="float-right text-xs bg-zinc-800 px-2 py-0.5 rounded-full text-zinc-500">
+                            {cat === 'All' ? customRules.length : customRules.filter(r => (r.category || 'General') === cat).length}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
+                </div>
+
+                {/* Data Table */}
+                <div className="flex-1 min-w-0">
+                  {loading ? (
+                    <div className="p-12 text-center border rounded-xl border-zinc-800 text-zinc-500 bg-zinc-950">Loading rules...</div>
+                  ) : (
+                    <RulesDataTable
+                      data={customRules}
+                      onEdit={(r) => openEditModal(r as any, false)}
+                      onDelete={handleDelete}
+                      onToggleStatus={handleToggleStatus as any}
+                      selectedCategory={selectedCategory}
+                      botReplyLang={cardPreviewLang}
+                    />
+                  )}
                 </div>
               </div>
 
-              {/* Data Table */}
-              <div className="flex-1">
-                {loading ? (
-                  <div className="p-12 text-center border rounded-xl border-zinc-800 text-zinc-500 bg-zinc-950">Loading rules...</div>
-                ) : (
-                  <RulesDataTable
-                    data={customRules}
-                    onEdit={(r) => openEditModal(r as any, false)}
-                    onDelete={handleDelete}
-                    onToggleStatus={handleToggleStatus as any}
-                    selectedCategory={selectedCategory}
-                    botReplyLang={cardPreviewLang}
-                  />
-                )}
+              {/* Sandbox Simulator */}
+              <div className="w-full xl:w-[380px] shrink-0 h-[650px] sticky top-6">
+                <SandboxSimulator />
               </div>
             </div>
           </TabsContent>

@@ -22,4 +22,4 @@ done 6: it say thatcurrent paln i on trial but say ai offline we need to get int
 19: [x] Slice 4: Bilingual Badges & Single Rule Auto-Translate (Table language badges, /api/rules/translate endpoint, Magic Wand UI button)
 20: [x] Slice 5: Bulk Review-and-Approve Translation (Translate All Missing button, Side-by-side Review Modal)
 21: [x] Slice 6: Multi-Rule LLM Synthesis & Premium Billing (Update pipeline to synthesize top 3 rules using Gemini, flag as AI message)
-22: [ ] Slice 7: The Sandbox Simulator (Build /api/business/simulate endpoint, Chat UI simulator next to rules table)
+22: [x] Slice 7: The Sandbox Simulator (Build /api/business/simulate endpoint, Chat UI simulator next to rules table)

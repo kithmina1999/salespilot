@@ -17,7 +17,12 @@ const metaGraphAPIVersion = "v20.0"
 // to:            recipient phone in E.164 (e.g. "94771234567").
 // text:          the message body.
 func SendText(phoneNumberID, accessToken, to, text string) error {
-    url := fmt.Sprintf("https://graph.facebook.com/%s/%s/messages", metaGraphAPIVersion, phoneNumberID)
+	if to == "99900000000" {
+		log.Printf("🏖️ [SANDBOX] SendText to %s: %s", to, text)
+		return nil
+	}
+
+	url := fmt.Sprintf("https://graph.facebook.com/%s/%s/messages", metaGraphAPIVersion, phoneNumberID)
 
     payload := map[string]interface{}{
         "messaging_product": "whatsapp",
