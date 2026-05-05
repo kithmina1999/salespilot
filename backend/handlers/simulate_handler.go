@@ -35,14 +35,6 @@ func SimulateMessage(c *gin.Context) {
 
 	// 1. Create a dummy incoming message using the sandbox phone number
 	sandboxPhone := "99900000000"
-	
-	// Create incoming message log for realism
-	database.DB.Create(&models.Message{
-		BusinessID: businessID,
-		Phone:      sandboxPhone,
-		Role:       "user",
-		Content:    req.Message,
-	})
 
 	incoming := whatsapp.IncomingMessage{
 		From:      sandboxPhone,
@@ -57,4 +49,16 @@ func SimulateMessage(c *gin.Context) {
 	pipeline.HandleIncomingMessage(&business, incoming)
 
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "Simulated successfully"})
+}
+
+// ClearSimulation deletes all sandbox messages for the business.
+func ClearSimulation(c *gin.Context) {
+	businessID := c.GetUint("business_id")
+	if businessID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	database.DB.Where("business_id = ? AND phone = ?", businessID, "99900000000").Delete(&models.Message{})
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "Simulation cleared"})
 }

@@ -61,6 +61,7 @@ function RulesContent() {
   const [generating, setGenerating] = useState(false);
   const [drafting,   setDrafting]   = useState(false);
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
 
   // Seed from URL — open create modal pre-filled
   useEffect(() => {
@@ -429,14 +430,10 @@ function RulesContent() {
                       onToggleStatus={handleToggleStatus as any}
                       selectedCategory={selectedCategory}
                       botReplyLang={cardPreviewLang}
+                      onOpenSimulator={() => setIsSimulatorOpen(true)}
                     />
                   )}
                 </div>
-              </div>
-
-              {/* Sandbox Simulator */}
-              <div className="w-full xl:w-[380px] shrink-0 h-[650px] sticky top-6">
-                <SandboxSimulator />
               </div>
             </div>
           </TabsContent>
@@ -523,6 +520,16 @@ function RulesContent() {
           onClose={closeModal}
         />
       )}
+      {/* Sandbox Simulator Slide-over */}
+      <div className={`fixed inset-0 z-50 transition-opacity duration-300 ${isSimulatorOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+        {/* Backdrop */}
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsSimulatorOpen(false)} />
+        
+        {/* Slide-over panel */}
+        <div className={`absolute inset-y-0 right-0 w-full sm:w-[450px] transition-transform duration-300 ease-out flex flex-col ${isSimulatorOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+          <SandboxSimulator onClose={() => setIsSimulatorOpen(false)} />
+        </div>
+      </div>
     </div>
   );
 }

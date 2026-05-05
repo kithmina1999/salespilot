@@ -83,6 +83,7 @@ type Business struct {
 	TotalStorageUsed    int64  `json:"total_storage_used" gorm:"default:0"`
 	RuleGenerationCount int    `json:"rule_generation_count" gorm:"default:0"`
 	RuleGenerationLimit int    `json:"rule_generation_limit" gorm:"default:100"` // 100 standard, 150 for first-activation bonus users
+	SimulationCount     int    `json:"simulation_count" gorm:"default:0"`
 
 	// Onboarding status
 	OnboardingComplete bool `json:"onboarding_complete" gorm:"default:false"`
@@ -135,6 +136,7 @@ func (b *Business) AfterFind(tx *gorm.DB) (err error) {
 		b.SystemMessageCount = 0
 		b.FaqReplyCount = 0
 		b.RuleGenerationCount = 0
+		b.SimulationCount = 0
 
 		// Fire async — don't block the caller
 		go tx.Model(b).Select(
@@ -143,6 +145,7 @@ func (b *Business) AfterFind(tx *gorm.DB) (err error) {
 			"system_message_count",
 			"faq_reply_count",
 			"rule_generation_count",
+			"simulation_count",
 		).Updates(*b)
 	}
 

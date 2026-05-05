@@ -20,7 +20,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Edit2, Trash2, Search, Power, PowerOff } from 'lucide-react';
+import { Edit2, Trash2, Search, Power, PowerOff, Bot } from 'lucide-react';
 
 interface RulesDataTableProps {
   data: RuleEntry[];
@@ -28,10 +28,11 @@ interface RulesDataTableProps {
   onDelete: (id: number) => void;
   onToggleStatus: (rule: RuleEntry) => void;
   selectedCategory: string | null;
-  botReplyLang: string;
+  botReplyLang?: string;
+  onOpenSimulator?: () => void;
 }
 
-export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selectedCategory, botReplyLang }: RulesDataTableProps) {
+export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selectedCategory, botReplyLang = 'en', onOpenSimulator }: RulesDataTableProps) {
   const [globalFilter, setGlobalFilter] = useState('');
 
   const filteredData = useMemo(() => {
@@ -142,15 +143,27 @@ export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selecte
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="relative w-72">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-zinc-500" />
-          <Input
-            placeholder="Search rules..."
-            value={globalFilter ?? ''}
-            onChange={(e) => setGlobalFilter(e.target.value)}
-            className="pl-8 bg-zinc-900 border-zinc-800 focus-visible:ring-1 focus-visible:ring-zinc-700 h-9"
-          />
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-zinc-500" />
+            <Input
+              placeholder="Search rules..."
+              value={globalFilter ?? ''}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              className="pl-8 bg-zinc-900 border-zinc-800 focus-visible:ring-1 focus-visible:ring-zinc-700 h-9"
+            />
+          </div>
+          {onOpenSimulator && (
+            <Button 
+              variant="outline" 
+              onClick={onOpenSimulator}
+              className="border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 w-full sm:w-auto h-9"
+            >
+              <Bot className="w-4 h-4 mr-2 text-amber-500" />
+              Test Bot
+            </Button>
+          )}
         </div>
       </div>
       

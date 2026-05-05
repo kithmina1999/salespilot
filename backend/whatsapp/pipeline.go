@@ -121,6 +121,8 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 		return
 	}
 
+	isSandbox := from == "99900000000"
+
 	// ── Layer B: Proactive delivery check (deferred goroutine) ──────────────
 	// Fired AFTER HandleIncomingMessage returns so the main reply lands first.
 	// Only sends a button if customer has a shipped order >1 day old and hasn't been asked.
@@ -312,18 +314,22 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 		replyText := selectReply(rule, detectedLang, business)
 		log.Printf("✅ [%s] FAQ HIGH-CONFIDENCE match — replying to %s (lang=%s)", business.Name, from, detectedLang)
 		enrichAndSend(business, from, fromRaw, replyText, text)
-		database.DB.Model(&models.Rule{}).Where("id = ?", rule.ID).UpdateColumn("usage_count", database.DB.Raw("usage_count + 1"))
-		database.DB.Model(business).UpdateColumn("faq_reply_count", database.DB.Raw("faq_reply_count + 1"))
+		if !isSandbox {
+			database.DB.Model(&models.Rule{}).Where("id = ?", rule.ID).UpdateColumn("usage_count", database.DB.Raw("usage_count + 1"))
+			database.DB.Model(business).UpdateColumn("faq_reply_count", database.DB.Raw("faq_reply_count + 1"))
+		}
 		return
 	}
 
 	// --- LAYER 5: Fallback to Semantic Embedding Match ---
 	var faqHint string
 	if rule != nil && confidence == "medium" {
-		// Tier 1: Hard DROP at medium confidence too
+		// Tier 1: Hard DROP protection (Confidence-based Action Gating)
+		// Medium confidence should NEVER trigger a destructive action like a hard drop.
 		if rule.IsDropRule {
-			log.Printf("🔇 [%s] Hard DROP rule (keyword/medium) — silently terminating for %s", business.Name, from)
-			return
+			log.Printf("🛡️ [%s] Safety Gate: Medium confidence fuzzy match on Drop Rule — ignoring action for %s", business.Name, from)
+			rule = nil // Un-match the rule so it falls through to Semantic/Gemini
+			goto FallbackSemantic
 		}
 		// Tier 2: Context Bridge at medium confidence
 		if rule.IsContextBridge {
@@ -332,8 +338,13 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 		}
 		log.Printf("💡 [%s] Keyword MEDIUM match — injecting as hint to Gemini", business.Name)
 		faqHint = rule.Response
-		database.DB.Model(&models.Rule{}).Where("id = ?", rule.ID).UpdateColumn("usage_count", database.DB.Raw("usage_count + 1"))
-	} else {
+		if !isSandbox {
+			database.DB.Model(&models.Rule{}).Where("id = ?", rule.ID).UpdateColumn("usage_count", database.DB.Raw("usage_count + 1"))
+		}
+	}
+
+FallbackSemantic:
+	if rule == nil || confidence != "medium" {
 		// No keyword match at all — try semantic
 		semRules, semConf := semanticMatch(business.ID, text)
 		if len(semRules) > 0 {
@@ -355,8 +366,10 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 				replyText := selectReply(&bestRule, detectedLang, business)
 				log.Printf("📤 [%s] Semantic FAQ reply sent to %s (lang=%s)", business.Name, from, detectedLang)
 				enrichAndSend(business, from, fromRaw, replyText, text)
-				database.DB.Model(&models.Rule{}).Where("id = ?", bestRule.ID).UpdateColumn("usage_count", database.DB.Raw("usage_count + 1"))
-				database.DB.Model(business).UpdateColumn("faq_reply_count", database.DB.Raw("faq_reply_count + 1"))
+				if !isSandbox {
+					database.DB.Model(&models.Rule{}).Where("id = ?", bestRule.ID).UpdateColumn("usage_count", database.DB.Raw("usage_count + 1"))
+					database.DB.Model(business).UpdateColumn("faq_reply_count", database.DB.Raw("faq_reply_count + 1"))
+				}
 				return
 			}
 			
@@ -364,7 +377,9 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 			var hints []string
 			for _, r := range semRules {
 				hints = append(hints, r.Response)
-				database.DB.Model(&models.Rule{}).Where("id = ?", r.ID).UpdateColumn("usage_count", database.DB.Raw("usage_count + 1"))
+				if !isSandbox {
+					database.DB.Model(&models.Rule{}).Where("id = ?", r.ID).UpdateColumn("usage_count", database.DB.Raw("usage_count + 1"))
+				}
 			}
 			faqHint = strings.Join(hints, "\n\n---\n\n")
 		}
@@ -378,11 +393,13 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 	}
 
 	// Log the unmatched/Gemini-routed query so merchants can improve FAQs
-	database.DB.Create(&models.UnmatchedMessage{
-		BusinessID:    &business.ID,
-		Message:       text,
-		IntentCluster: NormalizeMessage(text),
-	})
+	if !isSandbox {
+		database.DB.Create(&models.UnmatchedMessage{
+			BusinessID:    &business.ID,
+			Message:       text,
+			IntentCluster: NormalizeMessage(text),
+		})
+	}
 
 	// --- LAYER 6: AI Usage Limit Check ---
 
@@ -418,8 +435,19 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 		return
 	}
 
-	database.DB.Model(business).Update("ai_message_count", business.AIMessageCount+1)
-	business.AIMessageCount++
+	if isSandbox {
+		// Enforce Sandbox AI Quota for Free/Trial (100 msgs)
+		if business.Plan != models.PlanPro && business.SimulationCount >= 100 {
+			log.Printf("⚠️ [%s] Sandbox limit reached.", business.Name)
+			botSendText(business, fromRaw, "Sandbox AI limit reached for this month. Upgrade to Pro for unlimited testing, or keep testing standard Keyword matches.")
+			return
+		}
+		database.DB.Model(business).Update("simulation_count", business.SimulationCount+1)
+		business.SimulationCount++
+	} else {
+		database.DB.Model(business).Update("ai_message_count", business.AIMessageCount+1)
+		business.AIMessageCount++
+	}
 
 	// ── Staleness detection ────────────────────────────────────────────────────
 	// A message is "stale" if it was delayed 5–60 min (e.g. server briefly down).
@@ -435,9 +463,11 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 				isStale = true
 				log.Printf("⏰ [%s] Stale message from %s (age=%v) — apology mode, skipping AI counter",
 					business.Name, from, msgAge.Round(time.Second))
-				// Undo the AI count increment above
-				database.DB.Model(business).Update("ai_message_count", business.AIMessageCount-1)
-				business.AIMessageCount--
+				if !isSandbox {
+					// Undo the AI count increment above
+					database.DB.Model(business).Update("ai_message_count", business.AIMessageCount-1)
+					business.AIMessageCount--
+				}
 			}
 		}
 	}
@@ -447,7 +477,7 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 	if business.Plan == models.PlanPro {
 		maxAI = -1 // Pro plan = unlimited AI replies
 	}
-	if maxAI > 0 && business.AIMessageCount > maxAI {
+	if !isSandbox && maxAI > 0 && business.AIMessageCount > maxAI {
 		log.Printf("⚠️ [%s] AI Message Limit Hit (%d). AI Bot Disabled for %s.", business.Name, maxAI, from)
 		botSendText(business, fromRaw,
 			"I am currently receiving too many complex questions. Please wait for a human representative.")
@@ -590,7 +620,23 @@ func matchFAQ(businessID uint, msg string) (*models.Rule, string) {
 			if strings.Contains(entry, "+") {
 				continue
 			}
+			// 1. Short Keyword Protection: Disable fuzzy matching for keywords < 5 chars
+			if len(entry) < 5 {
+				continue
+			}
+
 			for _, word := range msgWords {
+				// 1b. Short Word Protection: Disable fuzzy matching for input words < 5 chars
+				if len(word) < 5 {
+					continue
+				}
+
+				// 2. Length Difference Penalty: Words must be similar in length
+				lenDiff := len(word) - len(entry)
+				if lenDiff < -1 || lenDiff > 1 {
+					continue
+				}
+
 				if score := strutil.Similarity(word, entry, jw); score > 0.85 {
 					log.Printf("FUZZY match! word='%s' ~ kw='%s' score=%.2f", word, entry, score)
 					ruleCopy := cr.Rule
