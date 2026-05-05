@@ -40,6 +40,22 @@ const (
     TrialAILimit      = 150 // AI replies allowed during trial period
     TrialMsgLimit     = 500 // Inbound messages allowed during trial
     TrialRuleLimit    = 50  // FAQ rules allowed during trial
+    TrialSimulationLimit   = 100
+)
+
+// Simulation Limits
+const (
+    FreeSimulationLimit    = 50
+    StarterSimulationLimit = 250
+    ProSimulationLimit     = -1 // unlimited fair use
+)
+
+// Sandbox Hourly Rate Limits
+const (
+    SandboxHourlyLimitFree    = 20
+    SandboxHourlyLimitTrial   = 30
+    SandboxHourlyLimitStarter = 60
+    SandboxHourlyLimitPro     = 100
 )
 
 // Billing Cycles
@@ -84,6 +100,7 @@ type Business struct {
 	RuleGenerationCount int    `json:"rule_generation_count" gorm:"default:0"`
 	RuleGenerationLimit int    `json:"rule_generation_limit" gorm:"default:100"` // 100 standard, 150 for first-activation bonus users
 	SimulationCount     int    `json:"simulation_count" gorm:"default:0"`
+	SimulationLimit     int    `json:"simulation_limit" gorm:"default:50"`
 
 	// Onboarding status
 	OnboardingComplete bool `json:"onboarding_complete" gorm:"default:false"`
@@ -125,7 +142,8 @@ func (b *Business) AfterFind(tx *gorm.DB) (err error) {
 		// First time migration: set current month without resetting counters.
 		b.CurrentUsageMonth = currentMonth
 		// Fire async — don't block the login/auth response
-		go tx.Model(b).UpdateColumn("current_usage_month", currentMonth)
+		businessID := b.ID
+		go tx.Model(&Business{}).Where("id = ?", businessID).UpdateColumn("current_usage_month", currentMonth)
 		return
 	}
 
@@ -139,7 +157,8 @@ func (b *Business) AfterFind(tx *gorm.DB) (err error) {
 		b.SimulationCount = 0
 
 		// Fire async — don't block the caller
-		go tx.Model(b).Select(
+		businessID := b.ID
+		go tx.Model(&Business{}).Where("id = ?", businessID).Select(
 			"current_usage_month",
 			"ai_message_count",
 			"system_message_count",

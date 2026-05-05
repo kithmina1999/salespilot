@@ -239,6 +239,7 @@ func SeedOnboardingTemplates(c *gin.Context) {
 		trialExpiry := now.AddDate(0, 0, models.TrialDurationDays)
 		business.TrialExpiresAt = &trialExpiry
 		business.AIMessageLimit = models.TrialAILimit // 150 AI replies during trial
+		business.SimulationLimit = models.TrialSimulationLimit
 		log.Printf("✨ 14-Day Starter Trial started for Business %d — Expires %s (AI limit: %d)", business.ID, trialExpiry.Format("2006-01-02"), models.TrialAILimit)
 	}
 

@@ -75,7 +75,23 @@ export function SandboxSimulator({ onClose }: { onClose?: () => void }) {
           </div>
           <div>
             <h3 className="font-bold text-white text-sm">Sandbox Simulator</h3>
-            <p className="text-[11px] text-zinc-400">Test your rules safely</p>
+            {profile?.simulation_limit > 0 ? (
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-[11px] text-zinc-400">
+                  {profile.simulation_count} / {profile.simulation_limit} tests used
+                </p>
+                <div className="w-16 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full ${profile.simulation_count >= profile.simulation_limit ? 'bg-red-500' : 'bg-amber-500'}`}
+                    style={{ width: `${Math.min(100, (profile.simulation_count / profile.simulation_limit) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            ) : profile?.simulation_limit === -1 ? (
+              <p className="text-[11px] text-zinc-400">Unlimited testing</p>
+            ) : (
+              <p className="text-[11px] text-zinc-400">Test your rules safely</p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">

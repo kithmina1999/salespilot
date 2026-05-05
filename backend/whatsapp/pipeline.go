@@ -455,10 +455,10 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 	}
 
 	if isSandbox {
-		// Enforce Sandbox AI Quota for Free/Trial (100 msgs)
-		if business.Plan != models.PlanPro && business.SimulationCount >= 100 {
+		// Enforce Sandbox AI Quota
+		if business.SimulationLimit > 0 && business.SimulationCount >= business.SimulationLimit {
 			log.Printf("⚠️ [%s] Sandbox limit reached.", business.Name)
-			botSendText(business, fromRaw, "Sandbox AI limit reached for this month. Upgrade to Pro for unlimited testing, or keep testing standard Keyword matches.")
+			botSendText(business, fromRaw, "Sandbox AI limit reached for this month. Upgrade your plan for more testing.")
 			return
 		}
 		database.DB.Model(business).Update("simulation_count", business.SimulationCount+1)

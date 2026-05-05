@@ -265,6 +265,13 @@ func RedeemActivationCode(c *gin.Context) {
 		newRuleGenLimit = 150 // First-activation bonus: +50 extra rule generations
 	}
 
+	newSimulationLimit := models.StarterSimulationLimit
+	if code.Plan == models.PlanPro {
+		newSimulationLimit = models.ProSimulationLimit
+	} else if code.Plan == models.PlanFree {
+		newSimulationLimit = models.FreeSimulationLimit
+	}
+
 	// Upgrade the business plan and clear the trial (trial ends when paid plan begins)
 	updates := map[string]interface{}{
 		"plan":                  code.Plan,
@@ -272,10 +279,11 @@ func RedeemActivationCode(c *gin.Context) {
 		"plan_expires_at":       newExpiry,
 		"ai_message_limit":      newAILimit,
 		"rule_generation_limit": newRuleGenLimit,
+		"simulation_limit":      newSimulationLimit,
 		"trial_expires_at":      nil, // Clear trial — paid plan is now active
 	}
 	// Use Session(&gorm.Session{}) with Select("*") to allow writing nil (zero) values
-	database.DB.Model(&biz).Select("plan", "billing_cycle", "plan_expires_at", "ai_message_limit", "rule_generation_limit", "trial_expires_at").Updates(updates)
+	database.DB.Model(&biz).Select("plan", "billing_cycle", "plan_expires_at", "ai_message_limit", "rule_generation_limit", "simulation_limit", "trial_expires_at").Updates(updates)
 
 	// Mark code as used
 	usedAt := time.Now()

@@ -50,6 +50,7 @@ func StartTrial(c *gin.Context) {
 	database.DB.Model(&biz).Updates(map[string]interface{}{
 		"trial_expires_at": expiresAt,
 		"ai_message_limit": models.TrialAILimit, // 150 AI replies during trial
+		"simulation_limit": models.TrialSimulationLimit,
 	})
 
 	LogActivity(biz.ID, "system", 0, "trial_started", "billing", "14_day_ai_trial",
