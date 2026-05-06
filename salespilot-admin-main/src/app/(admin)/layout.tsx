@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { RequireAuth } from "@/components/auth/require-auth";
 import { useAuth } from "@/lib/auth-context";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { api } from "@/lib/api";
 import {
   LayoutDashboard,
@@ -139,6 +140,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   {admin?.email || "admin@salespilot.lk"}
                 </p>
               </div>
+              <ThemeToggle />
         </div>
 
         {/* Main Nav */}

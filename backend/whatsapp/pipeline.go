@@ -121,16 +121,39 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 	isSandbox := from == "99900000000"
 
 	var pLog *models.PipelineLog
-	shouldLog := isSandbox || (business.DebugMode && business.DebugModeUntil != nil && business.DebugModeUntil.After(time.Now()))
+	shouldLog := business.DebugMode && business.DebugModeUntil != nil && business.DebugModeUntil.After(time.Now())
 	if shouldLog {
+		startTime := time.Now()
+		
+		var cartBefore models.Cart
+		database.DB.Where("phone = ? AND business_id = ?", from, business.ID).First(&cartBefore)
+		
 		pLog = &models.PipelineLog{
-			BusinessID: business.ID,
-			Phone:      from,
-			RawMessage: text,
-			IsSandbox:  isSandbox,
-			DebugMode:  business.DebugMode,
+			BusinessID:       business.ID,
+			Phone:            from,
+			RawMessage:       text,
+			IsSandbox:        isSandbox,
+			DebugMode:        business.DebugMode,
+			StateBefore:      cartBefore.State,
+			IntentClassified: ClassifyMessageIntent(text),
 		}
-		defer PersistPipelineLog(pLog)
+		
+		defer func() {
+			pLog.ExecutionTimeMs = time.Since(startTime).Milliseconds()
+			
+			var cartAfter models.Cart
+			if err := database.DB.Where("phone = ? AND business_id = ?", from, business.ID).First(&cartAfter).Error; err == nil {
+				pLog.StateAfter = cartAfter.State
+			}
+			
+			var lastMsg models.Message
+			// Fetch the latest bot message created during this request's lifecycle
+			if err := database.DB.Where("phone = ? AND business_id = ? AND role = 'model' AND created_at >= ?", from, business.ID, startTime).Order("created_at DESC").First(&lastMsg).Error; err == nil {
+				pLog.BotReplyText = lastMsg.Content
+			}
+			
+			PersistPipelineLog(pLog)
+		}()
 	}
 
 	// ── Layer B: Proactive delivery check (deferred goroutine) ──────────────
@@ -595,6 +618,7 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 			if pLog != nil {
 				pLog.RouteTaken = "catalog"
 				pLog.ActionTaken = "replied"
+				pLog.ModelUsed = "native_catalog"
 			}
 			return
 		}
@@ -607,6 +631,7 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 		}
 		pLog.ActionTaken = "replied"
 		pLog.AIUsed = true
+		pLog.ModelUsed = "gemini-1.5-flash"
 	}
 	p.callGemini(business, from, fromRaw, text, faqHint, isStale)
 

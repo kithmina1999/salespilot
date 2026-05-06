@@ -1,25 +1,117 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* ── Super Admin Design Tokens ──────────────────────────── */
+@custom-variant dark (&:is(.dark, .dark *));
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
 :root {
-  --bg:           #080b12;
-  --surface:      #0d1321;
-  --surface-2:    #121929;
-  --border:       #1c283a;
-  --border-2:     #243044;
-  --accent:       #6366f1;
+  /* Cohesive Light Theme */
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #4f46e5;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #f1f5f9;
+  --accent-foreground: #0f172a;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #4f46e5;
+  --radius: 0.75rem;
+
+  /* Legacy Custom Variables (Mapped to same values) */
+  --bg:           #f8fafc;
+  --surface:      #ffffff;
+  --surface-2:    #f1f5f9;
+  --border-2:     #e2e8f0;
   --accent-dim:   #4f46e5;
-  --accent-glow:  rgba(99, 102, 241, 0.12);
-  --accent-glow2: rgba(99, 102, 241, 0.22);
-  --text:         #e8eaf0;
-  --muted:        #64748b;
+  --accent-glow:  rgba(99, 102, 241, 0.08);
+  --accent-glow2: rgba(99, 102, 241, 0.15);
+  --text:         #0f172a;
   --muted-2:      #475569;
   --danger:       #ef4444;
   --success:      #22c55e;
   --warning:      #f59e0b;
   --info:         #3b82f6;
-  --radius:       0.75rem;
+}
+
+.dark {
+  /* Cohesive Dark Theme */
+  --background: #080b12;
+  --foreground: #e8eaf0;
+  --card: #0d1321;
+  --card-foreground: #e8eaf0;
+  --popover: #0d1321;
+  --popover-foreground: #e8eaf0;
+  --primary: #6366f1;
+  --primary-foreground: #ffffff;
+  --secondary: #121929;
+  --secondary-foreground: #e8eaf0;
+  --muted: #121929;
+  --muted-foreground: #64748b;
+  --accent: #121929;
+  --accent-foreground: #e8eaf0;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #1c283a;
+  --input: #1c283a;
+  --ring: #6366f1;
+
+  /* Legacy Custom Variables (Original Dark Theme) */
+  --bg:           #080b12;
+  --surface:      #0d1321;
+  --surface-2:    #121929;
+  --border-2:     #243044;
+  --accent-dim:   #4f46e5;
+  --accent-glow:  rgba(99, 102, 241, 0.12);
+  --accent-glow2: rgba(99, 102, 241, 0.22);
+  --text:         #e8eaf0;
+  --muted-2:      #475569;
+  --danger:       #ef4444;
+  --success:      #22c55e;
+  --warning:      #f59e0b;
+  --info:         #3b82f6;
 }
 
 /* ── Reset & Base ───────────────────────────────────────── */

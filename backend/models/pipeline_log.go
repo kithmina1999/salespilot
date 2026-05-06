@@ -19,6 +19,17 @@ type PipelineLog struct {
 	SelectedRawConfidence float64   `json:"selected_raw_confidence"`
 	AIUsed                bool      `gorm:"index" json:"ai_used"`
 	FAQHintUsed           bool      `json:"faq_hint_used"`
+	
+	// New Telemetry Fields
+	BotReplyText          string    `gorm:"type:text" json:"bot_reply_text"`
+	BotReplyPayload       string    `gorm:"type:text" json:"bot_reply_payload"`
+	ErrorMessage          string    `gorm:"type:text" json:"error_message"`
+	StateBefore           string    `gorm:"index" json:"state_before"`
+	StateAfter            string    `gorm:"index" json:"state_after"`
+	ExecutionTimeMs       int64     `json:"execution_time_ms"`
+	IntentClassified      string    `gorm:"index" json:"intent_classified"`
+	ModelUsed             string    `gorm:"index" json:"model_used"`
+	
 	IsSandbox             bool      `gorm:"index" json:"is_sandbox"`
 	DebugMode             bool      `gorm:"index" json:"debug_mode"`
 	CreatedAt             time.Time `gorm:"index" json:"created_at"`
