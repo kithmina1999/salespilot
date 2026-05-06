@@ -24,6 +24,14 @@ function PlanBadge({ plan }: { plan: string }) {
   );
 }
 
+function getApiErrorMessage(err: unknown) {
+  if (typeof err === "object" && err !== null && "response" in err) {
+    const response = (err as { response?: { data?: { error?: string } } }).response;
+    if (response?.data?.error) return response.data.error;
+  }
+  return err instanceof Error ? err.message : "Request failed";
+}
+
 type TabKey = "usage" | "override";
 
 export default function BusinessDetailPage() {
@@ -51,8 +59,6 @@ export default function BusinessDetailPage() {
   const [suspendConfirm, setSuspendConfirm] = useState("");
   const [suspending, setSuspending] = useState(false);
   const [suspendMessage, setSuspendMessage] = useState("");
-
-  const [togglingDebug, setTogglingDebug] = useState(false);
 
   useEffect(() => {
     if (b) {
@@ -82,8 +88,8 @@ export default function BusinessDetailPage() {
       mutate();
       setReason("");
       setConfirmAction("");
-    } catch (err: any) {
-      setMessage(`Error: ${err.response?.data?.error || err.message}`);
+    } catch (err: unknown) {
+      setMessage(`Error: ${getApiErrorMessage(err)}`);
     } finally {
       setSaving(false);
     }
@@ -103,8 +109,8 @@ export default function BusinessDetailPage() {
       mutate();
       setSuspendReason("");
       setSuspendConfirm("");
-    } catch (err: any) {
-      setSuspendMessage(`Error: ${err.response?.data?.error || err.message}`);
+    } catch (err: unknown) {
+      setSuspendMessage(`Error: ${getApiErrorMessage(err)}`);
     } finally {
       setSuspending(false);
     }
@@ -123,25 +129,10 @@ export default function BusinessDetailPage() {
       mutate();
       setSuspendReason("");
       setSuspendConfirm("");
-    } catch (err: any) {
-      setSuspendMessage(`Error: ${err.response?.data?.error || err.message}`);
+    } catch (err: unknown) {
+      setSuspendMessage(`Error: ${getApiErrorMessage(err)}`);
     } finally {
       setSuspending(false);
-    }
-  };
-
-  const handleToggleDebug = async () => {
-    setTogglingDebug(true);
-    try {
-      await api.post(`/system/businesses/${id}/debug-mode`, {
-        enable: !b.debug_mode,
-        duration_hours: 24,
-      });
-      mutate();
-    } catch (err: any) {
-      alert(`Error toggling debug mode: ${err.response?.data?.error || err.message}`);
-    } finally {
-      setTogglingDebug(false);
     }
   };
 
@@ -456,42 +447,6 @@ export default function BusinessDetailPage() {
               </p>
             )}
           </form>
-        </div>
-
-        <div
-          style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: "1rem",
-            padding: "1.75rem",
-            maxWidth: "520px",
-            marginTop: "1.5rem",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div>
-              <h3 style={{ fontSize: "1rem", fontWeight: 700, color: "var(--text)" }}>Pipeline Debug Mode</h3>
-              <p style={{ fontSize: "0.8375rem", color: "var(--muted)", marginTop: "0.25rem" }}>
-                Enable verbose pipeline telemetry. Automatically turns off after 24 hours.
-              </p>
-            </div>
-            <button
-              onClick={handleToggleDebug}
-              disabled={togglingDebug}
-              style={{
-                padding: "0.5rem 1rem",
-                borderRadius: "999px",
-                border: "none",
-                fontWeight: 600,
-                fontSize: "0.8125rem",
-                cursor: togglingDebug ? "not-allowed" : "pointer",
-                background: b.debug_mode ? "rgba(239,68,68,0.15)" : "var(--accent-glow)",
-                color: b.debug_mode ? "#f87171" : "var(--accent)",
-              }}
-            >
-              {togglingDebug ? "..." : b.debug_mode ? "Disable Debugging" : "Enable Debugging"}
-            </button>
-          </div>
         </div>
 
         {/* Suspend Account Block */}

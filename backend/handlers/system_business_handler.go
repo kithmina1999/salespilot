@@ -123,8 +123,8 @@ func ToggleDebugMode(c *gin.Context) {
 	id := c.Param("id")
 
 	var req struct {
-		Enable        bool `json:"enable"`
-		DurationHours int  `json:"duration_hours"` // How long to keep it on
+		Enable        bool   `json:"enable"`
+		DurationHours int    `json:"duration_hours"` // How long to keep it on
 		Reason        string `json:"reason"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {

@@ -3,8 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
+import { createPortal } from "react-dom";
 import { api } from "@/lib/api";
-import { Search, ChevronRight, Building2, ExternalLink } from "lucide-react";
+import { Search, ChevronRight, Building2, Bug, Eye, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 type Business = {
   id: number;
@@ -18,7 +22,14 @@ type Business = {
   ai_message_count: number;
   ai_message_limit: number;
   trial_expires_at: string | null;
+  debug_active: boolean;
+  debug_expires_at: string | null;
+  debug_remaining_seconds: number;
 };
+
+const DEBUG_DURATIONS = [1, 6, 24, 72];
+const DEBUG_MENU_WIDTH = 280;
+const DEBUG_MENU_HEIGHT = 230;
 
 function PlanBadge({ plan }: { plan: string }) {
   const styles: Record<string, { bg: string; color: string; border: string }> = {
@@ -47,9 +58,53 @@ function PlanBadge({ plan }: { plan: string }) {
   );
 }
 
+function formatDebugRemaining(seconds: number, expiresAt: string | null) {
+  if (seconds > 0) {
+    if (seconds < 3600) return `${Math.max(1, Math.ceil(seconds / 60))}m left`;
+    return `${Math.ceil(seconds / 3600)}h left`;
+  }
+  if (!expiresAt) return "";
+  return `until ${new Date(expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+}
+
+function DebugBadge({ business }: { business: Business }) {
+  if (!business.debug_active) return null;
+  return (
+    <span
+      title={business.debug_expires_at ? `Debugging until ${new Date(business.debug_expires_at).toLocaleString()}` : "Debugging active"}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "0.3rem",
+        width: "fit-content",
+        padding: "0.12rem 0.45rem",
+        borderRadius: "999px",
+        border: "1px solid rgba(251,191,36,0.35)",
+        background: "rgba(251,191,36,0.1)",
+        color: "#fbbf24",
+        fontSize: "0.68rem",
+        fontWeight: 800,
+        letterSpacing: "0.04em",
+      }}
+    >
+      DEBUG
+      <span style={{ color: "var(--muted)", fontWeight: 600, letterSpacing: 0 }}>
+        {formatDebugRemaining(business.debug_remaining_seconds, business.debug_expires_at)}
+      </span>
+    </span>
+  );
+}
+
 export default function BusinessesPage() {
   const [search, setSearch] = useState("");
-  const { data, isLoading: loading } = useSWR<{ businesses: Business[] }>(
+  const [debugTargetId, setDebugTargetId] = useState<number | null>(null);
+  const [debugDuration, setDebugDuration] = useState(24);
+  const [debugReason, setDebugReason] = useState("");
+  const [debugBusyId, setDebugBusyId] = useState<number | null>(null);
+  const [debugError, setDebugError] = useState("");
+  const [debugMenuPosition, setDebugMenuPosition] = useState<{ top: number; left: number } | null>(null);
+
+  const { data, isLoading: loading, mutate } = useSWR<{ businesses: Business[] }>(
     "/system/businesses",
     (url:string) => api.get(url).then((res) => res.data)
   );
@@ -60,6 +115,64 @@ export default function BusinessesPage() {
       b.name.toLowerCase().includes(search.toLowerCase()) ||
       b.phone.includes(search)
   );
+
+  const openDebugStart = (businessId: number, anchor: HTMLElement) => {
+    if (debugTargetId === businessId) {
+      setDebugTargetId(null);
+      setDebugMenuPosition(null);
+      return;
+    }
+    const rect = anchor.getBoundingClientRect();
+    const topBelow = rect.bottom + 8;
+    const topAbove = rect.top - DEBUG_MENU_HEIGHT - 8;
+    const top = topBelow + DEBUG_MENU_HEIGHT > window.innerHeight - 16
+      ? Math.max(16, topAbove)
+      : topBelow;
+    const left = Math.min(
+      Math.max(16, rect.right - DEBUG_MENU_WIDTH),
+      window.innerWidth - DEBUG_MENU_WIDTH - 16
+    );
+    setDebugTargetId(businessId);
+    setDebugMenuPosition({ top, left });
+    setDebugDuration(24);
+    setDebugReason("");
+    setDebugError("");
+  };
+
+  const startDebug = async (businessId: number) => {
+    setDebugBusyId(businessId);
+    setDebugError("");
+    try {
+      await api.post(`/system/businesses/${businessId}/debug-mode`, {
+        enable: true,
+        duration_hours: debugDuration,
+        reason: debugReason.trim() || undefined,
+      });
+      setDebugTargetId(null);
+      setDebugMenuPosition(null);
+      setDebugReason("");
+      mutate();
+    } catch (err: unknown) {
+      setDebugError(err instanceof Error ? err.message : "Failed to start debugging");
+    } finally {
+      setDebugBusyId(null);
+    }
+  };
+
+  const stopDebug = async (businessId: number) => {
+    setDebugBusyId(businessId);
+    setDebugError("");
+    try {
+      await api.post(`/system/businesses/${businessId}/debug-mode`, {
+        enable: false,
+      });
+      mutate();
+    } catch (err: unknown) {
+      setDebugError(err instanceof Error ? err.message : "Failed to stop debugging");
+    } finally {
+      setDebugBusyId(null);
+    }
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }} className="animate-fade-up">
@@ -126,7 +239,7 @@ export default function BusinessesPage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "2fr 1.5fr 1fr 1fr 1fr 1.5fr 80px",
+            gridTemplateColumns: "2fr 1.5fr 1fr 1fr 1fr 1.6fr 150px",
             padding: "0.75rem 1.25rem",
             background: "rgba(255,255,255,0.02)",
             borderBottom: "1px solid var(--border)",
@@ -168,7 +281,7 @@ export default function BusinessesPage() {
               key={b.id}
               style={{
                 display: "grid",
-                gridTemplateColumns: "2fr 1.5fr 1fr 1fr 1fr 1.5fr 80px",
+                gridTemplateColumns: "2fr 1.5fr 1fr 1fr 1fr 1.6fr 150px",
                 padding: "0.875rem 1.25rem",
                 borderBottom: idx < filtered.length - 1 ? "1px solid var(--border)" : "none",
                 alignItems: "center",
@@ -201,6 +314,7 @@ export default function BusinessesPage() {
 
               {/* Status & Joined */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+                <DebugBadge business={b} />
                 {b.suspended_at && (
                   <span style={{ fontSize: "0.7rem", color: "#ef4444", fontWeight: 600, background: "rgba(239,68,68,0.1)", padding: "0.1rem 0.4rem", borderRadius: "4px", width: "fit-content" }}>
                     SUSPENDED
@@ -212,7 +326,67 @@ export default function BusinessesPage() {
               </div>
 
               {/* Action */}
-              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "0.375rem", position: "relative" }}>
+                {b.debug_active ? (
+                  <>
+                    <button
+                      onClick={() => stopDebug(b.id)}
+                      disabled={debugBusyId === b.id}
+                      title="Stop pipeline debugging"
+                      style={{
+                        width: "30px",
+                        height: "30px",
+                        borderRadius: "0.5rem",
+                        border: "1px solid rgba(239,68,68,0.25)",
+                        background: "rgba(239,68,68,0.1)",
+                        color: "#f87171",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: debugBusyId === b.id ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                    <Link
+                      href={`/businesses/${b.id}/pipeline`}
+                      title="View pipeline logs"
+                      style={{
+                        width: "30px",
+                        height: "30px",
+                        borderRadius: "0.5rem",
+                        border: "1px solid rgba(251,191,36,0.25)",
+                        background: "rgba(251,191,36,0.1)",
+                        color: "#fbbf24",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        textDecoration: "none",
+                      }}
+                    >
+                      <Eye size={14} />
+                    </Link>
+                  </>
+                ) : (
+                  <button
+                    onClick={(e) => openDebugStart(b.id, e.currentTarget)}
+                    title="Start pipeline debugging"
+                    style={{
+                      width: "30px",
+                      height: "30px",
+                      borderRadius: "0.5rem",
+                      border: "1px solid rgba(251,191,36,0.25)",
+                      background: debugTargetId === b.id ? "rgba(251,191,36,0.18)" : "rgba(251,191,36,0.08)",
+                      color: "#fbbf24",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Bug size={14} />
+                  </button>
+                )}
                 <Link
                   href={`/businesses/${b.id}`}
                   style={{
@@ -239,11 +413,91 @@ export default function BusinessesPage() {
                   View
                   <ChevronRight size={13} />
                 </Link>
+
               </div>
             </div>
           ))
         )}
       </div>
+      {debugTargetId !== null && debugMenuPosition && createPortal(
+        <>
+          <button
+            aria-label="Close debug menu"
+            onClick={() => {
+              setDebugTargetId(null);
+              setDebugMenuPosition(null);
+            }}
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 40,
+              border: "none",
+              background: "transparent",
+              cursor: "default",
+            }}
+          />
+          <div
+            className="z-50"
+            style={{
+              position: "fixed",
+              top: `${debugMenuPosition.top}px`,
+              left: `${debugMenuPosition.left}px`,
+              width: `${DEBUG_MENU_WIDTH}px`,
+              zIndex: 41,
+            }}
+          >
+            <Card className="shadow-2xl">
+              <CardHeader className="grid-cols-[1fr_auto]">
+                <div>
+                  <CardTitle className="text-sm">Start pipeline debugging</CardTitle>
+                  <CardDescription className="text-xs">Capture all text pipeline events for this business.</CardDescription>
+                </div>
+                <Button
+                  onClick={() => {
+                    setDebugTargetId(null);
+                    setDebugMenuPosition(null);
+                  }}
+                  size="icon-sm"
+                  variant="ghost"
+                >
+                  <X />
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-4 gap-2">
+                  {DEBUG_DURATIONS.map((hours) => (
+                    <Button
+                      className={debugDuration === hours ? "border-amber-400/40 bg-amber-400/10 text-amber-300" : ""}
+                      key={hours}
+                      onClick={() => setDebugDuration(hours)}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      {hours}h
+                    </Button>
+                  ))}
+                </div>
+                <Input
+                  value={debugReason}
+                  onChange={(e) => setDebugReason(e.target.value)}
+                  placeholder="Reason (optional)"
+                />
+                {debugError && <p className="text-xs font-semibold text-destructive">{debugError}</p>}
+                <Button
+                  className="w-full border-amber-400/35 bg-amber-400/10 text-amber-300 hover:bg-amber-400/20"
+                  onClick={() => startDebug(debugTargetId)}
+                  disabled={debugBusyId === debugTargetId}
+                  variant="outline"
+                >
+                  {debugBusyId === debugTargetId ? "Starting..." : `Start for ${debugDuration}h`}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </>,
+        document.body
+      )}
     </div>
   );
 }

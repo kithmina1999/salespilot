@@ -15,16 +15,9 @@ import {
   Cpu,
   Zap,
   AlertTriangle,
+  Bug,
+  X,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Sheet,
   SheetContent,
@@ -32,8 +25,71 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 /* ── helpers ─────────────────────────────────────────────── */
+
+type PipelineSignalLog = {
+  id: number;
+  rule_id: number;
+  matched_entry: string;
+  keyword_strength: string;
+  raw_confidence: number;
+  final_confidence: number;
+  after_weight: number;
+  after_modifiers: number;
+  rank: number;
+};
+
+type PipelineLog = {
+  id: number;
+  created_at: string;
+  phone: string;
+  raw_message: string;
+  clean_message: string;
+  reduced_message: string;
+  route_taken: string;
+  action_taken: string;
+  ai_used: boolean;
+  signal_logs?: PipelineSignalLog[];
+};
+
+type BusinessDebugState = {
+  id: number;
+  name: string;
+  debug_active: boolean;
+  debug_expires_at: string | null;
+  debug_remaining_seconds: number;
+};
+
+const DEBUG_DURATIONS = [1, 6, 24, 72];
+
+function getApiErrorMessage(err: unknown) {
+  if (typeof err === "object" && err !== null && "response" in err) {
+    const response = (err as { response?: { data?: { error?: string } } }).response;
+    if (response?.data?.error) return response.data.error;
+  }
+  return err instanceof Error ? err.message : "Request failed";
+}
+
+function formatDebugRemaining(seconds: number, expiresAt: string | null) {
+  if (seconds > 0) {
+    if (seconds < 3600) return `${Math.max(1, Math.ceil(seconds / 60))}m left`;
+    return `${Math.ceil(seconds / 3600)}h left`;
+  }
+  if (!expiresAt) return "";
+  return `until ${new Date(expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+}
 
 function formatTime(dateString: string) {
   const d = new Date(dateString);
@@ -46,9 +102,14 @@ function formatTime(dateString: string) {
 
 function RouteTag({ route }: { route: string }) {
   const map: Record<string, { bg: string; color: string; border: string; label: string }> = {
-    deterministic: { bg: "rgba(34,197,94,0.1)",   color: "#4ade80", border: "rgba(34,197,94,0.3)",   label: "Deterministic" },
+    faq_high:       { bg: "rgba(34,197,94,0.1)",   color: "#4ade80", border: "rgba(34,197,94,0.3)",   label: "FAQ High" },
+    faq_medium:     { bg: "rgba(34,197,94,0.1)",   color: "#4ade80", border: "rgba(34,197,94,0.3)",   label: "FAQ Medium" },
+    semantic_direct:{ bg: "rgba(34,197,94,0.1)",   color: "#4ade80", border: "rgba(34,197,94,0.3)",   label: "Semantic Direct" },
     semantic_hint: { bg: "rgba(168,85,247,0.1)",  color: "#c084fc", border: "rgba(168,85,247,0.3)",  label: "Semantic Hint" },
-    llm_generative:{ bg: "rgba(99,102,241,0.1)",  color: "#818cf8", border: "rgba(99,102,241,0.3)",  label: "Generative AI"  },
+    gemini_raw:    { bg: "rgba(99,102,241,0.1)",  color: "#818cf8", border: "rgba(99,102,241,0.3)",  label: "Gemini Raw"  },
+    catalog:       { bg: "rgba(59,130,246,0.1)",  color: "#60a5fa", border: "rgba(59,130,246,0.3)",  label: "Catalog" },
+    system_limit:  { bg: "rgba(251,191,36,0.1)",  color: "#fbbf24", border: "rgba(251,191,36,0.3)",  label: "System Limit" },
+    gibberish:     { bg: "rgba(239,68,68,0.1)",   color: "#f87171", border: "rgba(239,68,68,0.3)",   label: "Gibberish" },
     drop:          { bg: "rgba(239,68,68,0.1)",   color: "#f87171", border: "rgba(239,68,68,0.3)",   label: "Dropped"        },
   };
   if (!route) return <span style={{ color: "var(--muted)" }}>—</span>;
@@ -94,21 +155,71 @@ export default function PipelineLogsPage() {
 
   const [page, setPage] = useState(1);
   const [selectedLogId, setSelectedLogId] = useState<number | null>(null);
+  const [debugDuration, setDebugDuration] = useState(24);
+  const [debugReason, setDebugReason] = useState("");
+  const [debugBusy, setDebugBusy] = useState(false);
+  const [debugMessage, setDebugMessage] = useState("");
+
+  const { data: businessData, mutate: mutateBusiness } = useSWR(
+    id ? `/system/businesses/${id}` : null,
+    (url: string) => api.get(url).then((r) => r.data as { business: BusinessDebugState })
+  );
 
   const { data, isLoading, mutate, isValidating } = useSWR(
     id ? `/system/businesses/${id}/pipeline-logs?page=${page}&limit=50` : null,
-    (url: string) => api.get(url).then((r) => r.data),
+    (url: string) => api.get(url).then((r) => r.data as { data: PipelineLog[]; meta: { total: number; page: number; limit: number } }),
     { refreshInterval: 10000 }
   );
 
   const { data: detailData, isLoading: detailLoading } = useSWR(
     selectedLogId ? `/system/pipeline-logs/${selectedLogId}` : null,
-    (url: string) => api.get(url).then((r) => r.data)
+    (url: string) => api.get(url).then((r) => r.data as { log: PipelineLog })
   );
 
-  const logs    = data?.data  || [];
-  const meta    = data?.meta  || { total: 0 };
-  const detail  = detailData?.log;
+  const logs: PipelineLog[] = data?.data || [];
+  const meta = data?.meta || { total: 0 };
+  const detail = detailData?.log;
+  const detailSignals = detail?.signal_logs || [];
+  const business = businessData?.business;
+
+  const startDebug = async () => {
+    setDebugBusy(true);
+    setDebugMessage("");
+    try {
+      await api.post(`/system/businesses/${id}/debug-mode`, {
+        enable: true,
+        duration_hours: debugDuration,
+        reason: debugReason.trim() || undefined,
+      });
+      setDebugMessage(`Pipeline debugging enabled for ${debugDuration}h.`);
+      setDebugReason("");
+      mutateBusiness();
+      mutate();
+    } catch (err: unknown) {
+      setDebugMessage(`Error: ${getApiErrorMessage(err)}`);
+    } finally {
+      setDebugBusy(false);
+    }
+  };
+
+  const stopDebug = async () => {
+    setDebugBusy(true);
+    setDebugMessage("");
+    try {
+      await api.post(`/system/businesses/${id}/debug-mode`, {
+        enable: false,
+        reason: debugReason.trim() || undefined,
+      });
+      setDebugMessage("Pipeline debugging stopped.");
+      setDebugReason("");
+      mutateBusiness();
+      mutate();
+    } catch (err: unknown) {
+      setDebugMessage(`Error: ${getApiErrorMessage(err)}`);
+    } finally {
+      setDebugBusy(false);
+    }
+  };
 
   /* ── skeleton ──────────────────────────────────────────── */
   const skeleton = (
@@ -171,6 +282,68 @@ export default function PipelineLogsPage() {
       </div>
 
       {/* ── Table card ─────────────────────────────────────── */}
+      <Card className={business?.debug_active ? "ring-amber-400/30" : ""}>
+        <CardHeader>
+          <div className="flex items-start gap-3">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-amber-400/25 bg-amber-400/10 text-amber-300">
+              <Bug className="size-4" />
+            </div>
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                Pipeline Debug Capture
+                {business?.debug_active && (
+                  <Badge className="border-amber-400/35 bg-amber-400/10 text-amber-300" variant="outline">
+                    Active
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                {business?.debug_active
+                  ? `Capturing until ${business.debug_expires_at ? new Date(business.debug_expires_at).toLocaleString() : "expiry"} (${formatDebugRemaining(business.debug_remaining_seconds, business.debug_expires_at)}).`
+                  : "Enable capture before reproducing a customer message."}
+              </CardDescription>
+            </div>
+          </div>
+          <CardAction>
+            <Button
+              className={business?.debug_active ? "border-red-400/30 bg-red-500/10 text-red-300 hover:bg-red-500/20" : "border-amber-400/30 bg-amber-400/10 text-amber-300 hover:bg-amber-400/20"}
+              disabled={debugBusy}
+              onClick={business?.debug_active ? stopDebug : startDebug}
+              variant="outline"
+            >
+              {business?.debug_active ? <X /> : <Bug />}
+              {debugBusy ? "Applying..." : business?.debug_active ? "Stop Debug" : "Start Debug"}
+            </Button>
+          </CardAction>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-[minmax(220px,320px)_1fr]">
+          <div className="grid grid-cols-4 gap-2">
+            {DEBUG_DURATIONS.map((hours) => (
+              <Button
+                className={debugDuration === hours ? "border-amber-400/40 bg-amber-400/10 text-amber-300" : ""}
+                disabled={business?.debug_active}
+                key={hours}
+                onClick={() => setDebugDuration(hours)}
+                type="button"
+                variant="outline"
+              >
+                {hours}h
+              </Button>
+            ))}
+          </div>
+          <Input
+            onChange={(e) => setDebugReason(e.target.value)}
+            placeholder={business?.debug_active ? "Stop reason (optional)" : "Reason (optional)"}
+            value={debugReason}
+          />
+          {debugMessage && (
+            <p className={`text-xs font-semibold md:col-span-2 ${debugMessage.includes("Error") ? "text-destructive" : "text-green-400"}`}>
+              {debugMessage}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "1rem", overflow: "hidden" }}>
 
         {/* thead */}
@@ -196,7 +369,7 @@ export default function PipelineLogsPage() {
             <p style={{ color: "var(--muted-2)", fontSize: "0.8rem", marginTop: "0.35rem" }}>Enable Debug Mode on this business to start capturing.</p>
           </div>
         ) : (
-          logs.map((log: any, idx: number) => (
+          logs.map((log, idx) => (
             <div
               key={log.id}
               onClick={() => setSelectedLogId(log.id)}
@@ -213,14 +386,14 @@ export default function PipelineLogsPage() {
                 {formatTime(log.created_at)}
               </span>
               <span style={{ fontSize: "0.8375rem", fontWeight: 600, color: "var(--text)", fontFamily: "monospace" }}>
-                {log.customer_phone}
+                {log.phone}
               </span>
               <span style={{
                 display: "inline-block", padding: "0.2rem 0.5rem",
                 background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-2)",
                 borderRadius: "999px", fontSize: "0.7rem", color: "var(--muted-2)", fontFamily: "monospace",
               }}>
-                {log.char_count}c
+                {(log.raw_message || "").length}c
               </span>
               <RouteTag route={log.route_taken} />
               <span style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>{log.action_taken || "—"}</span>
@@ -359,13 +532,13 @@ export default function PipelineLogsPage() {
                     {[
                       {
                         label: "Gemini Invoked",
-                        value: detail.used_gemini
+                        value: detail.ai_used
                           ? <span style={{ padding: "0.15rem 0.5rem", background: "rgba(251,191,36,0.1)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.3)", borderRadius: "999px", fontSize: "0.7rem", fontWeight: 700 }}>YES</span>
                           : <span style={{ fontSize: "0.8rem", color: "var(--muted-2)" }}>No</span>,
                       },
                       {
-                        label: "Toxic / Gibberish",
-                        value: (detail.is_gibberish || detail.is_toxic)
+                        label: "Dropped / Gibberish",
+                        value: (detail.route_taken === "gibberish" || detail.route_taken === "drop")
                           ? <span style={{ padding: "0.15rem 0.5rem", background: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "999px", fontSize: "0.7rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.25rem" }}><AlertTriangle size={10} /> Flagged</span>
                           : <span style={{ fontSize: "0.8rem", color: "var(--muted-2)" }}>Clean</span>,
                       },
@@ -389,7 +562,7 @@ export default function PipelineLogsPage() {
                   Each row shows a rule the scorer evaluated, with its raw confidence, any modifier effects, and the final confidence used for routing.
                 </p>
 
-                {(!detail.SignalLogs || detail.SignalLogs.length === 0) ? (
+                {detailSignals.length === 0 ? (
                   <div style={{
                     padding: "2.5rem", textAlign: "center",
                     border: "1px dashed var(--border-2)", borderRadius: "0.875rem",
@@ -413,13 +586,13 @@ export default function PipelineLogsPage() {
                     </div>
 
                     {/* signal rows */}
-                    {detail.SignalLogs.map((s: any, idx: number) => (
+                    {detailSignals.map((s, idx) => (
                       <div
                         key={s.id}
                         style={{
                           display: "grid", gridTemplateColumns: "36px 1.8fr 1fr 1fr 1fr 1.4fr",
                           padding: "0.75rem 1rem", alignItems: "center",
-                          borderBottom: idx < detail.SignalLogs.length - 1 ? "1px solid var(--border)" : "none",
+                          borderBottom: idx < detailSignals.length - 1 ? "1px solid var(--border)" : "none",
                           transition: "background 0.1s",
                         }}
                         onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.02)")}
@@ -448,17 +621,17 @@ export default function PipelineLogsPage() {
                         </span>
 
                         <span style={{ fontFamily: "monospace", fontSize: "0.8125rem", color: "var(--muted-2)", textAlign: "right" }}>
-                          {s.raw_confidence.toFixed(1)}%
+                          {(s.raw_confidence ?? 0).toFixed(1)}%
                         </span>
 
                         <span style={{ fontFamily: "monospace", fontSize: "0.8125rem", textAlign: "right",
                           color: s.after_modifiers !== s.after_weight ? "#fbbf24" : "var(--muted-2)",
                           fontWeight: s.after_modifiers !== s.after_weight ? 700 : 400,
                         }}>
-                          {s.after_modifiers !== s.after_weight ? `${s.after_modifiers.toFixed(1)}%` : "—"}
+                          {s.after_modifiers !== s.after_weight ? `${(s.after_modifiers ?? 0).toFixed(1)}%` : "—"}
                         </span>
 
-                        <ConfidenceBar value={s.final_confidence} />
+                        <ConfidenceBar value={s.final_confidence ?? 0} />
                       </div>
                     ))}
                   </div>
