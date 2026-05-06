@@ -124,11 +124,11 @@ func handleCartMessage(business *models.Business, phone, fromRaw, msg string) bo
 	}
 
 	// ── Two-tier smart bypass ──────────────────────────────────────────────────
-	// For loose states (browsing / add_more) use the intent classifier:
+	// For loose states (browsing / item_selected / add_more) use the intent classifier:
 	//   "general" → let FAQ+Gemini answer naturally (cart stays alive)
 	//   "shopping"/"browse" → stay in cart flow
 	// Pinned states (address/notes/confirm) always need the cart.
-	if cart.State == models.CartStateBrowsing || cart.State == models.CartStateAddMore {
+	if cart.State == models.CartStateBrowsing || cart.State == models.CartStateItemSelected || cart.State == models.CartStateAddMore {
 		intent := ClassifyMessageIntent(msg)
 		if intent == "general" {
 			log.Printf("🤔 [OrderBot] %s state + general intent → FAQ/Gemini bypass: %q", cart.State, msg)
@@ -166,7 +166,7 @@ func advanceCart(cart *models.Cart, business *models.Business, phone, fromRaw, m
 	case models.CartStateBrowsing:
 		return handleBrowsing(cart, business, phone, fromRaw, msg)
 	case models.CartStateItemSelected:
-		handleItemSelected(cart, business, fromRaw, msg)
+		return handleItemSelected(cart, business, fromRaw, msg)
 	case models.CartStatePendingSize:
 		handlePendingSize(cart, business, fromRaw, msg)
 	case models.CartStatePendingQty:
@@ -287,13 +287,13 @@ func handleBrowsing(cart *models.Cart, business *models.Business, phone, fromRaw
 	return true
 }
 
-func handleItemSelected(cart *models.Cart, business *models.Business, fromRaw, msg string) {
+func handleItemSelected(cart *models.Cart, business *models.Business, fromRaw, msg string) bool {
 	switch msg {
 	case "add_to_cart":
 		var product models.Product
 		if err := database.DB.First(&product, cart.PendingProductID).Error; err != nil {
 			showProductList(business, fromRaw)
-			return
+			return true
 		}
 		sizes := parseSizes(product.Sizes)
 		if len(sizes) > 0 {
@@ -307,11 +307,23 @@ func handleItemSelected(cart *models.Cart, business *models.Business, fromRaw, m
 		updateCart(cart, map[string]interface{}{"state": models.CartStateBrowsing})
 		showProductList(business, fromRaw)
 	default:
+		// Browse intent → show product list
+		if isBrowseSignal(msg) || detectCatalogIntent(msg) || ClassifyMessageIntent(msg) == "browse" {
+			updateCart(cart, map[string]interface{}{"state": models.CartStateBrowsing})
+			showProductList(business, fromRaw)
+			return true
+		}
+		// New purchase intent → signal to re-process as fresh intent
+		if resolveAddMoreIntent(msg) {
+			updateCart(cart, map[string]interface{}{"state": models.CartStateBrowsing})
+			return false
+		}
 		var product models.Product
 		if err := database.DB.First(&product, cart.PendingProductID).Error; err == nil {
 			showProductCard(business, fromRaw, &product)
 		}
 	}
+	return true
 }
 
 func handlePendingSize(cart *models.Cart, business *models.Business, fromRaw, msg string) {
