@@ -125,6 +125,9 @@ func main() {
 		system.PATCH("/businesses/:id/plan", middleware.RequireSuperPermission(middleware.PermPlanManage), middleware.HighRiskRoute("force_plan"), handlers.OverrideBusinessPlan)
 		system.POST("/businesses/:id/suspend", middleware.RequireSuperPermission(middleware.PermBusinessManage), middleware.HighRiskRoute("suspend_business"), handlers.SuspendBusiness)
 		system.POST("/businesses/:id/unsuspend", middleware.RequireSuperPermission(middleware.PermBusinessManage), middleware.HighRiskRoute("unsuspend_business"), handlers.UnsuspendBusiness)
+		system.POST("/businesses/:id/debug-mode", middleware.RequireSuperPermission(middleware.PermBusinessManage), handlers.ToggleDebugMode)
+		system.GET("/businesses/:id/pipeline-logs", middleware.RequireSuperPermission(middleware.PermBusinessView), handlers.ListPipelineLogs)
+		system.GET("/pipeline-logs/:log_id", middleware.RequireSuperPermission(middleware.PermBusinessView), handlers.GetPipelineLogDetails)
 
 		// Activation code management
 		system.POST("/activation-codes", middleware.RequireSuperPermission(middleware.PermActivationCreate), middleware.HighRiskRoute("generate_code"), handlers.CreateActivationCode)

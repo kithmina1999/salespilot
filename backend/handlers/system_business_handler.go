@@ -10,6 +10,28 @@ import (
 	"github.com/kithmina1999/salespilot/models"
 )
 
+type systemBusinessResponse struct {
+	models.Business
+	DebugActive           bool       `json:"debug_active"`
+	DebugExpiresAt        *time.Time `json:"debug_expires_at"`
+	DebugRemainingSeconds int64      `json:"debug_remaining_seconds"`
+}
+
+func buildSystemBusinessResponse(b models.Business) systemBusinessResponse {
+	now := time.Now()
+	active := b.DebugMode && b.DebugModeUntil != nil && b.DebugModeUntil.After(now)
+	remaining := int64(0)
+	if active {
+		remaining = int64(b.DebugModeUntil.Sub(now).Seconds())
+	}
+	return systemBusinessResponse{
+		Business:              b,
+		DebugActive:           active,
+		DebugExpiresAt:        b.DebugModeUntil,
+		DebugRemainingSeconds: remaining,
+	}
+}
+
 // ListSystemBusinesses returns all businesses with light details
 func ListSystemBusinesses(c *gin.Context) {
 	var businesses []models.Business
@@ -18,8 +40,13 @@ func ListSystemBusinesses(c *gin.Context) {
 		return
 	}
 
+	response := make([]systemBusinessResponse, 0, len(businesses))
+	for _, business := range businesses {
+		response = append(response, buildSystemBusinessResponse(business))
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"businesses": businesses,
+		"businesses": response,
 	})
 }
 
@@ -34,7 +61,7 @@ func GetSystemBusiness(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"business": business,
+		"business": buildSystemBusinessResponse(business),
 	})
 }
 
@@ -89,4 +116,61 @@ func OverrideBusinessPlan(c *gin.Context) {
 	// Fetch updated record
 	database.DB.First(&business, id)
 	c.JSON(http.StatusOK, gin.H{"message": "Plan overridden successfully", "business": business})
+}
+
+// ToggleDebugMode enables or disables verbose pipeline tracking for a business
+func ToggleDebugMode(c *gin.Context) {
+	id := c.Param("id")
+
+	var req struct {
+		Enable        bool `json:"enable"`
+		DurationHours int  `json:"duration_hours"` // How long to keep it on
+		Reason        string `json:"reason"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	var business models.Business
+	if err := database.DB.First(&business, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Business not found"})
+		return
+	}
+
+	updates := map[string]interface{}{
+		"debug_mode": req.Enable,
+	}
+
+	if req.Enable {
+		hours := req.DurationHours
+		switch hours {
+		case 1, 6, 24, 72:
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "duration_hours must be one of 1, 6, 24, or 72"})
+			return
+		}
+		expiresAt := time.Now().Add(time.Duration(hours) * time.Hour)
+		updates["debug_mode_until"] = &expiresAt
+	} else {
+		updates["debug_mode_until"] = nil
+	}
+
+	if err := database.DB.Model(&business).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to toggle debug mode"})
+		return
+	}
+
+	status := "disabled"
+	if req.Enable {
+		status = "enabled"
+	}
+	LogActivity(business.ID, "super_admin", 0, "debug_mode_toggled", "system", "", map[string]interface{}{
+		"status":         status,
+		"duration_hours": req.DurationHours,
+		"reason":         req.Reason,
+	}, c.ClientIP(), "medium", business.Name, business.Plan)
+
+	database.DB.First(&business, id)
+	c.JSON(http.StatusOK, gin.H{"message": "Debug mode " + status, "business": buildSystemBusinessResponse(business)})
 }
