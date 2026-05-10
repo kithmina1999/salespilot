@@ -17,6 +17,26 @@ type systemBusinessResponse struct {
 	DebugRemainingSeconds int64      `json:"debug_remaining_seconds"`
 }
 
+type businessCounts struct {
+	ProductsActive int64   `json:"products_active"`
+	ProductsTotal  int64   `json:"products_total"`
+	RulesActive    int64   `json:"rules_active"`
+	RulesTotal     int64   `json:"rules_total"`
+	Customers      int64   `json:"customers"`
+	Orders         int64   `json:"orders"`
+	TotalRevenue   float64 `json:"total_revenue"`
+	DashboardUsers int64   `json:"dashboard_users"`
+}
+
+type enrichedBusinessResponse struct {
+	Business                systemBusinessResponse  `json:"business"`
+	Counts                  businessCounts          `json:"counts"`
+	RecentAuditLogs         []models.AuditLog       `json:"recent_audit_logs"`
+	RecentPipelineLogs      []models.PipelineLog    `json:"recent_pipeline_logs"`
+	PaymentHistory          []models.PaymentProof   `json:"payment_history"`
+	RedeemedActivationCodes []models.ActivationCode `json:"redeemed_activation_codes"`
+}
+
 func buildSystemBusinessResponse(b models.Business) systemBusinessResponse {
 	now := time.Now()
 	active := b.DebugMode && b.DebugModeUntil != nil && b.DebugModeUntil.After(now)
@@ -60,8 +80,40 @@ func GetSystemBusiness(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"business": buildSystemBusinessResponse(business),
+	var counts businessCounts
+	database.DB.Model(&models.Product{}).Where("business_id = ? AND active = ?", id, true).Count(&counts.ProductsActive)
+	database.DB.Model(&models.Product{}).Where("business_id = ?", id).Count(&counts.ProductsTotal)
+	database.DB.Model(&models.Rule{}).Where("business_id = ? AND is_active = ?", id, true).Count(&counts.RulesActive)
+	database.DB.Model(&models.Rule{}).Where("business_id = ?", id).Count(&counts.RulesTotal)
+	database.DB.Model(&models.Customer{}).Where("business_id = ?", id).Count(&counts.Customers)
+	database.DB.Model(&models.Order{}).Where("business_id = ?", id).Count(&counts.Orders)
+	
+	type Result struct { Total float64 }
+	var result Result
+	database.DB.Model(&models.Order{}).Select("coalesce(sum(total_price), 0) as total").Where("business_id = ?", id).Scan(&result)
+	counts.TotalRevenue = result.Total
+
+	database.DB.Model(&models.User{}).Where("business_id = ?", id).Count(&counts.DashboardUsers)
+
+	var auditLogs []models.AuditLog
+	database.DB.Where("business_id = ?", id).Order("created_at desc").Limit(10).Find(&auditLogs)
+
+	var pipelineLogs []models.PipelineLog
+	database.DB.Where("business_id = ?", id).Order("created_at desc").Limit(10).Find(&pipelineLogs)
+
+	var paymentHistory []models.PaymentProof
+	database.DB.Where("business_id = ?", id).Order("created_at desc").Limit(5).Find(&paymentHistory)
+
+	var activationCodes []models.ActivationCode
+	database.DB.Where("used_by_id = ?", id).Order("used_at desc").Limit(5).Find(&activationCodes)
+
+	c.JSON(http.StatusOK, enrichedBusinessResponse{
+		Business:                buildSystemBusinessResponse(business),
+		Counts:                  counts,
+		RecentAuditLogs:         auditLogs,
+		RecentPipelineLogs:      pipelineLogs,
+		PaymentHistory:          paymentHistory,
+		RedeemedActivationCodes: activationCodes,
 	})
 }
 
@@ -173,4 +225,62 @@ func ToggleDebugMode(c *gin.Context) {
 
 	database.DB.First(&business, id)
 	c.JSON(http.StatusOK, gin.H{"message": "Debug mode " + status, "business": buildSystemBusinessResponse(business)})
+}
+
+// OverrideBusinessQuotas allows super admin to force a quota limit change on a tenant
+func OverrideBusinessQuotas(c *gin.Context) {
+	id := c.Param("id")
+
+	var req struct {
+		AIMessageLimit      *int   `json:"ai_message_limit"`
+		SystemMessageLimit  *int   `json:"system_message_limit"`
+		RuleGenerationLimit *int   `json:"rule_generation_limit"`
+		SimulationLimit     *int   `json:"simulation_limit"`
+		Reason              string `json:"reason" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	var business models.Business
+	if err := database.DB.First(&business, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Business not found"})
+		return
+	}
+
+	updates := map[string]interface{}{}
+	auditMeta := map[string]interface{}{"reason": req.Reason}
+
+	if req.AIMessageLimit != nil {
+		updates["ai_message_limit"] = *req.AIMessageLimit
+		auditMeta["new_ai_limit"] = *req.AIMessageLimit
+	}
+	if req.SystemMessageLimit != nil {
+		updates["system_message_limit"] = *req.SystemMessageLimit
+		auditMeta["new_system_limit"] = *req.SystemMessageLimit
+	}
+	if req.RuleGenerationLimit != nil {
+		updates["rule_generation_limit"] = *req.RuleGenerationLimit
+		auditMeta["new_rule_gen_limit"] = *req.RuleGenerationLimit
+	}
+	if req.SimulationLimit != nil {
+		updates["simulation_limit"] = *req.SimulationLimit
+		auditMeta["new_sim_limit"] = *req.SimulationLimit
+	}
+
+	if len(updates) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No limits provided to update"})
+		return
+	}
+
+	if err := database.DB.Model(&business).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update business quotas"})
+		return
+	}
+
+	LogActivity(business.ID, "super_admin", 0, "quotas_overridden", "billing", "", auditMeta, c.ClientIP(), "medium", business.Name, business.Plan)
+
+	database.DB.First(&business, id)
+	c.JSON(http.StatusOK, gin.H{"message": "Quotas overridden successfully", "business": buildSystemBusinessResponse(business)})
 }
