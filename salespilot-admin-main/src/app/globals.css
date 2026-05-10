@@ -31,6 +31,11 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
@@ -38,7 +43,6 @@
 }
 
 :root {
-  /* Cohesive Light Theme */
   --background: #f8fafc;
   --foreground: #0f172a;
   --card: #ffffff;
@@ -58,26 +62,30 @@
   --border: #e2e8f0;
   --input: #e2e8f0;
   --ring: #4f46e5;
-  --radius: 0.75rem;
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-accent: var(--muted);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --radius: 0.5rem;
 
-  /* Legacy Custom Variables (Mapped to same values) */
-  --bg:           #f8fafc;
-  --surface:      #ffffff;
-  --surface-2:    #f1f5f9;
-  --border-2:     #e2e8f0;
-  --accent-dim:   #4f46e5;
-  --accent-glow:  rgba(99, 102, 241, 0.08);
-  --accent-glow2: rgba(99, 102, 241, 0.15);
-  --text:         #0f172a;
-  --muted-2:      #475569;
-  --danger:       #ef4444;
-  --success:      #22c55e;
-  --warning:      #f59e0b;
-  --info:         #3b82f6;
+  /* Compatibility aliases for screens not yet migrated to shadcn tokens. */
+  --bg: var(--background);
+  --surface: var(--card);
+  --surface-2: var(--secondary);
+  --border-2: var(--border);
+  --accent-dim: var(--primary);
+  --accent-glow: color-mix(in oklab, var(--primary) 8%, transparent);
+  --accent-glow2: color-mix(in oklab, var(--primary) 15%, transparent);
+  --text: var(--foreground);
+  --muted-2: var(--muted-foreground);
+  --danger: var(--destructive);
+  --success: #16a34a;
+  --warning: #d97706;
+  --info: #2563eb;
 }
 
 .dark {
-  /* Cohesive Dark Theme */
   --background: #080b12;
   --foreground: #e8eaf0;
   --card: #0d1321;
@@ -89,7 +97,7 @@
   --secondary: #121929;
   --secondary-foreground: #e8eaf0;
   --muted: #121929;
-  --muted-foreground: #64748b;
+  --muted-foreground: #94a3b8;
   --accent: #121929;
   --accent-foreground: #e8eaf0;
   --destructive: #ef4444;
@@ -97,71 +105,101 @@
   --border: #1c283a;
   --input: #1c283a;
   --ring: #6366f1;
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-accent: color-mix(in oklab, var(--muted) 70%, white 2%);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
 
-  /* Legacy Custom Variables (Original Dark Theme) */
-  --bg:           #080b12;
-  --surface:      #0d1321;
-  --surface-2:    #121929;
-  --border-2:     #243044;
-  --accent-dim:   #4f46e5;
-  --accent-glow:  rgba(99, 102, 241, 0.12);
-  --accent-glow2: rgba(99, 102, 241, 0.22);
-  --text:         #e8eaf0;
-  --muted-2:      #475569;
-  --danger:       #ef4444;
-  --success:      #22c55e;
-  --warning:      #f59e0b;
-  --info:         #3b82f6;
+  /* Compatibility aliases for screens not yet migrated to shadcn tokens. */
+  --bg: var(--background);
+  --surface: var(--card);
+  --surface-2: var(--secondary);
+  --border-2: #243044;
+  --accent-dim: #4f46e5;
+  --accent-glow: color-mix(in oklab, var(--primary) 12%, transparent);
+  --accent-glow2: color-mix(in oklab, var(--primary) 22%, transparent);
+  --text: var(--foreground);
+  --muted-2: var(--muted-foreground);
+  --danger: var(--destructive);
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --info: #3b82f6;
 }
 
-/* ── Reset & Base ───────────────────────────────────────── */
-* { box-sizing: border-box; margin: 0; padding: 0; }
+
 
 html {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: Inter, system-ui, sans-serif;
   font-feature-settings: "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  background: var(--bg);
-  color: var(--text);
   min-height: 100vh;
+  background: var(--background);
+  color: var(--foreground);
 }
 
-/* ── Scrollbar ──────────────────────────────────────────── */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--muted-2); }
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
 
-/* ── Selection ──────────────────────────────────────────── */
-::selection { background: var(--accent-glow2); color: var(--text); }
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
 
-/* ── Animations ─────────────────────────────────────────── */
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+::selection {
+  background: color-mix(in oklab, var(--primary) 20%, transparent);
+  color: var(--foreground);
+}
+
 @keyframes fade-up {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
+
 @keyframes fade-in {
   from { opacity: 0; }
-  to   { opacity: 1; }
+  to { opacity: 1; }
 }
+
 @keyframes pulse-ring {
-  0%   { box-shadow: 0 0 0 0 var(--accent-glow2); }
-  70%  { box-shadow: 0 0 0 10px transparent; }
+  0% { box-shadow: 0 0 0 0 var(--accent-glow2); }
+  70% { box-shadow: 0 0 0 10px transparent; }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
+
 @keyframes shimmer {
-  0%   { background-position: -200% 0; }
+  0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
 
-.animate-fade-up { animation: fade-up 0.4s ease both; }
-.animate-fade-in { animation: fade-in 0.3s ease both; }
+.animate-fade-up {
+  animation: fade-up 0.4s ease both;
+}
 
-/* ── Tailwind layer overrides ───────────────────────────── */
+.animate-fade-in {
+  animation: fade-in 0.3s ease both;
+}
+
 @layer base {
   * {
     border-color: var(--border);

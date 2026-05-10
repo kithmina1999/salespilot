@@ -1,247 +1,178 @@
-"use client";
+"use client"
 
-import useSWR from "swr";
-import { api } from "@/lib/api";
+import type { ReactNode } from "react"
+import useSWR from "swr"
 import {
-  Zap, Bot, Users, Activity, MessageSquare,
-  TrendingUp, Server, ArrowUpRight,
-} from "lucide-react";
+  Activity,
+  ArrowUpRight,
+  Bot,
+  MessageSquare,
+  Server,
+  TrendingUp,
+  Users,
+  Zap,
+} from "lucide-react"
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
-  AreaChart, Area, XAxis, YAxis, CartesianGrid,
-} from "recharts";
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts"
+
+import {
+  AdminBadge,
+  AdminCard,
+  AdminPage,
+  AdminPageHeader,
+  AdminSectionCard,
+  AdminSkeleton,
+  AdminStatCard,
+} from "@/components/admin/page"
+import { api } from "@/lib/api"
 
 type MetricsData = {
   businesses: {
-    total: number;
-    free: number;
-    starter: number;
-    pro: number;
-    active_trials: number;
-    expired_plans: number;
-  };
+    total: number
+    free: number
+    starter: number
+    pro: number
+    active_trials: number
+    expired_plans: number
+  }
   whatsapp: {
-    connected: number;
-    disconnected: number;
-    not_connected: number;
-  };
+    connected: number
+    disconnected: number
+    not_connected: number
+  }
   usage: {
-    ai_messages: number;
-    faq_replies: number;
-    system_messages: number;
-    rule_generations: number;
-    simulation_messages: number;
-  };
+    ai_messages: number
+    faq_replies: number
+    system_messages: number
+    rule_generations: number
+    simulation_messages: number
+  }
   revenue: {
-    estimated_mrr: number;
-    estimated_arr: number;
-    currency: string;
-    is_estimate: boolean;
-  };
+    estimated_mrr: number
+    estimated_arr: number
+    currency: string
+    is_estimate: boolean
+  }
   risk: {
-    near_ai_limit_count: number;
-    near_simulation_limit_count: number;
-    expired_paid_count: number;
-  };
-};
-
-function StatCard({
-  icon,
-  label,
-  value,
-  sub,
-  accent,
-  delay = 0,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string | number;
-  sub: string;
-  accent: string;
-  delay?: number;
-}) {
-  return (
-    <div
-      className="animate-fade-up"
-      style={{
-        animationDelay: `${delay}ms`,
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-        borderRadius: "1rem",
-        padding: "1.25rem 1.375rem",
-        display: "flex",
-        flexDirection: "column",
-        gap: "0.875rem",
-        transition: "border-color 0.2s",
-      }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border-2)"; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border)"; }}
-    >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}>{label}</span>
-        <div
-          style={{
-            width: "36px",
-            height: "36px",
-            borderRadius: "10px",
-            background: `${accent}18`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: accent,
-          }}
-        >
-          {icon}
-        </div>
-      </div>
-      <div>
-        <p style={{ fontSize: "2rem", fontWeight: 900, color: "var(--text)", letterSpacing: "-0.03em", lineHeight: 1 }}>
-          {value}
-        </p>
-        <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.375rem", fontWeight: 500 }}>{sub}</p>
-      </div>
-    </div>
-  );
+    near_ai_limit_count: number
+    near_simulation_limit_count: number
+    expired_paid_count: number
+  }
 }
 
 const PLAN_COLORS = {
-  Free:   "#64748b",
+  Free: "#64748b",
   Growth: "#22c55e",
-  Pro:    "#6366f1",
-};
+  Pro: "#6366f1",
+}
+
+const chartTooltipStyle = {
+  background: "var(--popover)",
+  border: "1px solid var(--border)",
+  borderRadius: "0.5rem",
+  color: "var(--foreground)",
+  fontSize: "13px",
+}
 
 export default function DashboardPage() {
   const { data: metrics, error } = useSWR<MetricsData>(
     "/system/metrics",
     (url: string) => api.get(url).then((res) => res.data)
-  );
+  )
 
   if (error) {
     return (
-      <div
-        style={{
-          padding: "1.25rem",
-          background: "rgba(239,68,68,0.06)",
-          border: "1px solid rgba(239,68,68,0.2)",
-          borderRadius: "0.875rem",
-          color: "var(--danger)",
-        }}
-      >
-        <p style={{ fontWeight: 700 }}>Error loading metrics</p>
-        <p style={{ fontSize: "0.875rem", marginTop: "0.25rem", opacity: 0.8 }}>{error.message || "Failed to load metrics"}</p>
-      </div>
-    );
+      <AdminCard className="border-destructive/25 bg-destructive/10 p-5 text-destructive">
+        <p className="font-bold">Error loading metrics</p>
+        <p className="mt-1 text-sm opacity-80">
+          {error.message || "Failed to load metrics"}
+        </p>
+      </AdminCard>
+    )
   }
 
   if (!metrics) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+      <AdminPage>
         <div>
-          <div style={{ height: "2.25rem", width: "240px", background: "var(--surface)", borderRadius: "0.5rem", marginBottom: "0.5rem", animation: "pulse 1.5s ease-in-out infinite" }} />
-          <div style={{ height: "1rem", width: "180px", background: "var(--surface)", borderRadius: "0.5rem", animation: "pulse 1.5s ease-in-out infinite" }} />
+          <AdminSkeleton className="mb-2 h-9 w-60" />
+          <AdminSkeleton className="h-4 w-44" />
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem" }}>
-          {[...Array(4)].map((_, i) => (
-            <div key={i} style={{ height: "120px", background: "var(--surface)", borderRadius: "1rem", animation: "pulse 1.5s ease-in-out infinite" }} />
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {[...Array(4)].map((_, index) => (
+            <AdminSkeleton key={index} className="h-[120px]" />
           ))}
         </div>
-        <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
-      </div>
-    );
+      </AdminPage>
+    )
   }
 
   const planData = [
-    { name: "Free",    value: metrics.businesses.free,    color: PLAN_COLORS.Free },
+    { name: "Free", value: metrics.businesses.free, color: PLAN_COLORS.Free },
     { name: "Starter", value: metrics.businesses.starter, color: PLAN_COLORS.Growth },
-    { name: "Pro",     value: metrics.businesses.pro,     color: PLAN_COLORS.Pro },
-  ];
+    { name: "Pro", value: metrics.businesses.pro, color: PLAN_COLORS.Pro },
+  ]
 
   const usageData = [
-    { name: "Inbound",   messages: metrics.usage.system_messages },
-    { name: "FAQ",       messages: metrics.usage.faq_replies },
-    { name: "AI",        messages: metrics.usage.ai_messages },
-  ];
+    { name: "Inbound", messages: metrics.usage.system_messages },
+    { name: "FAQ", messages: metrics.usage.faq_replies },
+    { name: "AI", messages: metrics.usage.ai_messages },
+  ]
 
-  const activePaid = metrics.businesses.starter + metrics.businesses.pro;
-  const conversionRate = ((activePaid / (metrics.businesses.total || 1)) * 100).toFixed(1);
+  const activePaid = metrics.businesses.starter + metrics.businesses.pro
+  const conversionRate = ((activePaid / (metrics.businesses.total || 1)) * 100).toFixed(1)
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }} className="animate-fade-up">
-      {/* Header */}
-      <div>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", marginBottom: "0.375rem" }}>
-          <h1 style={{ fontSize: "1.75rem", fontWeight: 900, color: "var(--text)", letterSpacing: "-0.03em" }}>
-            Platform Overview
-          </h1>
-          <span
-            style={{
-              padding: "0.2rem 0.625rem",
-              background: "var(--accent-glow)",
-              border: "1px solid rgba(99,102,241,0.2)",
-              borderRadius: "999px",
-              fontSize: "0.75rem",
-              fontWeight: 700,
-              color: "var(--accent)",
-            }}
-          >
-            Live
-          </span>
-        </div>
-        <p style={{ fontSize: "0.875rem", color: "var(--muted)" }}>
-          Real-time SaaS metrics across all tenants
-        </p>
-      </div>
+    <AdminPage>
+      <AdminPageHeader
+        title="Platform Overview"
+        description="Real-time SaaS metrics across all tenants"
+        badge={<AdminBadge>Live</AdminBadge>}
+      />
 
-      {/* KPI Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem" }}>
-        <StatCard
-          icon={<Users size={16} />}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <AdminStatCard
+          icon={Users}
           label="Total Tenants"
           value={metrics.businesses.total}
-          sub={`${metrics.businesses.active_trials} active trials`}
-          accent="#6366f1"
-          delay={0}
+          description={`${metrics.businesses.active_trials} active trials`}
+          tone="primary"
         />
-        <StatCard
-          icon={<Activity size={16} />}
+        <AdminStatCard
+          icon={Activity}
           label="Estimated MRR"
           value={`${metrics.revenue.currency} ${metrics.revenue.estimated_mrr.toLocaleString()}`}
-          sub={`${conversionRate}% conversion rate`}
-          accent="#22c55e"
-          delay={60}
+          description={`${conversionRate}% conversion rate`}
+          tone="success"
         />
-        <StatCard
-          icon={<Bot size={16} />}
+        <AdminStatCard
+          icon={Bot}
           label="AI Messages"
           value={metrics.usage.ai_messages.toLocaleString()}
-          sub="Gemini API calls this month"
-          accent="#8b5cf6"
-          delay={120}
+          description="Gemini API calls this month"
+          tone="info"
         />
-        <StatCard
-          icon={<MessageSquare size={16} />}
+        <AdminStatCard
+          icon={MessageSquare}
           label="Connected WA"
           value={metrics.whatsapp.connected}
-          sub={`Out of ${metrics.businesses.total} tenants`}
-          accent="#3b82f6"
-          delay={180}
+          description={`Out of ${metrics.businesses.total} tenants`}
+          tone="info"
         />
       </div>
 
-      {/* Charts Row */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "1.25rem" }}>
-        {/* Plan Donut */}
-        <div
-          style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: "1rem",
-            padding: "1.5rem",
-          }}
-        >
-          <h3 style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--text)", marginBottom: "1.25rem" }}>
-            Plan Distribution
-          </h3>
+      <div className="grid gap-4 xl:grid-cols-[1fr_2fr]">
+        <AdminSectionCard title="Plan Distribution" contentClassName="pt-4">
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
               <Pie
@@ -253,115 +184,100 @@ export default function DashboardPage() {
                 paddingAngle={4}
                 dataKey="value"
               >
-                {planData.map((entry, i) => (
-                  <Cell key={i} fill={entry.color} strokeWidth={0} />
+                {planData.map((entry) => (
+                  <Cell key={entry.name} fill={entry.color} strokeWidth={0} />
                 ))}
               </Pie>
-              <Tooltip
-                contentStyle={{
-                  background: "var(--surface-2)",
-                  border: "1px solid var(--border-2)",
-                  borderRadius: "8px",
-                  color: "var(--text)",
-                  fontSize: "13px",
-                }}
-              />
+              <Tooltip contentStyle={chartTooltipStyle} />
             </PieChart>
           </ResponsiveContainer>
-          {/* Legend */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginTop: "0.75rem" }}>
-            {planData.map((p) => (
-              <div key={p.name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: p.color }} />
-                  <span style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>{p.name}</span>
+
+          <div className="mt-4 flex flex-col gap-2">
+            {planData.map((plan) => (
+              <div key={plan.name} className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="size-2 rounded-full"
+                    style={{ backgroundColor: plan.color }}
+                  />
+                  <span className="text-sm text-muted-foreground">{plan.name}</span>
                 </div>
-                <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text)" }}>{p.value}</span>
+                <span className="text-sm font-bold text-foreground">{plan.value}</span>
               </div>
             ))}
           </div>
-        </div>
+        </AdminSectionCard>
 
-        {/* Usage Area Chart */}
-        <div
-          style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: "1rem",
-            padding: "1.5rem",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.25rem" }}>
-            <h3 style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--text)" }}>
-              Platform Usage — Month to Date
-            </h3>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.375rem", fontSize: "0.75rem", color: "var(--accent)", fontWeight: 600 }}>
-              <TrendingUp size={13} />
+        <AdminSectionCard
+          title="Platform Usage - Month to Date"
+          action={
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+              <TrendingUp className="size-3.5" />
               This month
             </div>
-          </div>
+          }
+          contentClassName="pt-4"
+        >
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={usageData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
               <defs>
-                <linearGradient id="grad1" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.25} />
+                <linearGradient id="usage-gradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
                   <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-              <XAxis dataKey="name" stroke="var(--muted)" fontSize={12} tickLine={false} axisLine={false} />
-              <YAxis stroke="var(--muted)" fontSize={12} tickLine={false} axisLine={false} />
+              <XAxis dataKey="name" stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
+              <YAxis stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
               <Tooltip
-                contentStyle={{
-                  background: "var(--surface-2)",
-                  border: "1px solid var(--border-2)",
-                  borderRadius: "8px",
-                  color: "var(--text)",
-                  fontSize: "13px",
-                }}
-                cursor={{ stroke: "var(--border-2)", strokeWidth: 1 }}
+                contentStyle={chartTooltipStyle}
+                cursor={{ stroke: "var(--border)", strokeWidth: 1 }}
               />
               <Area
                 type="monotone"
                 dataKey="messages"
                 stroke="#6366f1"
                 strokeWidth={2.5}
-                fill="url(#grad1)"
+                fill="url(#usage-gradient)"
               />
             </AreaChart>
           </ResponsiveContainer>
-        </div>
+        </AdminSectionCard>
       </div>
 
-      {/* Quick Summary Row */}
-      <div
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: "1rem",
-          padding: "1.25rem 1.5rem",
-          display: "flex",
-          alignItems: "center",
-          gap: "2rem",
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <Server size={14} style={{ color: "var(--accent)" }} />
-          <span style={{ fontSize: "0.8125rem", color: "var(--muted)", fontWeight: 500 }}>Active Trials:</span>
-          <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text)" }}>{metrics.businesses.active_trials}</span>
+      <AdminCard className="p-4">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          <SummaryItem icon={Server} label="Active Trials" value={metrics.businesses.active_trials} />
+          <SummaryItem icon={Zap} label="FAQ Replies" value={metrics.usage.faq_replies.toLocaleString()} tone="warning" />
+          <SummaryItem icon={ArrowUpRight} label="Near AI Limit" value={metrics.risk.near_ai_limit_count} tone="destructive" />
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <Zap size={14} style={{ color: "#f59e0b" }} />
-          <span style={{ fontSize: "0.8125rem", color: "var(--muted)", fontWeight: 500 }}>FAQ Replies:</span>
-          <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text)" }}>{metrics.usage.faq_replies.toLocaleString()}</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <ArrowUpRight size={14} style={{ color: "#ef4444" }} />
-          <span style={{ fontSize: "0.8125rem", color: "var(--muted)", fontWeight: 500 }}>Near AI Limit:</span>
-          <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text)" }}>{metrics.risk.near_ai_limit_count}</span>
-        </div>
-      </div>
+      </AdminCard>
+    </AdminPage>
+  )
+}
+
+function SummaryItem({
+  icon: Icon,
+  label,
+  value,
+  tone = "primary",
+}: {
+  icon: typeof Server
+  label: string
+  value: ReactNode
+  tone?: "primary" | "warning" | "destructive"
+}) {
+  const color = {
+    primary: "text-primary",
+    warning: "text-amber-500",
+    destructive: "text-destructive",
+  }[tone]
+
+  return (
+    <div className="flex items-center gap-2">
+      <Icon className={`size-4 ${color}`} />
+      <span className="text-sm font-medium text-muted-foreground">{label}:</span>
+      <span className="text-sm font-bold text-foreground">{value}</span>
     </div>
-  );
+  )
 }

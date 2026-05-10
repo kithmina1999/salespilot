@@ -133,11 +133,11 @@ export default function PaymentsPage() {
             <h1 style={{ fontSize: "1.75rem", fontWeight: 900, color: "var(--text)", letterSpacing: "-0.03em" }}>
               Payment Verification
             </h1>
-            <p style={{ fontSize: "0.875rem", color: "var(--muted)", marginTop: "0.25rem" }}>
+            <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", marginTop: "0.25rem" }}>
               Review bank transfer screenshots and issue activation codes
             </p>
           </div>
-          <button onClick={() => mutate()} style={{ padding: "0.5rem", background: "var(--surface)", border: "1px solid var(--border-2)", borderRadius: "0.625rem", color: "var(--muted)", cursor: "pointer", display: "flex", alignItems: "center" }}>
+          <button onClick={() => mutate()} style={{ padding: "0.5rem", background: "var(--surface)", border: "1px solid var(--border-2)", borderRadius: "0.625rem", color: "var(--muted-foreground)", cursor: "pointer", display: "flex", alignItems: "center" }}>
             <RefreshCw size={15} />
           </button>
         </div>
@@ -153,7 +153,7 @@ export default function PaymentsPage() {
               <div style={{ width: 38, height: 38, borderRadius: 10, background: `${s.accent}18`, display: "flex", alignItems: "center", justifyContent: "center", color: s.accent, flexShrink: 0 }}>{s.icon}</div>
               <div>
                 <p style={{ fontSize: "1.75rem", fontWeight: 900, color: "var(--text)", letterSpacing: "-0.03em", lineHeight: 1 }}>{s.value}</p>
-                <p style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: "0.2rem" }}>{s.label}</p>
+                <p style={{ fontSize: "0.8rem", color: "var(--muted-foreground)", marginTop: "0.2rem" }}>{s.label}</p>
               </div>
             </div>
           ))}
@@ -188,7 +188,7 @@ export default function PaymentsPage() {
 
           {/* Search */}
           <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
-            <Search size={14} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "var(--muted)", pointerEvents: "none" }} />
+            <Search size={14} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "var(--muted-foreground)", pointerEvents: "none" }} />
             <input
               type="text" placeholder="Search by name, phone, email..." value={search}
               onChange={e => setSearch(e.target.value)}
@@ -202,18 +202,18 @@ export default function PaymentsPage() {
           {/* Headers */}
           <div style={{ display: "grid", gridTemplateColumns: "2.5fr 1.5fr 1.2fr 100px 1fr 180px", padding: "0.75rem 1.25rem", background: "rgba(255,255,255,0.02)", borderBottom: "1px solid var(--border)" }}>
             {["Business", "Cycle / Amount", "Submitted", "Screenshot", "Status", "Actions"].map(h => (
-              <span key={h} style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--muted)", letterSpacing: "0.05em", textTransform: "uppercase", textAlign: h === "Actions" ? "right" : "left" }}>{h}</span>
+              <span key={h} style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--muted-foreground)", letterSpacing: "0.05em", textTransform: "uppercase", textAlign: h === "Actions" ? "right" : "left" }}>{h}</span>
             ))}
           </div>
 
           {loading ? (
             <div style={{ padding: "3rem", textAlign: "center" }}>
-              <Loader2 size={24} style={{ color: "var(--muted)", animation: "spin 1s linear infinite", margin: "0 auto" }} />
+              <Loader2 size={24} style={{ color: "var(--muted-foreground)", animation: "spin 1s linear infinite", margin: "0 auto" }} />
             </div>
           ) : filtered.length === 0 ? (
             <div style={{ padding: "3.5rem", textAlign: "center" }}>
-              <Banknote size={28} style={{ color: "var(--muted)", margin: "0 auto 0.75rem" }} />
-              <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>No payment submissions {statusFilter !== "all" ? `with status "${statusFilter}"` : "yet"}.</p>
+              <Banknote size={28} style={{ color: "var(--muted-foreground)", margin: "0 auto 0.75rem" }} />
+              <p style={{ color: "var(--muted-foreground)", fontSize: "0.9rem" }}>No payment submissions {statusFilter !== "all" ? `with status "${statusFilter}"` : "yet"}.</p>
             </div>
           ) : (
             filtered.map((proof, idx) => {
@@ -228,18 +228,18 @@ export default function PaymentsPage() {
                   {/* Business */}
                   <div>
                     <p style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--text)" }}>{proof.business_name}</p>
-                    <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.15rem", fontFamily: "monospace" }}>{proof.business_phone}</p>
+                    <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginTop: "0.15rem", fontFamily: "monospace" }}>{proof.business_phone}</p>
                     <p style={{ fontSize: "0.7rem", color: "var(--muted-2)", marginTop: "0.1rem" }}>{proof.business_email}</p>
                   </div>
 
                   {/* Cycle */}
                   <div>
                     <p style={{ fontSize: "0.8375rem", fontWeight: 700, color: "var(--text)" }}>{formatLKR(proof.amount)}</p>
-                    <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.1rem" }}>{CYCLE_LABEL[proof.billing_cycle] ?? proof.billing_cycle}</p>
+                    <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginTop: "0.1rem" }}>{CYCLE_LABEL[proof.billing_cycle] ?? proof.billing_cycle}</p>
                   </div>
 
                   {/* Submitted */}
-                  <p style={{ fontSize: "0.75rem", color: "var(--muted)" }}>{fmtDate(proof.created_at)}</p>
+                  <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>{fmtDate(proof.created_at)}</p>
 
                   {/* Screenshot thumbnail */}
                   <div>
@@ -259,7 +259,7 @@ export default function PaymentsPage() {
                       </button>
                     ) : (
                       <div style={{ width: 60, height: 44, background: "var(--surface-2)", borderRadius: "0.5rem", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <ImageIcon size={14} style={{ color: "var(--muted)" }} />
+                        <ImageIcon size={14} style={{ color: "var(--muted-foreground)" }} />
                       </div>
                     )}
                   </div>
@@ -268,7 +268,7 @@ export default function PaymentsPage() {
                   <div>
                     <span style={{ padding: "0.2rem 0.6rem", background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: "999px", fontSize: "0.7rem", fontWeight: 700 }}>{s.label}</span>
                     {proof.status === "approved" && proof.activation_code && (
-                      <p style={{ fontSize: "0.7rem", color: "var(--muted)", marginTop: "0.2rem", fontFamily: "monospace" }}>{proof.activation_code}</p>
+                      <p style={{ fontSize: "0.7rem", color: "var(--muted-foreground)", marginTop: "0.2rem", fontFamily: "monospace" }}>{proof.activation_code}</p>
                     )}
                     {proof.status === "rejected" && proof.admin_note && (
                       <p style={{ fontSize: "0.7rem", color: "#f87171", marginTop: "0.2rem", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={proof.admin_note}>{proof.admin_note}</p>
@@ -333,10 +333,10 @@ export default function PaymentsPage() {
               </div>
               <h3 style={{ fontSize: "1.0625rem", fontWeight: 700, color: "var(--text)" }}>Approve Payment</h3>
             </div>
-            <p style={{ fontSize: "0.875rem", color: "var(--muted)", marginBottom: "0.5rem", lineHeight: 1.6 }}>
+            <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", marginBottom: "0.5rem", lineHeight: 1.6 }}>
               Approve payment from <strong style={{ color: "var(--text)" }}>{approving.business_name}</strong>?
             </p>
-            <p style={{ fontSize: "0.875rem", color: "var(--muted)", marginBottom: "1.5rem", lineHeight: 1.6 }}>
+            <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", marginBottom: "1.5rem", lineHeight: 1.6 }}>
               The system will generate a <strong style={{ color: "#4ade80" }}>BSS-STR-XXXX</strong> code and email it to{" "}
               <strong style={{ color: "var(--text)" }}>{approving.business_email}</strong>.
             </p>
@@ -367,11 +367,11 @@ export default function PaymentsPage() {
               </div>
               <h3 style={{ fontSize: "1.0625rem", fontWeight: 700, color: "var(--text)" }}>Reject Payment</h3>
             </div>
-            <p style={{ fontSize: "0.875rem", color: "var(--muted)", marginBottom: "1rem", lineHeight: 1.6 }}>
+            <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", marginBottom: "1rem", lineHeight: 1.6 }}>
               Reject payment from <strong style={{ color: "var(--text)" }}>{rejecting.business_name}</strong>. This reason will be shown to the tenant so they can resubmit.
             </p>
             <div style={{ marginBottom: "1.5rem" }}>
-              <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)", marginBottom: "0.375rem" }}>
+              <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted-foreground)", marginBottom: "0.375rem" }}>
                 Rejection Reason <span style={{ color: "#ef4444" }}>*</span>
               </label>
               <textarea

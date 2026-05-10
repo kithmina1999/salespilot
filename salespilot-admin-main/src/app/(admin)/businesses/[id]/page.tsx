@@ -11,10 +11,10 @@ import {
 
 function PlanBadge({ plan }: { plan: string }) {
   const styles: Record<string, { bg: string; color: string; border: string }> = {
-    pro:     { bg: "rgba(99,102,241,0.1)",  color: "#818cf8", border: "rgba(99,102,241,0.3)" },
-    starter: { bg: "rgba(34,197,94,0.1)",   color: "#4ade80", border: "rgba(34,197,94,0.3)" },
-    growth:  { bg: "rgba(34,197,94,0.1)",   color: "#4ade80", border: "rgba(34,197,94,0.3)" },
-    free:    { bg: "rgba(100,116,139,0.1)", color: "#94a3b8", border: "rgba(100,116,139,0.25)" },
+    pro:     { bg: "rgba(99,102,241,0.1)",  color: "var(--info)", border: "rgba(99,102,241,0.3)" },
+    starter: { bg: "rgba(34,197,94,0.1)",   color: "var(--success)", border: "rgba(34,197,94,0.3)" },
+    growth:  { bg: "rgba(34,197,94,0.1)",   color: "var(--success)", border: "rgba(34,197,94,0.3)" },
+    free:    { bg: "var(--surface-2)", color: "var(--muted-foreground)", border: "var(--border)" },
   };
   const s = styles[plan?.toLowerCase()] ?? styles.free;
   return (
@@ -178,7 +178,7 @@ export default function BusinessDetailPage() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            color: "var(--muted)",
+            color: "var(--muted-foreground)",
             cursor: "pointer",
             transition: "all 0.15s",
             flexShrink: 0,
@@ -197,13 +197,13 @@ export default function BusinessDetailPage() {
             <PlanBadge plan={b.plan} />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginTop: "0.375rem", flexWrap: "wrap" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.8125rem", color: "var(--muted)" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.8125rem", color: "var(--muted-foreground)" }}>
               <Phone size={12} /> {b.phone}
             </span>
-            <span style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.8125rem", color: "var(--muted)" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.8125rem", color: "var(--muted-foreground)" }}>
               <Hash size={12} /> ID: {b.id}
             </span>
-            <span style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.8125rem", color: "var(--muted)" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.8125rem", color: "var(--muted-foreground)" }}>
               <Calendar size={12} /> Joined {new Date(b.created_at).toLocaleDateString()}
             </span>
           </div>
@@ -213,7 +213,7 @@ export default function BusinessDetailPage() {
           style={{
             padding: "0.5rem 1rem",
             background: "var(--accent)",
-            color: "#fff",
+            color: "var(--primary-foreground)",
             borderRadius: "0.625rem",
             fontSize: "0.875rem",
             fontWeight: 600,
@@ -244,7 +244,7 @@ export default function BusinessDetailPage() {
                 borderRadius: "0.625rem",
                 fontSize: "0.875rem",
                 fontWeight: active ? 700 : 500,
-                color: active ? (tab === "override" ? "#f87171" : "var(--accent)") : "var(--muted)",
+                color: active ? (tab === "override" ? "var(--danger)" : "var(--accent)") : "var(--muted)",
                 background: active
                   ? tab === "override" ? "rgba(239,68,68,0.08)" : "var(--accent-glow)"
                   : "transparent",
@@ -266,9 +266,9 @@ export default function BusinessDetailPage() {
       {activeTab === "usage" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem" }}>
           {[
-            { icon: <MessageSquare size={16} />, label: "Inbound Messages", value: b.system_message_count, accent: "#3b82f6" },
-            { icon: <Activity size={16} />,      label: "FAQ Replies",       value: b.faq_reply_count,     accent: "#22c55e" },
-            { icon: <Bot size={16} />,            label: "AI Messages",       value: b.ai_message_count,    accent: "#8b5cf6", sub: `/ ${b.ai_message_limit} limit` },
+            { icon: <MessageSquare size={16} />, label: "Inbound Messages", value: b.system_message_count, accent: "var(--info)" },
+            { icon: <Activity size={16} />,      label: "FAQ Replies",       value: b.faq_reply_count,     accent: "var(--success)" },
+            { icon: <Bot size={16} />,            label: "AI Messages",       value: b.ai_message_count,    accent: "var(--accent)", sub: `/ ${b.ai_message_limit} limit` },
           ].map((card) => (
             <div
               key={card.label}
@@ -283,14 +283,14 @@ export default function BusinessDetailPage() {
               }}
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}>{card.label}</span>
+                <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted-foreground)" }}>{card.label}</span>
                 <div style={{ width: "34px", height: "34px", borderRadius: "10px", background: `${card.accent}18`, display: "flex", alignItems: "center", justifyContent: "center", color: card.accent }}>
                   {card.icon}
                 </div>
               </div>
               <div>
                 <p style={{ fontSize: "2rem", fontWeight: 900, color: "var(--text)", letterSpacing: "-0.03em", lineHeight: 1 }}>{card.value ?? "—"}</p>
-                {card.sub && <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.25rem" }}>{card.sub}</p>}
+                {card.sub && <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginTop: "0.25rem" }}>{card.sub}</p>}
               </div>
             </div>
           ))}
@@ -310,17 +310,17 @@ export default function BusinessDetailPage() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", marginBottom: "0.375rem" }}>
-            <ShieldAlert size={18} color="#f87171" />
-            <h3 style={{ fontSize: "1rem", fontWeight: 700, color: "#f87171" }}>Super Admin Override</h3>
+            <ShieldAlert size={18} color="var(--danger)" />
+            <h3 style={{ fontSize: "1rem", fontWeight: 700, color: "var(--danger)" }}>Super Admin Override</h3>
           </div>
-          <p style={{ fontSize: "0.8375rem", color: "var(--muted)", marginBottom: "1.5rem" }}>
+          <p style={{ fontSize: "0.8375rem", color: "var(--muted-foreground)", marginBottom: "1.5rem" }}>
             Force a plan change without payment. This action is logged to the audit trail.
           </p>
 
           <form onSubmit={handleOverride} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             {/* Plan */}
             <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-              <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}>Force Plan</label>
+              <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted-foreground)" }}>Force Plan</label>
               <select
                 value={plan}
                 onChange={(e) => setPlan(e.target.value)}
@@ -336,7 +336,7 @@ export default function BusinessDetailPage() {
 
             {/* Billing Cycle */}
             <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-              <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}>Billing Cycle</label>
+              <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted-foreground)" }}>Billing Cycle</label>
               <select
                 value={cycle}
                 onChange={(e) => setCycle(e.target.value)}
@@ -353,7 +353,7 @@ export default function BusinessDetailPage() {
 
             {/* Expiry */}
             <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-              <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}>
+              <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted-foreground)" }}>
                 Expiry Date <span style={{ color: "var(--muted-2)", fontWeight: 400 }}>(leave empty = infinite)</span>
               </label>
               <input
@@ -368,8 +368,8 @@ export default function BusinessDetailPage() {
 
             {/* Reason */}
             <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-              <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}>
-                Reason <span style={{ color: "#f87171", fontWeight: 700 }}>*</span>
+              <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted-foreground)" }}>
+                Reason <span style={{ color: "var(--danger)", fontWeight: 700 }}>*</span>
               </label>
               <input
                 required
@@ -385,8 +385,8 @@ export default function BusinessDetailPage() {
             </div>
             {/* Confirm */}
             <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-              <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}>
-                Confirm Override <span style={{ color: "#f87171", fontWeight: 700 }}>*</span>
+              <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted-foreground)" }}>
+                Confirm Override <span style={{ color: "var(--danger)", fontWeight: 700 }}>*</span>
               </label>
               <input
                 required
@@ -408,7 +408,7 @@ export default function BusinessDetailPage() {
                 background: saving || !reason ? "rgba(239,68,68,0.1)" : "rgba(239,68,68,0.15)",
                 border: "1px solid rgba(239,68,68,0.3)",
                 borderRadius: "0.625rem",
-                color: saving || !reason ? "#9ca3af" : "#f87171",
+                color: saving || !reason ? "var(--muted)" : "var(--danger)",
                 fontSize: "0.9rem",
                 fontWeight: 700,
                 cursor: saving || !reason ? "not-allowed" : "pointer",
@@ -421,13 +421,13 @@ export default function BusinessDetailPage() {
               }}
               onMouseEnter={(e) => {
                 if (!saving && reason) {
-                  e.currentTarget.style.background = "rgba(239,68,68,0.25)";
-                  e.currentTarget.style.color = "#fff";
+                  e.currentTarget.style.background = "var(--danger)";
+                  e.currentTarget.style.color = "var(--primary-foreground)";
                 }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "rgba(239,68,68,0.15)";
-                e.currentTarget.style.color = "#f87171";
+                e.currentTarget.style.color = "var(--danger)";
               }}
             >
               <Save size={15} />
@@ -461,12 +461,12 @@ export default function BusinessDetailPage() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", marginBottom: "0.375rem" }}>
-            <ShieldAlert size={18} color="#f87171" />
-            <h3 style={{ fontSize: "1rem", fontWeight: 700, color: "#f87171" }}>
+            <ShieldAlert size={18} color="var(--danger)" />
+            <h3 style={{ fontSize: "1rem", fontWeight: 700, color: "var(--danger)" }}>
               {b.suspended_at ? "Unsuspend Business" : "Suspend Business"}
             </h3>
           </div>
-          <p style={{ fontSize: "0.8375rem", color: "var(--muted)", marginBottom: "1.5rem" }}>
+          <p style={{ fontSize: "0.8375rem", color: "var(--muted-foreground)", marginBottom: "1.5rem" }}>
             {b.suspended_at
               ? "Reactivate this account. Their bot and dashboard will be unlocked."
               : "Suspend this account. Their bot will stop answering, and their dashboard will go into read-only mode."}
@@ -476,7 +476,7 @@ export default function BusinessDetailPage() {
             {/* Type */}
             {!b.suspended_at && (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-                <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}>Suspension Type</label>
+                <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted-foreground)" }}>Suspension Type</label>
                 <select
                   value={suspendType}
                   onChange={(e) => setSuspendType(e.target.value)}
@@ -493,8 +493,8 @@ export default function BusinessDetailPage() {
 
             {/* Reason */}
             <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-              <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}>
-                Reason <span style={{ color: "#f87171", fontWeight: 700 }}>*</span>
+              <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted-foreground)" }}>
+                Reason <span style={{ color: "var(--danger)", fontWeight: 700 }}>*</span>
               </label>
               <input
                 required
@@ -510,8 +510,8 @@ export default function BusinessDetailPage() {
 
             {/* Confirm */}
             <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-              <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}>
-                Confirm Action <span style={{ color: "#f87171", fontWeight: 700 }}>*</span>
+              <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted-foreground)" }}>
+                Confirm Action <span style={{ color: "var(--danger)", fontWeight: 700 }}>*</span>
               </label>
               <input
                 required
@@ -534,7 +534,7 @@ export default function BusinessDetailPage() {
                 background: suspending || !suspendReason || !suspendConfirm ? "rgba(239,68,68,0.1)" : "rgba(239,68,68,0.15)",
                 border: "1px solid rgba(239,68,68,0.3)",
                 borderRadius: "0.625rem",
-                color: suspending || !suspendReason || !suspendConfirm ? "#9ca3af" : "#f87171",
+                color: suspending || !suspendReason || !suspendConfirm ? "var(--muted)" : "var(--danger)",
                 fontSize: "0.9rem",
                 fontWeight: 700,
                 cursor: suspending || !suspendReason || !suspendConfirm ? "not-allowed" : "pointer",
@@ -547,13 +547,13 @@ export default function BusinessDetailPage() {
               }}
               onMouseEnter={(e) => {
                 if (!suspending && suspendReason && suspendConfirm) {
-                  e.currentTarget.style.background = "rgba(239,68,68,0.25)";
-                  e.currentTarget.style.color = "#fff";
+                  e.currentTarget.style.background = "var(--danger)";
+                  e.currentTarget.style.color = "var(--primary-foreground)";
                 }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "rgba(239,68,68,0.15)";
-                e.currentTarget.style.color = "#f87171";
+                e.currentTarget.style.color = "var(--danger)";
               }}
             >
               <ShieldAlert size={15} />

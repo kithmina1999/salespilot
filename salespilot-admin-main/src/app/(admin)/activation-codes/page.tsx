@@ -26,10 +26,10 @@ type ActivationCode = {
 
 function PlanBadge({ plan }: { plan: string }) {
   const styles: Record<string, { bg: string; color: string; border: string }> = {
-    pro:     { bg: "rgba(99,102,241,0.12)",  color: "#818cf8", border: "rgba(99,102,241,0.3)" },
-    growth:  { bg: "rgba(34,197,94,0.1)",    color: "#4ade80", border: "rgba(34,197,94,0.3)" },
-    starter: { bg: "rgba(34,197,94,0.08)",   color: "#86efac", border: "rgba(34,197,94,0.2)" },
-    free:    { bg: "rgba(100,116,139,0.1)",  color: "#94a3b8", border: "rgba(100,116,139,0.25)" },
+    pro:     { bg: "rgba(99,102,241,0.12)",  color: "var(--info)", border: "rgba(99,102,241,0.3)" },
+    growth:  { bg: "rgba(34,197,94,0.1)",    color: "var(--success)", border: "rgba(34,197,94,0.3)" },
+    starter: { bg: "rgba(34,197,94,0.08)",   color: "var(--success)", border: "rgba(34,197,94,0.2)" },
+    free:    { bg: "var(--surface-2)",  color: "var(--muted-foreground)", border: "var(--border)" },
   };
   const s = styles[plan?.toLowerCase()] ?? styles.free;
   return (
@@ -47,7 +47,7 @@ function CopyButton({ text }: { text: string }) {
     setTimeout(() => setCopied(false), 1500);
   };
   return (
-    <button onClick={copy} style={{ background: "none", border: "none", cursor: "pointer", color: copied ? "#4ade80" : "var(--muted)", transition: "color 0.15s", padding: "0.2rem", display: "flex", alignItems: "center" }}>
+    <button onClick={copy} style={{ background: "none", border: "none", cursor: "pointer", color: copied ? "var(--success)" : "var(--muted)", transition: "color 0.15s", padding: "0.2rem", display: "flex", alignItems: "center" }}>
       {copied ? <CheckCircle size={13} /> : <Copy size={13} />}
     </button>
   );
@@ -77,7 +77,7 @@ function SendWhatsApp({ phone, code, plan, days }: { phone: string; code: string
         background: "rgba(34,197,94,0.1)",
         border: "1px solid rgba(34,197,94,0.25)",
         borderRadius: "0.5rem",
-        color: "#4ade80",
+        color: "var(--success)",
         fontSize: "0.75rem", fontWeight: 600,
         textDecoration: "none",
         transition: "background 0.15s",
@@ -171,14 +171,14 @@ export default function ActivationCodesPage() {
           <h1 style={{ fontSize: "1.75rem", fontWeight: 900, color: "var(--text)", letterSpacing: "-0.03em" }}>
             Activation Codes
           </h1>
-          <p style={{ fontSize: "0.875rem", color: "var(--muted)", marginTop: "0.25rem" }}>
+          <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", marginTop: "0.25rem" }}>
             Generate BSS codes for tenants who pay via bank transfer
           </p>
         </div>
         <div style={{ display: "flex", gap: "0.625rem", alignItems: "center" }}>
           {/* Search */}
           <div style={{ position: "relative" }}>
-            <Search size={14} style={{ position: "absolute", left: "0.7rem", top: "50%", transform: "translateY(-50%)", color: "var(--muted)", pointerEvents: "none" }} />
+            <Search size={14} style={{ position: "absolute", left: "0.7rem", top: "50%", transform: "translateY(-50%)", color: "var(--muted-foreground)", pointerEvents: "none" }} />
             <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)}
               style={{ ...inputStyle, paddingLeft: "2rem", width: "200px" }}
               onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
@@ -186,12 +186,12 @@ export default function ActivationCodesPage() {
             />
           </div>
           {/* Reload */}
-          <button onClick={() => mutate()} style={{ padding: "0.5rem", background: "var(--surface)", border: "1px solid var(--border-2)", borderRadius: "0.625rem", color: "var(--muted)", cursor: "pointer", display: "flex", alignItems: "center" }}>
+          <button onClick={() => mutate()} style={{ padding: "0.5rem", background: "var(--surface)", border: "1px solid var(--border-2)", borderRadius: "0.625rem", color: "var(--muted-foreground)", cursor: "pointer", display: "flex", alignItems: "center" }}>
             <RefreshCw size={15} />
           </button>
           {/* Create */}
           <button onClick={() => setShowCreate(true)}
-            style={{ display: "flex", alignItems: "center", gap: "0.425rem", padding: "0.5rem 1rem", background: "linear-gradient(135deg, var(--accent), var(--accent-dim))", border: "none", borderRadius: "0.625rem", color: "#fff", fontSize: "0.875rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 14px var(--accent-glow2)" }}
+            style={{ display: "flex", alignItems: "center", gap: "0.425rem", padding: "0.5rem 1rem", background: "var(--accent)", border: "none", borderRadius: "0.625rem", color: "var(--primary-foreground)", fontSize: "0.875rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 14px var(--accent-glow2)" }}
           >
             <Plus size={15} /> Generate Code
           </button>
@@ -201,15 +201,15 @@ export default function ActivationCodesPage() {
       {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem" }}>
         {[
-          { icon: <KeyRound size={16} />, label: "Total Codes",  value: stats.total,     accent: "#6366f1" },
-          { icon: <CheckCircle size={16} />, label: "Used",      value: stats.used,      accent: "#22c55e" },
-          { icon: <Clock size={16} />,       label: "Available", value: stats.available, accent: "#f59e0b" },
+          { icon: <KeyRound size={16} />, label: "Total Codes",  value: stats.total,     accent: "var(--info)" },
+          { icon: <CheckCircle size={16} />, label: "Used",      value: stats.used,      accent: "var(--success)" },
+          { icon: <Clock size={16} />,       label: "Available", value: stats.available, accent: "var(--warning)" },
         ].map((s) => (
           <div key={s.label} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "1rem", padding: "1.125rem 1.375rem", display: "flex", alignItems: "center", gap: "0.875rem" }}>
             <div style={{ width: "38px", height: "38px", borderRadius: "10px", background: `${s.accent}18`, display: "flex", alignItems: "center", justifyContent: "center", color: s.accent, flexShrink: 0 }}>{s.icon}</div>
             <div>
               <p style={{ fontSize: "1.75rem", fontWeight: 900, color: "var(--text)", letterSpacing: "-0.03em", lineHeight: 1 }}>{s.value}</p>
-              <p style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: "0.25rem" }}>{s.label}</p>
+              <p style={{ fontSize: "0.8rem", color: "var(--muted-foreground)", marginTop: "0.25rem" }}>{s.label}</p>
             </div>
           </div>
         ))}
@@ -218,9 +218,9 @@ export default function ActivationCodesPage() {
       {/* Table */}
       <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "1rem", overflow: "hidden" }}>
         {/* Column headers */}
-        <div style={{ display: "grid", gridTemplateColumns: "3fr 1.5fr 1.5fr 2fr 160px", padding: "0.75rem 1.25rem", background: "rgba(255,255,255,0.02)", borderBottom: "1px solid var(--border)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "3fr 1.5fr 1.5fr 2fr 160px", padding: "0.75rem 1.25rem", background: "var(--surface-2)", borderBottom: "1px solid var(--border)" }}>
           {["Code / Note", "Plan", "Duration", "Status / Used By", "Actions"].map((h) => (
-            <span key={h} style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--muted)", letterSpacing: "0.05em", textTransform: "uppercase", textAlign: h === "Actions" ? "right" : "left" }}>{h}</span>
+            <span key={h} style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--muted-foreground)", letterSpacing: "0.05em", textTransform: "uppercase", textAlign: h === "Actions" ? "right" : "left" }}>{h}</span>
           ))}
         </div>
 
@@ -233,14 +233,14 @@ export default function ActivationCodesPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div style={{ padding: "3.5rem", textAlign: "center" }}>
-            <KeyRound size={28} style={{ color: "var(--muted)", margin: "0 auto 0.75rem" }} />
-            <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>No activation codes yet. Generate the first one!</p>
+            <KeyRound size={28} style={{ color: "var(--muted-foreground)", margin: "0 auto 0.75rem" }} />
+            <p style={{ color: "var(--muted-foreground)", fontSize: "0.9rem" }}>No activation codes yet. Generate the first one!</p>
           </div>
         ) : (
           filtered.map((c, idx) => (
             <div key={c.id}
               style={{ display: "grid", gridTemplateColumns: "3fr 1.5fr 1.5fr 2fr 160px", padding: "0.875rem 1.25rem", borderBottom: idx < filtered.length - 1 ? "1px solid var(--border)" : "none", alignItems: "center", transition: "background 0.12s" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.025)")}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-2)")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
             >
               {/* Code */}
@@ -261,17 +261,17 @@ export default function ActivationCodesPage() {
               <div><PlanBadge plan={c.plan} /></div>
 
               {/* Duration */}
-              <span style={{ fontSize: "0.8375rem", color: "var(--muted)" }}>{c.duration_days}d · {c.billing_cycle}</span>
+              <span style={{ fontSize: "0.8375rem", color: "var(--muted-foreground)" }}>{c.duration_days}d · {c.billing_cycle}</span>
 
               {/* Status */}
               <div>
                 {c.is_used ? (
                   <div>
-                    <span style={{ padding: "0.2rem 0.6rem", background: "rgba(34,197,94,0.1)", color: "#4ade80", border: "1px solid rgba(34,197,94,0.25)", borderRadius: "999px", fontSize: "0.7rem", fontWeight: 700 }}>USED</span>
+                    <span style={{ padding: "0.2rem 0.6rem", background: "rgba(34,197,94,0.1)", color: "var(--success)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: "999px", fontSize: "0.7rem", fontWeight: 700 }}>USED</span>
                     {c.used_by_name && <p style={{ fontSize: "0.7rem", color: "var(--muted-2)", marginTop: "0.2rem" }}>{c.used_by_name}</p>}
                   </div>
                 ) : (
-                  <span style={{ padding: "0.2rem 0.6rem", background: "rgba(245,158,11,0.1)", color: "#fbbf24", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "999px", fontSize: "0.7rem", fontWeight: 700 }}>AVAILABLE</span>
+                  <span style={{ padding: "0.2rem 0.6rem", background: "rgba(245,158,11,0.1)", color: "var(--warning)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "999px", fontSize: "0.7rem", fontWeight: 700 }}>AVAILABLE</span>
                 )}
               </div>
 
@@ -282,7 +282,7 @@ export default function ActivationCodesPage() {
                 )}
                 {!c.is_used && (
                   <button onClick={() => handleRevoke(c.code)}
-                    style={{ padding: "0.35rem 0.5rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: "0.5rem", color: "#f87171", cursor: "pointer", display: "flex", alignItems: "center", transition: "background 0.15s", height: "100%" }}
+                    style={{ padding: "0.35rem 0.5rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: "0.5rem", color: "var(--danger)", cursor: "pointer", display: "flex", alignItems: "center", transition: "background 0.15s", height: "100%" }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(239,68,68,0.2)")}
                     onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(239,68,68,0.08)")}
                     title="Revoke Code"
@@ -316,7 +316,7 @@ export default function ActivationCodesPage() {
               {/* Plan + Cycle row */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-                  <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}>Plan</label>
+                  <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted-foreground)" }}>Plan</label>
                   <select value={newPlan} onChange={(e) => { setNewPlan(e.target.value); }} style={selectStyle}
                     onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
                     onBlur={(e) => (e.target.style.borderColor = "var(--border-2)")}>
@@ -326,7 +326,7 @@ export default function ActivationCodesPage() {
                   </select>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-                  <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}>Billing Cycle</label>
+                  <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted-foreground)" }}>Billing Cycle</label>
                   <select value={newCycle} onChange={(e) => {
                     setNewCycle(e.target.value);
                     setNewDays(e.target.value === "monthly" ? 30 : e.target.value === "quarterly" ? 90 : 365);
@@ -342,7 +342,7 @@ export default function ActivationCodesPage() {
 
               {/* Duration override */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-                <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}>Duration (days)</label>
+                <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted-foreground)" }}>Duration (days)</label>
                 <input type="number" value={newDays} onChange={(e) => setNewDays(Number(e.target.value))} min={1} style={inputStyle}
                   onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
                   onBlur={(e) => (e.target.style.borderColor = "var(--border-2)")} />
@@ -350,7 +350,7 @@ export default function ActivationCodesPage() {
 
               {/* Target phone */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-                <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}>
+                <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted-foreground)" }}>
                   Lock to Phone <span style={{ color: "var(--accent)", fontSize: "0.75rem", fontWeight: 500 }}>🔒 Recommended</span>
                 </label>
                 <input type="text" placeholder="+94771234567 — leave empty for any tenant" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} style={inputStyle}
@@ -361,7 +361,7 @@ export default function ActivationCodesPage() {
 
               {/* Note */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-                <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)" }}>Admin Note</label>
+                <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted-foreground)" }}>Admin Note</label>
                 <input type="text" placeholder="e.g., Ahmed paid LKR 4500 via ComBank on 30 Mar" value={newNote} onChange={(e) => setNewNote(e.target.value)} style={inputStyle}
                   onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
                   onBlur={(e) => (e.target.style.borderColor = "var(--border-2)")} />
@@ -369,16 +369,16 @@ export default function ActivationCodesPage() {
 
               {createError && (
                 <div style={{ padding: "0.75rem 1rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "0.625rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <AlertTriangle size={14} color="#f87171" />
-                  <span style={{ fontSize: "0.875rem", color: "#f87171" }}>{createError}</span>
+                  <AlertTriangle size={14} color="var(--danger)" />
+                  <span style={{ fontSize: "0.875rem", color: "var(--danger)" }}>{createError}</span>
                 </div>
               )}
 
               <div style={{ display: "flex", gap: "0.625rem", justifyContent: "flex-end", marginTop: "0.5rem" }}>
                 <button type="button" onClick={() => { setShowCreate(false); setCreateError(""); }}
-                  style={{ padding: "0.5rem 1.125rem", borderRadius: "0.625rem", fontSize: "0.875rem", fontWeight: 600, color: "var(--text)", background: "transparent", border: "1px solid var(--border-2)", cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                  style={{ padding: "0.5rem 1.125rem", borderRadius: "0.625rem", fontSize: "0.875rem", fontWeight: 600, color: "var(--text)", background: "var(--surface)", border: "1px solid var(--border-2)", cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
                 <button type="submit" disabled={creating}
-                  style={{ padding: "0.5rem 1.25rem", borderRadius: "0.625rem", fontSize: "0.875rem", fontWeight: 700, color: "#fff", background: creating ? "var(--accent-dim)" : "linear-gradient(135deg, var(--accent), var(--accent-dim))", border: "none", cursor: creating ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: "0 4px 14px var(--accent-glow2)", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  style={{ padding: "0.5rem 1.25rem", borderRadius: "0.625rem", fontSize: "0.875rem", fontWeight: 700, color: "var(--primary-foreground)", background: "var(--accent)", border: "none", cursor: creating ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: "0 4px 14px var(--accent-glow2)", display: "flex", alignItems: "center", gap: "0.4rem" }}>
                   {creating ? <><RefreshCw size={13} style={{ animation: "spin 1s linear infinite" }} /> Generating...</> : <><KeyRound size={13} /> Generate</>}
                 </button>
               </div>

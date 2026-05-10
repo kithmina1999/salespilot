@@ -1,466 +1,324 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import Link from "next/link";
-import useSWR from "swr";
-import { createPortal } from "react-dom";
-import { api } from "@/lib/api";
-import { Search, ChevronRight, Building2, Bug, Eye, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { useState } from "react"
+import Link from "next/link"
+import { createPortal } from "react-dom"
+import useSWR from "swr"
+import { Bug, Building2, ChevronRight, Eye, Search, X } from "lucide-react"
+
+import {
+  AdminDataTable,
+  type AdminDataTableColumn,
+} from "@/components/admin/data-table"
+import {
+  AdminPage,
+  AdminPageHeader,
+} from "@/components/admin/page"
+import { PlanBadge, StatusBadge } from "@/components/admin/status-badge"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import {
+  TableCell,
+  TableRow,
+} from "@/components/ui/table"
+import { api } from "@/lib/api"
+import { cn } from "@/lib/utils"
 
 type Business = {
-  id: number;
-  name: string;
-  phone: string;
-  plan: string;
-  plan_expires_at: string | null;
-  created_at: string;
-  wa_status: string;
-  suspended_at: string | null;
-  ai_message_count: number;
-  ai_message_limit: number;
-  trial_expires_at: string | null;
-  debug_active: boolean;
-  debug_expires_at: string | null;
-  debug_remaining_seconds: number;
-};
-
-const DEBUG_DURATIONS = [1, 6, 24, 72];
-const DEBUG_MENU_WIDTH = 280;
-const DEBUG_MENU_HEIGHT = 230;
-
-function PlanBadge({ plan }: { plan: string }) {
-  const styles: Record<string, { bg: string; color: string; border: string }> = {
-    pro:     { bg: "rgba(99,102,241,0.1)",  color: "#818cf8", border: "rgba(99,102,241,0.3)" },
-    starter: { bg: "rgba(34,197,94,0.1)",   color: "#4ade80", border: "rgba(34,197,94,0.3)" },
-    growth:  { bg: "rgba(34,197,94,0.1)",   color: "#4ade80", border: "rgba(34,197,94,0.3)" },
-    free:    { bg: "rgba(100,116,139,0.1)", color: "#94a3b8", border: "rgba(100,116,139,0.25)" },
-  };
-  const s = styles[plan?.toLowerCase()] ?? styles.free;
-  return (
-    <span
-      style={{
-        padding: "0.2rem 0.6rem",
-        background: s.bg,
-        color: s.color,
-        border: `1px solid ${s.border}`,
-        borderRadius: "999px",
-        fontSize: "0.7rem",
-        fontWeight: 700,
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
-      }}
-    >
-      {plan}
-    </span>
-  );
+  id: number
+  name: string
+  phone: string
+  plan: string
+  plan_expires_at: string | null
+  created_at: string
+  wa_status: string
+  suspended_at: string | null
+  ai_message_count: number
+  ai_message_limit: number
+  trial_expires_at: string | null
+  debug_active: boolean
+  debug_expires_at: string | null
+  debug_remaining_seconds: number
 }
+
+const DEBUG_DURATIONS = [1, 6, 24, 72]
+const DEBUG_MENU_WIDTH = 280
+const DEBUG_MENU_HEIGHT = 230
+const BUSINESS_COLUMNS: AdminDataTableColumn[] = [
+  { key: "name", header: "ID / Name" },
+  { key: "phone", header: "Phone" },
+  { key: "plan", header: "Plan" },
+  { key: "wa", header: "WA" },
+  { key: "usage", header: "Usage" },
+  { key: "status", header: "Status / Joined" },
+  { key: "actions", header: "", className: "text-right" },
+]
 
 function formatDebugRemaining(seconds: number, expiresAt: string | null) {
   if (seconds > 0) {
-    if (seconds < 3600) return `${Math.max(1, Math.ceil(seconds / 60))}m left`;
-    return `${Math.ceil(seconds / 3600)}h left`;
+    if (seconds < 3600) return `${Math.max(1, Math.ceil(seconds / 60))}m left`
+    return `${Math.ceil(seconds / 3600)}h left`
   }
-  if (!expiresAt) return "";
-  return `until ${new Date(expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+  if (!expiresAt) return ""
+  return `until ${new Date(expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
 }
 
 function DebugBadge({ business }: { business: Business }) {
-  if (!business.debug_active) return null;
+  if (!business.debug_active) return null
+
   return (
-    <span
+    <StatusBadge
+      tone="warning"
       title={business.debug_expires_at ? `Debugging until ${new Date(business.debug_expires_at).toLocaleString()}` : "Debugging active"}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "0.3rem",
-        width: "fit-content",
-        padding: "0.12rem 0.45rem",
-        borderRadius: "999px",
-        border: "1px solid rgba(251,191,36,0.35)",
-        background: "rgba(251,191,36,0.1)",
-        color: "#fbbf24",
-        fontSize: "0.68rem",
-        fontWeight: 800,
-        letterSpacing: "0.04em",
-      }}
+      className="gap-1"
     >
-      DEBUG
-      <span style={{ color: "var(--muted)", fontWeight: 600, letterSpacing: 0 }}>
+      Debug
+      <span className="normal-case tracking-normal text-muted-foreground">
         {formatDebugRemaining(business.debug_remaining_seconds, business.debug_expires_at)}
       </span>
-    </span>
-  );
+    </StatusBadge>
+  )
+}
+
+function getDebugError(err: unknown) {
+  if (err instanceof Error) return err.message
+  return "Failed to update debugging"
 }
 
 export default function BusinessesPage() {
-  const [search, setSearch] = useState("");
-  const [debugTargetId, setDebugTargetId] = useState<number | null>(null);
-  const [debugDuration, setDebugDuration] = useState(24);
-  const [debugReason, setDebugReason] = useState("");
-  const [debugBusyId, setDebugBusyId] = useState<number | null>(null);
-  const [debugError, setDebugError] = useState("");
-  const [debugMenuPosition, setDebugMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const [search, setSearch] = useState("")
+  const [debugTargetId, setDebugTargetId] = useState<number | null>(null)
+  const [debugDuration, setDebugDuration] = useState(24)
+  const [debugReason, setDebugReason] = useState("")
+  const [debugBusyId, setDebugBusyId] = useState<number | null>(null)
+  const [debugError, setDebugError] = useState("")
+  const [debugMenuPosition, setDebugMenuPosition] = useState<{ top: number; left: number } | null>(null)
 
   const { data, isLoading: loading, mutate } = useSWR<{ businesses: Business[] }>(
     "/system/businesses",
-    (url:string) => api.get(url).then((res) => res.data)
-  );
-  const businesses = data?.businesses || [];
+    (url: string) => api.get(url).then((res) => res.data)
+  )
+  const businesses = data?.businesses || []
 
   const filtered = businesses.filter(
-    (b) =>
-      b.name.toLowerCase().includes(search.toLowerCase()) ||
-      b.phone.includes(search)
-  );
+    (business) =>
+      business.name.toLowerCase().includes(search.toLowerCase()) ||
+      business.phone.includes(search)
+  )
 
   const openDebugStart = (businessId: number, anchor: HTMLElement) => {
     if (debugTargetId === businessId) {
-      setDebugTargetId(null);
-      setDebugMenuPosition(null);
-      return;
+      setDebugTargetId(null)
+      setDebugMenuPosition(null)
+      return
     }
-    const rect = anchor.getBoundingClientRect();
-    const topBelow = rect.bottom + 8;
-    const topAbove = rect.top - DEBUG_MENU_HEIGHT - 8;
+
+    const rect = anchor.getBoundingClientRect()
+    const topBelow = rect.bottom + 8
+    const topAbove = rect.top - DEBUG_MENU_HEIGHT - 8
     const top = topBelow + DEBUG_MENU_HEIGHT > window.innerHeight - 16
       ? Math.max(16, topAbove)
-      : topBelow;
+      : topBelow
     const left = Math.min(
       Math.max(16, rect.right - DEBUG_MENU_WIDTH),
       window.innerWidth - DEBUG_MENU_WIDTH - 16
-    );
-    setDebugTargetId(businessId);
-    setDebugMenuPosition({ top, left });
-    setDebugDuration(24);
-    setDebugReason("");
-    setDebugError("");
-  };
+    )
+
+    setDebugTargetId(businessId)
+    setDebugMenuPosition({ top, left })
+    setDebugDuration(24)
+    setDebugReason("")
+    setDebugError("")
+  }
 
   const startDebug = async (businessId: number) => {
-    setDebugBusyId(businessId);
-    setDebugError("");
+    setDebugBusyId(businessId)
+    setDebugError("")
     try {
       await api.post(`/system/businesses/${businessId}/debug-mode`, {
         enable: true,
         duration_hours: debugDuration,
         reason: debugReason.trim() || undefined,
-      });
-      setDebugTargetId(null);
-      setDebugMenuPosition(null);
-      setDebugReason("");
-      mutate();
+      })
+      setDebugTargetId(null)
+      setDebugMenuPosition(null)
+      setDebugReason("")
+      mutate()
     } catch (err: unknown) {
-      setDebugError(err instanceof Error ? err.message : "Failed to start debugging");
+      setDebugError(getDebugError(err))
     } finally {
-      setDebugBusyId(null);
+      setDebugBusyId(null)
     }
-  };
+  }
 
   const stopDebug = async (businessId: number) => {
-    setDebugBusyId(businessId);
-    setDebugError("");
+    setDebugBusyId(businessId)
+    setDebugError("")
     try {
       await api.post(`/system/businesses/${businessId}/debug-mode`, {
         enable: false,
-      });
-      mutate();
+      })
+      mutate()
     } catch (err: unknown) {
-      setDebugError(err instanceof Error ? err.message : "Failed to stop debugging");
+      setDebugError(getDebugError(err))
     } finally {
-      setDebugBusyId(null);
+      setDebugBusyId(null)
     }
-  };
+  }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }} className="animate-fade-up">
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem" }}>
-        <div>
-          <h1 style={{ fontSize: "1.75rem", fontWeight: 900, color: "var(--text)", letterSpacing: "-0.03em" }}>
-            Businesses
-          </h1>
-          <p style={{ fontSize: "0.875rem", color: "var(--muted)", marginTop: "0.25rem" }}>
-            {loading ? "Loading tenants..." : `${filtered.length} of ${businesses.length} tenants`}
-          </p>
-        </div>
+    <AdminPage>
+      <AdminPageHeader
+        title="Businesses"
+        description={loading ? "Loading tenants..." : `${filtered.length} of ${businesses.length} tenants`}
+        actions={
+          <div className="relative w-[280px] max-w-full">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search name or phone..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="bg-card pl-9"
+            />
+          </div>
+        }
+      />
 
-        {/* Search */}
-        <div style={{ position: "relative" }}>
-          <Search
-            size={15}
-            style={{
-              position: "absolute",
-              left: "0.75rem",
-              top: "50%",
-              transform: "translateY(-50%)",
-              color: "var(--muted)",
-              pointerEvents: "none",
-            }}
-          />
-          <input
-            type="text"
-            placeholder="Search name or phone..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{
-              paddingLeft: "2.25rem",
-              paddingRight: "0.875rem",
-              paddingTop: "0.5625rem",
-              paddingBottom: "0.5625rem",
-              background: "var(--surface)",
-              border: "1px solid var(--border-2)",
-              borderRadius: "0.625rem",
-              color: "var(--text)",
-              fontSize: "0.875rem",
-              outline: "none",
-              width: "260px",
-              fontFamily: "inherit",
-              transition: "border-color 0.15s",
-            }}
-            onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-            onBlur={(e) => (e.target.style.borderColor = "var(--border-2)")}
-          />
-        </div>
-      </div>
-
-      {/* Table */}
-      <div
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: "1rem",
-          overflow: "hidden",
-        }}
+      <AdminDataTable
+        columns={BUSINESS_COLUMNS}
+        isLoading={loading}
+        isEmpty={filtered.length === 0}
+        emptyIcon={Building2}
+        emptyTitle="No businesses found."
+        minWidth="1100px"
       >
-        {/* Table Header */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "2fr 1.5fr 1fr 1fr 1fr 1.6fr 150px",
-            padding: "0.75rem 1.25rem",
-            background: "rgba(255,255,255,0.02)",
-            borderBottom: "1px solid var(--border)",
-          }}
-        >
-          {["ID / Name", "Phone", "Plan", "WA", "Usage", "Status/Joined", ""].map((h) => (
-            <span key={h} style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", letterSpacing: "0.04em", textTransform: "uppercase" }}>
-              {h}
-            </span>
-          ))}
-        </div>
-
-        {/* Rows */}
-        {loading ? (
-          <div style={{ padding: "3rem", textAlign: "center" }}>
-            {[...Array(5)].map((_, i) => (
-              <div
-                key={i}
-                style={{
-                  height: "52px",
-                  background: "var(--surface-2)",
-                  borderRadius: "0.5rem",
-                  marginBottom: "0.5rem",
-                  animation: "pulse 1.5s ease-in-out infinite",
-                  animationDelay: `${i * 100}ms`,
-                }}
-              />
-            ))}
-            <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div style={{ padding: "4rem", textAlign: "center" }}>
-            <Building2 size={32} style={{ color: "var(--muted)", margin: "0 auto 0.75rem" }} />
-            <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>No businesses found.</p>
-          </div>
-        ) : (
-          filtered.map((b, idx) => (
-            <div
-              key={b.id}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "2fr 1.5fr 1fr 1fr 1fr 1.6fr 150px",
-                padding: "0.875rem 1.25rem",
-                borderBottom: idx < filtered.length - 1 ? "1px solid var(--border)" : "none",
-                alignItems: "center",
-                transition: "background 0.12s",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.025)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-            >
-              {/* Name */}
-              <div>
-                <p style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text)" }}>{b.name}</p>
-                <p style={{ fontSize: "0.7rem", color: "var(--muted-2)", marginTop: "1px" }}>ID: {b.id}</p>
-              </div>
-
-              {/* Phone */}
-              <span style={{ fontSize: "0.8375rem", color: "var(--muted)", fontFamily: "monospace" }}>{b.phone}</span>
-
-              {/* Plan */}
-              <div><PlanBadge plan={b.plan} /></div>
-
-              {/* WA Status */}
-              <span style={{ fontSize: "0.8125rem", color: b.wa_status === "connected" ? "#4ade80" : "var(--muted-2)", textTransform: "capitalize" }}>
-                {b.wa_status ? b.wa_status.replace("_", " ") : "Not Connected"}
-              </span>
-
-              {/* AI Usage % */}
-              <span style={{ fontSize: "0.8125rem", color: "var(--text)" }}>
-                {b.ai_message_limit > 0 ? `${((b.ai_message_count / b.ai_message_limit) * 100).toFixed(1)}%` : "N/A"}
-              </span>
-
-              {/* Status & Joined */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-                <DebugBadge business={b} />
-                {b.suspended_at && (
-                  <span style={{ fontSize: "0.7rem", color: "#ef4444", fontWeight: 600, background: "rgba(239,68,68,0.1)", padding: "0.1rem 0.4rem", borderRadius: "4px", width: "fit-content" }}>
-                    SUSPENDED
-                  </span>
-                )}
-                <span style={{ fontSize: "0.8125rem", color: "var(--muted-2)" }}>
-                  {new Date(b.created_at).toLocaleDateString()}
+        {filtered.map((business) => (
+          <TableRow key={business.id} className="border-border/50 hover:bg-muted/30">
+            <TableCell className="px-4 py-3">
+              <div className="font-semibold text-foreground">{business.name}</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">ID: {business.id}</div>
+            </TableCell>
+            <TableCell className="px-4 py-3 font-mono text-sm text-muted-foreground">
+              {business.phone}
+            </TableCell>
+            <TableCell className="px-4 py-3">
+              <PlanBadge plan={business.plan} />
+            </TableCell>
+            <TableCell className="px-4 py-3">
+              <StatusBadge tone={business.wa_status === "connected" ? "success" : "muted"}>
+                {business.wa_status ? business.wa_status.replace("_", " ") : "Not Connected"}
+              </StatusBadge>
+            </TableCell>
+            <TableCell className="px-4 py-3 text-sm font-semibold text-foreground">
+              {business.ai_message_limit > 0
+                ? `${((business.ai_message_count / business.ai_message_limit) * 100).toFixed(1)}%`
+                : "N/A"}
+            </TableCell>
+            <TableCell className="px-4 py-3">
+              <div className="flex flex-col items-start gap-1.5">
+                <DebugBadge business={business} />
+                {business.suspended_at && <StatusBadge tone="destructive">Suspended</StatusBadge>}
+                <span className="text-sm text-muted-foreground">
+                  {new Date(business.created_at).toLocaleDateString()}
                 </span>
               </div>
-
-              {/* Action */}
-              <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "0.375rem", position: "relative" }}>
-                {b.debug_active ? (
+            </TableCell>
+            <TableCell className="px-4 py-3">
+              <div className="flex justify-end gap-1.5">
+                {business.debug_active ? (
                   <>
-                    <button
-                      onClick={() => stopDebug(b.id)}
-                      disabled={debugBusyId === b.id}
+                    <Button
+                      onClick={() => stopDebug(business.id)}
+                      disabled={debugBusyId === business.id}
                       title="Stop pipeline debugging"
-                      style={{
-                        width: "30px",
-                        height: "30px",
-                        borderRadius: "0.5rem",
-                        border: "1px solid rgba(239,68,68,0.25)",
-                        background: "rgba(239,68,68,0.1)",
-                        color: "#f87171",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: debugBusyId === b.id ? "not-allowed" : "pointer",
-                      }}
+                      variant="destructive"
+                      size="icon-sm"
                     >
-                      <X size={14} />
-                    </button>
-                    <Link
-                      href={`/businesses/${b.id}/pipeline`}
+                      <X className="size-4" />
+                    </Button>
+                    <Button
+                      render={<Link href={`/businesses/${business.id}/pipeline`} />}
                       title="View pipeline logs"
-                      style={{
-                        width: "30px",
-                        height: "30px",
-                        borderRadius: "0.5rem",
-                        border: "1px solid rgba(251,191,36,0.25)",
-                        background: "rgba(251,191,36,0.1)",
-                        color: "#fbbf24",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        textDecoration: "none",
-                      }}
+                      variant="outline"
+                      size="icon-sm"
+                      className="border-amber-500/30 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20"
                     >
-                      <Eye size={14} />
-                    </Link>
+                      <Eye className="size-4" />
+                    </Button>
                   </>
                 ) : (
-                  <button
-                    onClick={(e) => openDebugStart(b.id, e.currentTarget)}
+                  <Button
+                    onClick={(event) => openDebugStart(business.id, event.currentTarget)}
                     title="Start pipeline debugging"
-                    style={{
-                      width: "30px",
-                      height: "30px",
-                      borderRadius: "0.5rem",
-                      border: "1px solid rgba(251,191,36,0.25)",
-                      background: debugTargetId === b.id ? "rgba(251,191,36,0.18)" : "rgba(251,191,36,0.08)",
-                      color: "#fbbf24",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      cursor: "pointer",
-                    }}
+                    variant="outline"
+                    size="icon-sm"
+                    className={cn(
+                      "border-amber-500/30 text-amber-500 hover:bg-amber-500/10",
+                      debugTargetId === business.id && "bg-amber-500/10"
+                    )}
                   >
-                    <Bug size={14} />
-                  </button>
+                    <Bug className="size-4" />
+                  </Button>
                 )}
-                <Link
-                  href={`/businesses/${b.id}`}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.25rem",
-                    padding: "0.375rem 0.75rem",
-                    background: "var(--accent-glow)",
-                    border: "1px solid rgba(99,102,241,0.2)",
-                    borderRadius: "0.5rem",
-                    fontSize: "0.8rem",
-                    fontWeight: 600,
-                    color: "var(--accent)",
-                    textDecoration: "none",
-                    transition: "all 0.15s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(99,102,241,0.2)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "var(--accent-glow)";
-                  }}
-                >
-                  View
-                  <ChevronRight size={13} />
-                </Link>
 
+                      <Button
+                        render={<Link href={`/businesses/${business.id}`} />}
+                        variant="outline"
+                        size="sm"
+                        className="text-primary"
+                      >
+                        View
+                        <ChevronRight className="size-3.5" />
+                      </Button>
               </div>
-            </div>
-          ))
-        )}
-      </div>
+            </TableCell>
+          </TableRow>
+        ))}
+      </AdminDataTable>
+
       {debugTargetId !== null && debugMenuPosition && createPortal(
         <>
           <button
             aria-label="Close debug menu"
             onClick={() => {
-              setDebugTargetId(null);
-              setDebugMenuPosition(null);
+              setDebugTargetId(null)
+              setDebugMenuPosition(null)
             }}
-            style={{
-              position: "fixed",
-              inset: 0,
-              zIndex: 40,
-              border: "none",
-              background: "transparent",
-              cursor: "default",
-            }}
+            className="fixed inset-0 z-40 cursor-default border-0 bg-transparent"
           />
           <div
-            className="z-50"
+            className="fixed z-50"
             style={{
-              position: "fixed",
               top: `${debugMenuPosition.top}px`,
               left: `${debugMenuPosition.left}px`,
               width: `${DEBUG_MENU_WIDTH}px`,
-              zIndex: 41,
             }}
           >
             <Card className="shadow-2xl">
               <CardHeader className="grid-cols-[1fr_auto]">
                 <div>
                   <CardTitle className="text-sm">Start pipeline debugging</CardTitle>
-                  <CardDescription className="text-xs">Capture all text pipeline events for this business.</CardDescription>
+                  <CardDescription className="text-xs">
+                    Capture all text pipeline events for this business.
+                  </CardDescription>
                 </div>
                 <Button
                   onClick={() => {
-                    setDebugTargetId(null);
-                    setDebugMenuPosition(null);
+                    setDebugTargetId(null)
+                    setDebugMenuPosition(null)
                   }}
                   size="icon-sm"
                   variant="ghost"
                 >
-                  <X />
+                  <X className="size-4" />
                 </Button>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -480,7 +338,7 @@ export default function BusinessesPage() {
                 </div>
                 <Input
                   value={debugReason}
-                  onChange={(e) => setDebugReason(e.target.value)}
+                  onChange={(event) => setDebugReason(event.target.value)}
                   placeholder="Reason (optional)"
                 />
                 {debugError && <p className="text-xs font-semibold text-destructive">{debugError}</p>}
@@ -498,6 +356,6 @@ export default function BusinessesPage() {
         </>,
         document.body
       )}
-    </div>
-  );
+    </AdminPage>
+  )
 }

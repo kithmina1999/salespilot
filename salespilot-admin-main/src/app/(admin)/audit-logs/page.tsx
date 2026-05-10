@@ -14,7 +14,6 @@ import {
   AlertCircle,
   Info,
   Shield,
-  ShoppingCart,
   CreditCard,
   Package,
   Settings,
@@ -41,7 +40,6 @@ type AuditLog = {
 };
 
 type Stats = { high: number; medium: number; low: number };
-
 type Business = { id: number; name: string };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -71,39 +69,32 @@ function parseMetadata(raw: string): object | null {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 function RiskBadge({ risk }: { risk: string }) {
-  const styles: Record<string, { bg: string; color: string; border: string; label: string }> = {
-    high:   { bg: "rgba(239,68,68,0.12)",   color: "#f87171", border: "rgba(239,68,68,0.35)",   label: "HIGH"   },
-    medium: { bg: "rgba(245,158,11,0.12)",  color: "#fbbf24", border: "rgba(245,158,11,0.35)",  label: "MEDIUM" },
-    low:    { bg: "rgba(34,197,94,0.1)",    color: "#4ade80", border: "rgba(34,197,94,0.3)",    label: "LOW"    },
+  const styles: Record<string, string> = {
+    high:   "bg-destructive/10 text-destructive border-destructive/30",
+    medium: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30",
+    low:    "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
   };
   const s = styles[risk?.toLowerCase()] ?? styles.low;
   return (
-    <span style={{
-      padding: "0.175rem 0.55rem",
-      background: s.bg, color: s.color, border: `1px solid ${s.border}`,
-      borderRadius: "999px", fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.07em",
-    }}>
-      {s.label}
+    <span className={`px-2.5 py-0.5 border rounded-full text-[0.65rem] font-bold tracking-widest uppercase ${s}`}>
+      {risk?.toLowerCase() || "low"}
     </span>
   );
 }
 
 function BusinessBadge({ name, plan, businessId }: { name: string; plan: string; businessId: number }) {
   const planColors: Record<string, string> = {
-    pro: "#818cf8", starter: "#4ade80", growth: "#4ade80", free: "#94a3b8",
+    pro: "text-blue-500 dark:text-blue-400", 
+    starter: "text-emerald-500 dark:text-emerald-400", 
+    growth: "text-emerald-500 dark:text-emerald-400", 
+    free: "text-muted-foreground",
   };
-  const color = planColors[plan?.toLowerCase()] ?? "#94a3b8";
+  const color = planColors[plan?.toLowerCase()] ?? "text-muted-foreground";
   // Super admin / platform-level actions have no business
   const displayName = name || (businessId === 0 ? "Platform" : "—");
-  const displayColor = businessId === 0 ? "#fbbf24" : color;
+  const displayColor = businessId === 0 ? "text-amber-500 dark:text-amber-400" : color;
   return (
-    <span style={{
-      padding: "0.175rem 0.55rem",
-      background: "rgba(255,255,255,0.06)", color: displayColor, border: `1px solid ${displayColor}33`,
-      borderRadius: "999px", fontSize: "0.7rem", fontWeight: 600,
-      maxWidth: "140px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-      display: "inline-block",
-    }}>
+    <span className={`px-2 py-0.5 bg-secondary border border-border rounded-full text-[0.7rem] font-semibold max-w-[140px] truncate inline-block ${displayColor}`}>
       {displayName}
     </span>
   );
@@ -111,34 +102,28 @@ function BusinessBadge({ name, plan, businessId }: { name: string; plan: string;
 
 function CategoryIcon({ category }: { category: string }) {
   const icons: Record<string, React.ReactNode> = {
-    billing:  <CreditCard size={13} color="#818cf8" />,
-    security: <Shield    size={13} color="#f87171" />,
-    bot:      <Bot       size={13} color="#60a5fa" />,
-    catalog:  <Package   size={13} color="#4ade80" />,
-    system:   <Settings  size={13} color="#fbbf24" />,
+    billing:  <CreditCard className="w-3.5 h-3.5 text-blue-500" />,
+    security: <Shield    className="w-3.5 h-3.5 text-destructive" />,
+    bot:      <Bot       className="w-3.5 h-3.5 text-primary" />,
+    catalog:  <Package   className="w-3.5 h-3.5 text-emerald-500" />,
+    system:   <Settings  className="w-3.5 h-3.5 text-amber-500" />,
   };
-  return <span style={{ display: "flex", alignItems: "center" }}>{icons[category] ?? <Info size={13} color="#94a3b8" />}</span>;
+  return <span className="flex items-center">{icons[category] ?? <Info className="w-3.5 h-3.5 text-foreground" />}</span>;
 }
 
 function ActorBadge({ actorType }: { actorType: string }) {
-  const styles: Record<string, { bg: string; color: string }> = {
-    super_admin: { bg: "rgba(99,102,241,0.12)", color: "#818cf8" },
-    user:        { bg: "rgba(255,255,255,0.06)", color: "#e2e8f0" },
-    system:      { bg: "rgba(245,158,11,0.1)",  color: "#fbbf24" },
+  const styles: Record<string, string> = {
+    super_admin: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
+    user:        "bg-secondary text-foreground border border-border/50",
+    system:      "bg-amber-500/10 text-amber-600 dark:text-amber-400",
   };
   const s = styles[actorType] ?? styles.user;
   return (
-    <span style={{
-      padding: "0.125rem 0.45rem",
-      background: s.bg, color: s.color, borderRadius: "999px",
-      fontSize: "0.68rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em",
-    }}>
+    <span className={`px-2 py-0.5 rounded-full text-[0.68rem] font-semibold uppercase tracking-wider ${s}`}>
       {actorType?.replace("_", " ")}
     </span>
   );
 }
-
-
 
 // ── Filter Pill ───────────────────────────────────────────────────────────────
 function FilterPill({
@@ -147,17 +132,11 @@ function FilterPill({
   return (
     <button
       onClick={onClick}
-      style={{
-        padding: "0.375rem 0.875rem",
-        borderRadius: "999px",
-        fontSize: "0.8rem", fontWeight: 600,
-        background: active ? "var(--accent)" : "rgba(255,255,255,0.05)",
-        color: active ? "#fff" : "var(--muted)",
-        border: `1px solid ${active ? "var(--accent)" : "var(--border-2)"}`,
-        cursor: "pointer", fontFamily: "inherit",
-        transition: "all 0.15s",
-        boxShadow: active ? "0 0 10px rgba(99,102,241,0.3)" : "none",
-      }}
+      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 border outline-none cursor-pointer ${
+        active 
+          ? "bg-primary text-primary-foreground border-primary shadow-[0_0_10px_rgba(99,102,241,0.3)]" 
+          : "bg-secondary text-muted-foreground border-transparent hover:border-border hover:bg-secondary/80"
+      }`}
     >
       {label}
     </button>
@@ -249,112 +228,79 @@ export default function AuditLogsPage() {
   const totalEvents = stats.high + stats.medium + stats.low;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }} className="animate-fade-up">
+    <div className="flex flex-col gap-7 animate-fade-up">
 
       {/* ── Header ── */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", marginBottom: "0.375rem" }}>
-            <div style={{
-              width: "34px", height: "34px", borderRadius: "10px",
-              background: "linear-gradient(135deg, rgba(99,102,241,0.2), rgba(99,102,241,0.1))",
-              border: "1px solid rgba(99,102,241,0.25)", display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <ScrollText size={17} color="var(--accent)" />
+          <div className="flex items-center gap-2.5 mb-1.5">
+            <div className="w-[34px] h-[34px] rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+              <ScrollText className="w-4 h-4 text-primary" />
             </div>
-            <h1 style={{ fontSize: "1.625rem", fontWeight: 900, color: "var(--text)", letterSpacing: "-0.03em" }}>
+            <h1 className="text-2xl font-black text-foreground tracking-tight">
               Audit Logs
             </h1>
           </div>
-          <p style={{ fontSize: "0.875rem", color: "var(--muted)", marginLeft: "0.25rem" }}>
+          <p className="text-sm text-muted-foreground ml-1">
             {formatDisplayDate(selectedDate)} · {loading ? "Loading…" : `${logs.length} events`}
           </p>
         </div>
 
         {/* Action buttons */}
-        <div style={{ display: "flex", gap: "0.625rem", alignItems: "center" }}>
+        <div className="flex gap-2.5 items-center">
           <button
             id="audit-refresh-btn"
             onClick={() => loadLogs(true)}
             disabled={refreshing}
-            style={{
-              display: "flex", alignItems: "center", gap: "0.4rem",
-              padding: "0.5rem 0.875rem",
-              background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-2)",
-              borderRadius: "0.625rem", color: "var(--muted)", fontSize: "0.8375rem", fontWeight: 600,
-              cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "var(--text)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; e.currentTarget.style.color = "var(--muted)"; }}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-card border border-border rounded-lg text-muted-foreground text-sm font-semibold transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50 outline-none cursor-pointer"
           >
-            <RefreshCw size={14} style={{ animation: refreshing ? "spin 1s linear infinite" : "none" }} />
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
           </button>
           <button
             id="audit-export-btn"
             onClick={handleExport}
-            style={{
-              display: "flex", alignItems: "center", gap: "0.4rem",
-              padding: "0.5rem 0.875rem",
-              background: "var(--accent)", border: "none",
-              borderRadius: "0.625rem", color: "#fff", fontSize: "0.8375rem", fontWeight: 600,
-              cursor: "pointer", fontFamily: "inherit",
-              boxShadow: "0 4px 12px rgba(99,102,241,0.35)", transition: "opacity 0.15s",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.85")}
-            onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-primary border-none rounded-lg text-primary-foreground text-sm font-semibold transition-opacity hover:opacity-85 shadow-[0_4px_12px_rgba(99,102,241,0.35)] outline-none cursor-pointer"
           >
-            <Download size={14} />
+            <Download className="w-3.5 h-3.5" />
             Export CSV
           </button>
         </div>
       </div>
 
       {/* ── Stats Row ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.875rem" }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {[
-          { label: "Total Events",    value: totalEvents, icon: <ScrollText size={16} color="#818cf8" />, color: "#818cf8", glow: "rgba(99,102,241,0.15)" },
-          { label: "High Risk",       value: stats.high,  icon: <AlertTriangle size={16} color="#f87171" />, color: "#f87171", glow: "rgba(239,68,68,0.12)" },
-          { label: "Medium Risk",     value: stats.medium, icon: <AlertCircle size={16} color="#fbbf24" />, color: "#fbbf24", glow: "rgba(245,158,11,0.12)" },
-          { label: "Low Risk",        value: stats.low,   icon: <Info size={16} color="#4ade80" />, color: "#4ade80", glow: "rgba(34,197,94,0.1)" },
+          { label: "Total Events",    value: totalEvents, icon: <ScrollText className="w-4 h-4 text-blue-500" />, bg: "bg-blue-500/10", border: "border-blue-500/20", color: "text-blue-500 dark:text-blue-400" },
+          { label: "High Risk",       value: stats.high,  icon: <AlertTriangle className="w-4 h-4 text-destructive" />, bg: "bg-destructive/10", border: "border-destructive/20", color: "text-destructive" },
+          { label: "Medium Risk",     value: stats.medium, icon: <AlertCircle className="w-4 h-4 text-amber-500" />, bg: "bg-amber-500/10", border: "border-amber-500/20", color: "text-amber-500 dark:text-amber-400" },
+          { label: "Low Risk",        value: stats.low,   icon: <Info className="w-4 h-4 text-emerald-500" />, bg: "bg-emerald-500/10", border: "border-emerald-500/20", color: "text-emerald-500 dark:text-emerald-400" },
         ].map((s) => (
-          <div key={s.label} style={{
-            background: "var(--surface)", border: "1px solid var(--border)",
-            borderRadius: "0.875rem", padding: "1rem 1.25rem",
-            display: "flex", alignItems: "center", gap: "0.875rem",
-          }}>
-            <div style={{
-              width: "36px", height: "36px", borderRadius: "10px",
-              background: s.glow, border: `1px solid ${s.color}33`,
-              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            }}>
+          <div key={s.label} className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3.5">
+            <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${s.bg} ${s.border}`}>
               {s.icon}
             </div>
             <div>
-              <div style={{ fontSize: "1.625rem", fontWeight: 900, color: s.color, lineHeight: 1 }}>
+              <div className={`text-2xl font-black leading-none ${s.color}`}>
                 {loading ? "—" : s.value}
               </div>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.2rem" }}>{s.label}</div>
+              <div className="text-xs text-muted-foreground mt-1">{s.label}</div>
             </div>
           </div>
         ))}
       </div>
 
       {/* ── Filter Bar ── */}
-      <div style={{
-        background: "var(--surface)", border: "1px solid var(--border)",
-        borderRadius: "1rem", padding: "1.125rem 1.25rem",
-        display: "flex", flexDirection: "column", gap: "1rem",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--muted)", fontSize: "0.8rem", fontWeight: 600 }}>
-          <Filter size={13} />
+      <div className="bg-card border border-border rounded-2xl p-[1.125rem_1.25rem] flex flex-col gap-4">
+        <div className="flex items-center gap-2 text-muted-foreground text-xs font-semibold">
+          <Filter className="w-3.5 h-3.5" />
           FILTERS
         </div>
 
         {/* Row 1: Date nav + search */}
-        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+        <div className="flex gap-3 flex-wrap items-center">
           {/* Quick shortcuts */}
-          <div style={{ display: "flex", gap: "0.375rem" }}>
+          <div className="flex gap-1.5">
             {quickDates.map((qd) => (
               <FilterPill
                 key={qd.label}
@@ -366,51 +312,36 @@ export default function AuditLogsPage() {
           </div>
 
           {/* Calendar picker */}
-          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-            <Calendar size={14} color="var(--muted)" />
+          <div className="flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
             <input
               id="audit-date-picker"
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              style={{
-                background: "var(--surface-2)", border: "1px solid var(--border-2)",
-                borderRadius: "0.5rem", color: "var(--text)", fontSize: "0.8375rem",
-                padding: "0.375rem 0.625rem", cursor: "pointer", fontFamily: "inherit",
-                outline: "none",
-              }}
-              onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-              onBlur={(e) => (e.target.style.borderColor = "var(--border-2)")}
+              className="bg-secondary border border-transparent focus:border-primary rounded-lg text-foreground text-sm px-2.5 py-1.5 cursor-pointer outline-none transition-colors"
             />
           </div>
 
           {/* Text search */}
-          <div style={{ position: "relative", flex: 1, minWidth: "200px" }}>
-            <Search size={14} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "var(--muted)", pointerEvents: "none" }} />
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <input
               id="audit-search-input"
               type="text"
               placeholder="Search business, action, entity…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{
-                width: "100%", paddingLeft: "2.25rem", paddingRight: "0.875rem",
-                paddingTop: "0.5rem", paddingBottom: "0.5rem",
-                background: "var(--surface-2)", border: "1px solid var(--border-2)",
-                borderRadius: "0.625rem", color: "var(--text)", fontSize: "0.875rem",
-                outline: "none", fontFamily: "inherit", transition: "border-color 0.15s",
-              }}
-              onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-              onBlur={(e) => (e.target.style.borderColor = "var(--border-2)")}
+              className="w-full pl-9 pr-3.5 py-2 bg-secondary border border-transparent focus:border-primary rounded-lg text-foreground text-sm outline-none transition-colors"
             />
           </div>
         </div>
 
         {/* Row 2: Risk / Category / Actor / Business */}
-        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+        <div className="flex gap-3 flex-wrap items-center">
           {/* Risk */}
-          <div style={{ display: "flex", gap: "0.375rem", alignItems: "center" }}>
-            <span style={{ fontSize: "0.75rem", color: "var(--muted)", fontWeight: 600, marginRight: "0.125rem" }}>Risk</span>
+          <div className="flex gap-1.5 items-center">
+            <span className="text-xs text-muted-foreground font-semibold mr-0.5">Risk</span>
             {(["", "high", "medium", "low"] as const).map((r) => (
               <FilterPill key={r || "all"} label={r || "All"} active={risk === r} onClick={() => setRisk(r)} />
             ))}
@@ -421,14 +352,7 @@ export default function AuditLogsPage() {
             id="audit-category-filter"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            style={{
-              background: "var(--surface-2)", border: "1px solid var(--border-2)",
-              borderRadius: "0.5rem", color: category ? "var(--text)" : "var(--muted)",
-              fontSize: "0.8375rem", padding: "0.375rem 0.75rem", cursor: "pointer",
-              fontFamily: "inherit", outline: "none",
-            }}
-            onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-            onBlur={(e) => (e.target.style.borderColor = "var(--border-2)")}
+            className={`bg-secondary border border-transparent focus:border-primary rounded-lg text-sm px-3 py-1.5 cursor-pointer outline-none transition-colors ${category ? "text-foreground" : "text-muted-foreground"}`}
           >
             <option value="">All Categories</option>
             <option value="billing">💳 Billing</option>
@@ -443,14 +367,7 @@ export default function AuditLogsPage() {
             id="audit-actor-filter"
             value={actorType}
             onChange={(e) => setActorType(e.target.value)}
-            style={{
-              background: "var(--surface-2)", border: "1px solid var(--border-2)",
-              borderRadius: "0.5rem", color: actorType ? "var(--text)" : "var(--muted)",
-              fontSize: "0.8375rem", padding: "0.375rem 0.75rem", cursor: "pointer",
-              fontFamily: "inherit", outline: "none",
-            }}
-            onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-            onBlur={(e) => (e.target.style.borderColor = "var(--border-2)")}
+            className={`bg-secondary border border-transparent focus:border-primary rounded-lg text-sm px-3 py-1.5 cursor-pointer outline-none transition-colors ${actorType ? "text-foreground" : "text-muted-foreground"}`}
           >
             <option value="">All Actors</option>
             <option value="super_admin">🛡️ Super Admin</option>
@@ -463,14 +380,7 @@ export default function AuditLogsPage() {
             id="audit-business-filter"
             value={businessId}
             onChange={(e) => setBusinessId(e.target.value)}
-            style={{
-              background: "var(--surface-2)", border: "1px solid var(--border-2)",
-              borderRadius: "0.5rem", color: businessId ? "var(--text)" : "var(--muted)",
-              fontSize: "0.8375rem", padding: "0.375rem 0.75rem", cursor: "pointer",
-              fontFamily: "inherit", outline: "none", maxWidth: "200px",
-            }}
-            onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-            onBlur={(e) => (e.target.style.borderColor = "var(--border-2)")}
+            className={`bg-secondary border border-transparent focus:border-primary rounded-lg text-sm px-3 py-1.5 cursor-pointer outline-none transition-colors max-w-[200px] ${businessId ? "text-foreground" : "text-muted-foreground"}`}
           >
             <option value="">All Businesses</option>
             {businesses.map((b) => (
@@ -482,14 +392,7 @@ export default function AuditLogsPage() {
           {(risk || category || actorType || businessId || search) && (
             <button
               onClick={() => { setRisk(""); setCategory(""); setActorType(""); setBusinessId(""); setSearch(""); }}
-              style={{
-                padding: "0.375rem 0.75rem", borderRadius: "0.5rem",
-                background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)",
-                color: "#f87171", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer",
-                fontFamily: "inherit", transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(239,68,68,0.15)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(239,68,68,0.08)")}
+              className="px-3 py-1.5 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm font-semibold transition-colors hover:bg-destructive/20 outline-none cursor-pointer"
             >
               Clear filters
             </button>
@@ -498,43 +401,27 @@ export default function AuditLogsPage() {
       </div>
 
       {/* ── Log Table ── */}
-      <div style={{
-        background: "var(--surface)", border: "1px solid var(--border)",
-        borderRadius: "1rem", overflow: "hidden",
-      }}>
+      <div className="bg-card border border-border rounded-2xl overflow-hidden">
         {/* Table Header */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "75px 1fr 130px 110px 95px 90px 90px",
-          padding: "0.625rem 1.25rem",
-          background: "rgba(255,255,255,0.02)",
-          borderBottom: "1px solid var(--border)",
-          gap: "0.75rem",
-          alignItems: "center",
-        }}>
+        <div className="grid grid-cols-[75px_1fr_130px_110px_95px_90px_90px] px-5 py-2.5 bg-secondary border-b border-border gap-3 items-center">
           {["Time", "Action / Entity", "Business", "Actor", "Category", "Risk", "Details"].map((h) => (
-            <span key={h} style={{ fontSize: "0.7rem", fontWeight: 600, color: "var(--muted)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+            <span key={h} className="text-[0.7rem] font-semibold text-muted-foreground tracking-wider uppercase">
               {h}
             </span>
           ))}
         </div>
 
         {loading ? (
-          <div style={{ padding: "2rem 1.25rem" }}>
+          <div className="p-5">
             {[...Array(6)].map((_, i) => (
-              <div key={i} style={{
-                height: "48px", background: "var(--surface-2)", borderRadius: "0.5rem",
-                marginBottom: "0.5rem", opacity: 1 - i * 0.12,
-                animation: "pulse 1.8s ease-in-out infinite",
-                animationDelay: `${i * 80}ms`,
-              }} />
+              <div key={i} className="h-12 bg-secondary rounded-lg mb-2 animate-pulse" style={{ animationDelay: `${i * 80}ms`, opacity: 1 - i * 0.12 }} />
             ))}
           </div>
         ) : logs.length === 0 ? (
-          <div style={{ padding: "5rem", textAlign: "center" }}>
-            <ScrollText size={36} style={{ color: "var(--muted)", margin: "0 auto 1rem" }} />
-            <p style={{ color: "var(--muted)", fontSize: "0.95rem", fontWeight: 600 }}>No events for {formatDisplayDate(selectedDate)}</p>
-            <p style={{ color: "var(--muted-2)", fontSize: "0.8375rem", marginTop: "0.375rem" }}>Try a different date or adjust your filters.</p>
+          <div className="p-20 text-center flex flex-col items-center">
+            <ScrollText className="w-9 h-9 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground text-[0.95rem] font-semibold">No events for {formatDisplayDate(selectedDate)}</p>
+            <p className="text-muted-foreground opacity-60 text-sm mt-1.5">Try a different date or adjust your filters.</p>
           </div>
         ) : (
           logs.map((log, idx) => {
@@ -545,67 +432,56 @@ export default function AuditLogsPage() {
             return (
               <div
                 key={log.id}
-                style={{
-                  borderBottom: idx < logs.length - 1 ? "1px solid var(--border)" : "none",
-                  transition: "background 0.12s",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.02)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                className={`transition-colors hover:bg-secondary/50 ${idx < logs.length - 1 ? "border-b border-border" : ""}`}
               >
-                <div style={{
-                  display: "grid",
-                  gridTemplateColumns: "75px 1fr 130px 110px 95px 90px 90px",
-                  padding: "0.875rem 1.25rem",
-                  gap: "0.75rem",
-                  alignItems: "center",
-                }}>
+                <div className="grid grid-cols-[75px_1fr_130px_110px_95px_90px_90px] px-5 py-3.5 gap-3 items-center">
                   {/* Time */}
-                  <span style={{ fontSize: "0.72rem", color: "var(--muted-2)", fontFamily: "monospace", paddingTop: "0.125rem" }}>
+                  <span className="text-[0.72rem] text-muted-foreground font-mono pt-0.5">
                     {formatDate(log.created_at)}
                   </span>
 
                   {/* Action / Entity */}
                   <div>
-                    <p style={{ fontSize: "0.8375rem", fontWeight: 600, color: "var(--text)", fontFamily: "monospace" }}>
+                    <p className="text-sm font-semibold text-foreground font-mono">
                       {log.action}
                     </p>
                     {log.entity_type && (
-                      <p style={{ fontSize: "0.72rem", color: "var(--muted-2)", marginTop: "1px" }}>
+                      <p className="text-[0.72rem] text-muted-foreground mt-[1px]">
                         {log.entity_type}{log.entity_id ? ` #${log.entity_id}` : ""}
                       </p>
                     )}
                   </div>
 
                   {/* Business badge */}
-                  <div style={{ paddingTop: "0.125rem" }}>
+                  <div className="pt-0.5">
                     <BusinessBadge name={log.business_name} plan={log.business_plan} businessId={log.business_id} />
                   </div>
 
                   {/* Actor */}
-                  <div style={{ paddingTop: "0.125rem" }}>
+                  <div className="pt-0.5">
                     <ActorBadge actorType={log.actor_type} />
                     {log.ip_address && (
-                      <p style={{ fontSize: "0.68rem", color: "var(--muted-2)", marginTop: "3px", fontFamily: "monospace" }}>
+                      <p className="text-[0.68rem] text-muted-foreground mt-1 font-mono">
                         {log.ip_address}
                       </p>
                     )}
                   </div>
 
                   {/* Category */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", paddingTop: "0.125rem" }}>
+                  <div className="flex items-center gap-1 pt-0.5">
                     <CategoryIcon category={log.category} />
-                    <span style={{ fontSize: "0.72rem", color: "var(--muted)", textTransform: "capitalize" }}>
+                    <span className="text-[0.72rem] text-muted-foreground capitalize">
                       {log.category || "—"}
                     </span>
                   </div>
 
                   {/* Risk */}
-                  <div style={{ paddingTop: "0.125rem" }}>
+                  <div className="pt-0.5">
                     <RiskBadge risk={log.risk} />
                   </div>
 
                   {/* Details Toggle */}
-                  <div style={{ paddingTop: "0.125rem" }}>
+                  <div className="pt-0.5">
                     {hasMeta ? (
                       <button
                         onClick={() => {
@@ -614,43 +490,25 @@ export default function AuditLogsPage() {
                           else newSet.add(log.id);
                           setExpandedIds(newSet);
                         }}
-                        style={{
-                          display: "flex", alignItems: "center", gap: "0.3rem",
-                          background: isExpanded ? "rgba(99,102,241,0.1)" : "rgba(255,255,255,0.05)", 
-                          border: "1px solid var(--border-2)",
-                          borderRadius: "0.375rem", padding: "0.2rem 0.5rem",
-                          color: isExpanded ? "#818cf8" : "var(--muted)", 
-                          fontSize: "0.7rem", cursor: "pointer", fontFamily: "inherit",
-                          transition: "all 0.15s",
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(99,102,241,0.1)"; e.currentTarget.style.color = "#818cf8"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = isExpanded ? "rgba(99,102,241,0.1)" : "rgba(255,255,255,0.05)"; e.currentTarget.style.color = isExpanded ? "#818cf8" : "var(--muted)"; }}
+                        className={`flex items-center gap-1 border rounded-md px-2 py-1 text-[0.7rem] cursor-pointer outline-none transition-colors ${
+                          isExpanded 
+                            ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-500 dark:text-indigo-400" 
+                            : "bg-secondary border-transparent text-muted-foreground hover:border-border"
+                        }`}
                       >
-                        {isExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                        {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                         Details
                       </button>
                     ) : (
-                      <span style={{ color: "var(--muted-2)", fontSize: "0.75rem", paddingLeft: "0.5rem" }}>—</span>
+                      <span className="text-muted-foreground text-xs pl-2 opacity-60">—</span>
                     )}
                   </div>
                 </div>
 
                 {/* Expanded Details Content */}
                 {isExpanded && hasMeta && (
-                  <div style={{ padding: "0 1.25rem 1.25rem 1.25rem" }}>
-                    <pre style={{
-                      margin: 0,
-                      padding: "0.75rem 1rem",
-                      background: "rgba(0,0,0,0.35)",
-                      border: "1px solid var(--border)",
-                      borderRadius: "0.5rem",
-                      fontSize: "0.75rem",
-                      color: "#a5f3fc",
-                      overflow: "auto",
-                      maxHeight: "300px",
-                      lineHeight: 1.6,
-                      fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                    }}>
+                  <div className="px-5 pb-5">
+                    <pre className="m-0 p-4 bg-card border border-border rounded-lg text-xs text-foreground overflow-auto max-h-[300px] leading-relaxed font-mono">
                       {JSON.stringify(parsedMeta, null, 2)}
                     </pre>
                   </div>
@@ -660,11 +518,6 @@ export default function AuditLogsPage() {
           })
         )}
       </div>
-
-      <style>{`
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-        @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-      `}</style>
     </div>
   );
 }
