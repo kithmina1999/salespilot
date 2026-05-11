@@ -284,3 +284,62 @@ func OverrideBusinessQuotas(c *gin.Context) {
 	database.DB.First(&business, id)
 	c.JSON(http.StatusOK, gin.H{"message": "Quotas overridden successfully", "business": buildSystemBusinessResponse(business)})
 }
+
+// ResetBusinessUsage allows super admin to surgically reset usage counters with an audit log
+func ResetBusinessUsage(c *gin.Context) {
+	id := c.Param("id")
+
+	var req struct {
+		Counters []string `json:"counters" binding:"required"`
+		Reason   string   `json:"reason" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	if len(req.Counters) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No counters selected for reset"})
+		return
+	}
+
+	var business models.Business
+	if err := database.DB.First(&business, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Business not found"})
+		return
+	}
+
+	updates := map[string]interface{}{}
+	auditMeta := map[string]interface{}{
+		"reason":         req.Reason,
+		"reset_counters": req.Counters,
+	}
+
+	for _, counter := range req.Counters {
+		switch counter {
+		case "ai":
+			updates["ai_message_count"] = 0
+		case "inbound":
+			updates["system_message_count"] = 0
+		case "simulation":
+			updates["simulation_count"] = 0
+		case "rule_gen":
+			updates["rule_generation_count"] = 0
+		}
+	}
+
+	if len(updates) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid counters provided"})
+		return
+	}
+
+	if err := database.DB.Model(&business).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset business usage"})
+		return
+	}
+
+	LogActivity(business.ID, "super_admin", 0, "usage_reset", "billing", "", auditMeta, c.ClientIP(), "medium", business.Name, business.Plan)
+
+	database.DB.First(&business, id)
+	c.JSON(http.StatusOK, gin.H{"message": "Usage counters reset successfully", "business": buildSystemBusinessResponse(business)})
+}

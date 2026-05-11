@@ -124,6 +124,7 @@ func main() {
 		system.GET("/businesses/:id", middleware.RequireSuperPermission(middleware.PermBusinessView), handlers.GetSystemBusiness)
 		system.PATCH("/businesses/:id/plan", middleware.RequireSuperPermission(middleware.PermPlanManage), middleware.HighRiskRoute("force_plan"), handlers.OverrideBusinessPlan)
 		system.PATCH("/businesses/:id/quotas", middleware.RequireSuperPermission(middleware.PermPlanManage), middleware.HighRiskRoute("override_quotas"), handlers.OverrideBusinessQuotas)
+		system.POST("/businesses/:id/reset-usage", middleware.RequireSuperPermission(middleware.PermPlanManage), middleware.HighRiskRoute("reset_usage"), handlers.ResetBusinessUsage)
 		system.POST("/businesses/:id/suspend", middleware.RequireSuperPermission(middleware.PermBusinessManage), middleware.HighRiskRoute("suspend_business"), handlers.SuspendBusiness)
 		system.POST("/businesses/:id/unsuspend", middleware.RequireSuperPermission(middleware.PermBusinessManage), middleware.HighRiskRoute("unsuspend_business"), handlers.UnsuspendBusiness)
 		system.POST("/businesses/:id/debug-mode", middleware.RequireSuperPermission(middleware.PermBusinessManage), handlers.ToggleDebugMode)

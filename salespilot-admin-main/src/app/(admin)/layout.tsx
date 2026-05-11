@@ -14,6 +14,7 @@ import {
   ScrollText,
   Settings2,
   Shield,
+  BarChart3,
 } from "lucide-react"
 
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -46,6 +47,7 @@ import { useAuth } from "@/lib/auth-context"
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, section: "main" },
   { href: "/businesses", label: "Businesses", icon: Building2, section: "main" },
+  { href: "/usage", label: "Usage & Quotas", icon: BarChart3, section: "main" },
   { href: "/activation-codes", label: "Activation Codes", icon: KeyRound, section: "main" },
   { href: "/audit-logs", label: "Audit Logs", icon: ScrollText, section: "main" },
   { href: "/revenue", label: "Revenue", icon: DollarSign, section: "main" },
