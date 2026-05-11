@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "SalesPilot",
+    "slug": "salespilot-mobile",
+    "scheme": "salespilot",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "platforms": ["android", "ios"],
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "SalesPilot needs access to product and receipt photos.",
+          "cameraPermission": "SalesPilot needs camera access to capture product and receipt photos."
+        }
+      ]
+    ],
+    "android": {
+      "package": "lk.salespilot.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#F8FAFC"
+      },
+      "permissions": ["CAMERA", "POST_NOTIFICATIONS"]
+    },
+    "ios": {
+      "bundleIdentifier": "lk.salespilot.mobile"
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
