@@ -9,7 +9,7 @@ import (
 	"github.com/kithmina1999/salespilot/models"
 )
 
-type usageEntitlements struct {
+type UsageEntitlements struct {
 	ActiveTrial           bool
 	MaxProducts           int
 	MaxRules              int
@@ -17,19 +17,21 @@ type usageEntitlements struct {
 	MaxSystemMessages     int
 	MaxRuleGens           int
 	MaxStorageBytes       int64
+	MaxFileSizeBytes      int64
 	CanUploadCloudinary   bool
 	CanSendWhatsAppImages bool
 	CanUseGeminiVision    bool
 }
 
-func getUsageEntitlements(biz models.Business, now time.Time) usageEntitlements {
-	ent := usageEntitlements{
+func GetUsageEntitlements(biz models.Business, now time.Time) UsageEntitlements {
+	ent := UsageEntitlements{
 		MaxProducts:       models.FreeProductLimit,
 		MaxRules:          models.FreeRuleLimit,
 		MaxAIMessages:     models.FreeAILimit,
 		MaxSystemMessages: models.FreeMsgLimit,
 		MaxRuleGens:       models.FreeRuleGenLimit,
 		MaxStorageBytes:   0,
+		MaxFileSizeBytes:  0,
 	}
 
 	paidPlanActive := biz.PlanExpiresAt == nil || biz.PlanExpiresAt.After(now)
@@ -41,7 +43,8 @@ func getUsageEntitlements(biz models.Business, now time.Time) usageEntitlements 
 		ent.MaxAIMessages = models.StarterAILimit
 		ent.MaxSystemMessages = -1
 		ent.MaxRuleGens = models.StarterRuleGenLimit
-		ent.MaxStorageBytes = 500 * 1024 * 1024
+		ent.MaxStorageBytes = 100 * 1024 * 1024
+		ent.MaxFileSizeBytes = 2 * 1024 * 1024
 		ent.CanUploadCloudinary = true
 		ent.CanSendWhatsAppImages = true
 		return ent
@@ -51,7 +54,8 @@ func getUsageEntitlements(biz models.Business, now time.Time) usageEntitlements 
 		ent.MaxAIMessages = models.ProAILimit
 		ent.MaxSystemMessages = -1
 		ent.MaxRuleGens = models.ProRuleGenLimit
-		ent.MaxStorageBytes = 1024 * 1024 * 1024
+		ent.MaxStorageBytes = 500 * 1024 * 1024
+		ent.MaxFileSizeBytes = 5 * 1024 * 1024
 		ent.CanUploadCloudinary = true
 		ent.CanSendWhatsAppImages = true
 		ent.CanUseGeminiVision = true
@@ -65,6 +69,9 @@ func getUsageEntitlements(biz models.Business, now time.Time) usageEntitlements 
 		ent.MaxAIMessages = models.TrialAILimit
 		ent.MaxSystemMessages = models.TrialMsgLimit
 		ent.MaxRuleGens = models.StarterRuleGenLimit
+		ent.MaxStorageBytes = 10 * 1024 * 1024
+		ent.MaxFileSizeBytes = 2 * 1024 * 1024
+		ent.CanUploadCloudinary = true
 	}
 
 	return ent
@@ -85,7 +92,7 @@ func GetUsageStats(c *gin.Context) {
 	var ruleCount int64
 	database.DB.Model(&models.Rule{}).Where("business_id = ?", businessID).Count(&ruleCount)
 
-	ent := getUsageEntitlements(biz, time.Now())
+	ent := GetUsageEntitlements(biz, time.Now())
 
 	c.JSON(http.StatusOK, gin.H{
 		"plan":                  biz.Plan,
@@ -105,6 +112,7 @@ func GetUsageStats(c *gin.Context) {
 		"system_messages_limit": ent.MaxSystemMessages,
 		"storage_used_bytes":    biz.TotalStorageUsed,
 		"storage_limit_bytes":   ent.MaxStorageBytes,
+		"max_file_size_bytes":   ent.MaxFileSizeBytes,
 		"features": gin.H{
 			"cloudinary":      ent.CanUploadCloudinary,
 			"whatsapp_images": ent.CanSendWhatsAppImages,
@@ -125,7 +133,7 @@ func GetUsageStats(c *gin.Context) {
 				"ai_messages":     models.StarterAILimit,
 				"system_messages": -1,
 				"rule_gens":       models.StarterRuleGenLimit,
-				"storage_bytes":   500 * 1024 * 1024,
+				"storage_bytes":   100 * 1024 * 1024,
 			},
 			"pro": gin.H{
 				"products":        -1,
@@ -133,7 +141,7 @@ func GetUsageStats(c *gin.Context) {
 				"ai_messages":     models.ProAILimit,
 				"system_messages": -1,
 				"rule_gens":       models.ProRuleGenLimit,
-				"storage_bytes":   1024 * 1024 * 1024,
+				"storage_bytes":   500 * 1024 * 1024,
 			},
 		},
 	})

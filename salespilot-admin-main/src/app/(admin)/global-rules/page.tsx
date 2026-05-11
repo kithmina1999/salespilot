@@ -34,6 +34,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { api } from "@/lib/api"
+import { useAuth } from "@/lib/auth-context"
 
 interface GlobalRule {
   ID: number
@@ -102,6 +103,9 @@ export default function GlobalRulesPage() {
     ruleType: "faq" as RuleType,
   })
 
+  const { admin } = useAuth()
+  const isOwner = admin?.role === "owner"
+
   async function handleCreate(event: React.FormEvent) {
     event.preventDefault()
     setCreating(true)
@@ -148,7 +152,11 @@ export default function GlobalRulesPage() {
               <RefreshCw className={isLoading ? "size-4 animate-spin" : "size-4"} />
               Refresh
             </Button>
-            <Button onClick={() => setShowCreate(true)}>
+            <Button 
+              disabled={!isOwner} 
+              onClick={() => setShowCreate(true)}
+              title={!isOwner ? "Owner permissions required" : ""}
+            >
               <Plus className="size-4" />
               New Global Rule
             </Button>
@@ -277,9 +285,11 @@ export default function GlobalRulesPage() {
                     {rule.usage_count} hits
                   </span>
                   <Button
+                    disabled={!isOwner}
                     onClick={() => handleDelete(rule.ID)}
                     size="icon-sm"
                     variant="destructive"
+                    title={!isOwner ? "Owner permissions required" : ""}
                   >
                     <Trash2 className="size-4" />
                   </Button>

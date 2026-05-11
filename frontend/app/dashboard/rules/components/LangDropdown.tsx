@@ -55,7 +55,7 @@ export default function LangDropdown({
       <button
         type="button"
         onClick={() => setOpen(prev => !prev)}
-        className="flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-zinc-700/80 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 transition-all text-[11px] font-medium select-none"
+        className="flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-border/80 bg-muted hover:bg-secondary hover:border-zinc-600 transition-all text-[11px] font-medium select-none"
         title="Switch preview language"
       >
         {/* Active lang flag */}
@@ -75,15 +75,15 @@ export default function LangDropdown({
 
         <ChevronDown
           size={11}
-          className={`text-zinc-500 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
+          className={`text-muted-foreground transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
         />
       </button>
 
       {/* ── Dropdown panel ── */}
       {open && (
-        <div className="absolute bottom-full right-0 mb-1.5 w-52 bg-zinc-950 border border-zinc-800 rounded-2xl z-50 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-100">
+        <div className="absolute bottom-full right-0 mb-1.5 w-52 bg-background border border-border rounded-2xl z-50 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-100">
           {/* Panel header */}
-          <div className="px-3 py-2 border-b border-zinc-800/80 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+          <div className="px-3 py-2 border-b border-border/80 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
             Preview language
           </div>
 
@@ -109,8 +109,8 @@ export default function LangDropdown({
                     : !hasCoverage
                     ? 'opacity-45 cursor-default'
                     : isActive
-                    ? 'bg-zinc-800/80'
-                    : 'hover:bg-zinc-800/50 cursor-pointer',
+                    ? 'bg-secondary/80'
+                    : 'hover:bg-accent cursor-pointer',
                 ].join(' ')}
               >
                 {/* Flag */}
@@ -118,7 +118,7 @@ export default function LangDropdown({
 
                 {/* Labels */}
                 <span className="flex flex-col min-w-0">
-                  <span className={`text-[12px] font-semibold leading-tight ${enabled ? meta.color : 'text-zinc-500'}`}>
+                  <span className={`text-[12px] font-semibold leading-tight ${enabled ? meta.color : 'text-muted-foreground'}`}>
                     {meta.label}
                   </span>
                   {meta.nativeLabel !== meta.label && (

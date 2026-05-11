@@ -11,7 +11,13 @@ import {
   TrendingUp,
   Users,
   Zap,
+  CreditCard,
+  AlertTriangle,
+  WifiOff,
+  Ban,
+  CheckCircle2,
 } from "lucide-react"
+import Link from "next/link"
 import {
   Area,
   AreaChart,
@@ -35,6 +41,7 @@ import {
   AdminStatCard,
 } from "@/components/admin/page"
 import { api } from "@/lib/api"
+import { NoticeManager } from "./components/NoticeManager"
 
 type MetricsData = {
   businesses: {
@@ -67,6 +74,13 @@ type MetricsData = {
     near_ai_limit_count: number
     near_simulation_limit_count: number
     expired_paid_count: number
+  }
+  action_queue: {
+    pending_payments: number
+    expired_paid_plans: number
+    near_quota_tenants: number
+    disconnected_whatsapp: number
+    suspended_tenants: number
   }
 }
 
@@ -140,6 +154,78 @@ export default function DashboardPage() {
         badge={<AdminBadge>Live</AdminBadge>}
       />
 
+      {/* Operator Action Queue */}
+      <div className="flex flex-col gap-3">
+        <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+          <AlertTriangle className="size-4 text-amber-500" />
+          Operator Action Queue
+        </h3>
+        
+        {metrics.action_queue.pending_payments === 0 && 
+         metrics.action_queue.expired_paid_plans === 0 && 
+         metrics.action_queue.near_quota_tenants === 0 && 
+         metrics.action_queue.disconnected_whatsapp === 0 && 
+         metrics.action_queue.suspended_tenants === 0 ? (
+          <AdminCard className="p-4 border-emerald-500/20 bg-emerald-500/5">
+            <div className="flex items-center gap-3 text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="size-5" />
+              <div>
+                <p className="text-sm font-bold">All clear!</p>
+                <p className="text-xs opacity-90">No pending operator actions required at this time.</p>
+              </div>
+            </div>
+          </AdminCard>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            {metrics.action_queue.pending_payments > 0 && (
+              <ActionCard 
+                href="/activation-codes" // Using activation-codes as proxy since payments page is missing
+                icon={CreditCard} 
+                count={metrics.action_queue.pending_payments} 
+                label="Pending Payments" 
+                tone="warning" 
+              />
+            )}
+            {metrics.action_queue.expired_paid_plans > 0 && (
+              <ActionCard 
+                href="/businesses" 
+                icon={AlertTriangle} 
+                count={metrics.action_queue.expired_paid_plans} 
+                label="Expired Paid Plans" 
+                tone="destructive" 
+              />
+            )}
+            {metrics.action_queue.near_quota_tenants > 0 && (
+              <ActionCard 
+                href="/usage" 
+                icon={Zap} 
+                count={metrics.action_queue.near_quota_tenants} 
+                label="Near Quota" 
+                tone="warning" 
+              />
+            )}
+            {metrics.action_queue.disconnected_whatsapp > 0 && (
+              <ActionCard 
+                href="/businesses" 
+                icon={WifiOff} 
+                count={metrics.action_queue.disconnected_whatsapp} 
+                label="Disconnected WA" 
+                tone="destructive" 
+              />
+            )}
+            {metrics.action_queue.suspended_tenants > 0 && (
+              <ActionCard 
+                href="/businesses" 
+                icon={Ban} 
+                count={metrics.action_queue.suspended_tenants} 
+                label="Suspended Tenants" 
+                tone="primary" 
+              />
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <AdminStatCard
           icon={Users}
@@ -172,9 +258,11 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1fr_2fr]">
-        <AdminSectionCard title="Plan Distribution" contentClassName="pt-4">
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
+        <div className="flex flex-col gap-4">
+          <NoticeManager />
+          <AdminSectionCard title="Plan Distribution" contentClassName="pt-4 flex-1">
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
               <Pie
                 data={planData}
                 cx="50%"
@@ -207,6 +295,7 @@ export default function DashboardPage() {
             ))}
           </div>
         </AdminSectionCard>
+        </div>
 
         <AdminSectionCard
           title="Platform Usage - Month to Date"
@@ -245,39 +334,45 @@ export default function DashboardPage() {
         </AdminSectionCard>
       </div>
 
-      <AdminCard className="p-4">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-          <SummaryItem icon={Server} label="Active Trials" value={metrics.businesses.active_trials} />
-          <SummaryItem icon={Zap} label="FAQ Replies" value={metrics.usage.faq_replies.toLocaleString()} tone="warning" />
-          <SummaryItem icon={ArrowUpRight} label="Near AI Limit" value={metrics.risk.near_ai_limit_count} tone="destructive" />
-        </div>
-      </AdminCard>
     </AdminPage>
   )
 }
 
-function SummaryItem({
+function ActionCard({
+  href,
   icon: Icon,
+  count,
   label,
-  value,
-  tone = "primary",
+  tone = "warning",
 }: {
-  icon: typeof Server
+  href: string
+  icon: any
+  count: number
   label: string
-  value: ReactNode
   tone?: "primary" | "warning" | "destructive"
 }) {
-  const color = {
-    primary: "text-primary",
-    warning: "text-amber-500",
-    destructive: "text-destructive",
+  const styles = {
+    primary: "border-primary/20 bg-primary/5 text-primary hover:bg-primary/10",
+    warning: "border-amber-500/20 bg-amber-500/5 text-amber-600 dark:text-amber-500 hover:bg-amber-500/10",
+    destructive: "border-destructive/20 bg-destructive/5 text-destructive hover:bg-destructive/10",
   }[tone]
 
   return (
-    <div className="flex items-center gap-2">
-      <Icon className={`size-4 ${color}`} />
-      <span className="text-sm font-medium text-muted-foreground">{label}:</span>
-      <span className="text-sm font-bold text-foreground">{value}</span>
-    </div>
+    <Link href={href} className="outline-none block">
+      <AdminCard className={`p-4 transition-colors ${styles}`}>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-background/50 backdrop-blur-sm shadow-sm">
+              <Icon className="size-4" strokeWidth={2.5} />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-lg font-black leading-none">{count}</span>
+              <span className="text-[0.65rem] font-bold uppercase tracking-wider opacity-80 mt-1">{label}</span>
+            </div>
+          </div>
+          <ArrowUpRight className="size-4 opacity-50" />
+        </div>
+      </AdminCard>
+    </Link>
   )
 }

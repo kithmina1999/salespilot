@@ -8,6 +8,7 @@ import {
   Clock, Shield, MessageCircle, RefreshCw, AlertTriangle,
   ChevronDown,
 } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
 
 type ActivationCode = {
   id: number;
@@ -109,6 +110,9 @@ export default function ActivationCodesPage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
 
+  const { admin } = useAuth();
+  const isOwner = admin?.role === "owner";
+
   const [newPlan, setNewPlan]           = useState("starter");
   const [newCycle, setNewCycle]         = useState("quarterly");
   const [newDays, setNewDays]           = useState(90);
@@ -190,8 +194,11 @@ export default function ActivationCodesPage() {
             <RefreshCw size={15} />
           </button>
           {/* Create */}
-          <button onClick={() => setShowCreate(true)}
-            style={{ display: "flex", alignItems: "center", gap: "0.425rem", padding: "0.5rem 1rem", background: "var(--accent)", border: "none", borderRadius: "0.625rem", color: "var(--primary-foreground)", fontSize: "0.875rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 14px var(--accent-glow2)" }}
+          <button 
+            disabled={!isOwner}
+            onClick={() => setShowCreate(true)}
+            style={{ display: "flex", alignItems: "center", gap: "0.425rem", padding: "0.5rem 1rem", background: "var(--accent)", border: "none", borderRadius: "0.625rem", color: "var(--primary-foreground)", fontSize: "0.875rem", fontWeight: 700, cursor: isOwner ? "pointer" : "not-allowed", fontFamily: "inherit", boxShadow: "0 4px 14px var(--accent-glow2)", opacity: isOwner ? 1 : 0.5 }}
+            title={!isOwner ? "Owner permissions required" : ""}
           >
             <Plus size={15} /> Generate Code
           </button>
@@ -281,11 +288,13 @@ export default function ActivationCodesPage() {
                   <SendWhatsApp phone={c.target_phone} code={c.code} plan={c.plan} days={c.duration_days} />
                 )}
                 {!c.is_used && (
-                  <button onClick={() => handleRevoke(c.code)}
-                    style={{ padding: "0.35rem 0.5rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: "0.5rem", color: "var(--danger)", cursor: "pointer", display: "flex", alignItems: "center", transition: "background 0.15s", height: "100%" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(239,68,68,0.2)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(239,68,68,0.08)")}
-                    title="Revoke Code"
+                  <button 
+                    disabled={!isOwner}
+                    onClick={() => handleRevoke(c.code)}
+                    style={{ padding: "0.35rem 0.5rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: "0.5rem", color: "var(--danger)", cursor: isOwner ? "pointer" : "not-allowed", display: "flex", alignItems: "center", transition: "background 0.15s", height: "100%", opacity: isOwner ? 1 : 0.5 }}
+                    onMouseEnter={(e) => { if(isOwner) e.currentTarget.style.background = "rgba(239,68,68,0.2)"; }}
+                    onMouseLeave={(e) => { if(isOwner) e.currentTarget.style.background = "rgba(239,68,68,0.08)"; }}
+                    title={!isOwner ? "Owner permissions required" : "Revoke Code"}
                   >
                     <Trash2 size={13} />
                   </button>

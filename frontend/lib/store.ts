@@ -92,6 +92,14 @@ export interface AppPricing {
   days_remaining: number | null;
 }
 
+export interface PlatformNotice {
+  id: number;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'critical';
+  expires_at: string | null;
+}
+
 interface AppState {
   // Auth
   token: string | null;
@@ -101,6 +109,7 @@ interface AppState {
   business: AppBusiness | null;
   usage: AppUsage | null;
   pricing: AppPricing | null;
+  platformNotice: PlatformNotice | null;
 
   // Appearance
   appearance: { fontScale: 'sm' | 'md' | 'lg' | 'xl' };
@@ -143,6 +152,7 @@ export const useAppStore = create<AppState>()(
       business: null,
       usage: null,
       pricing: null,
+      platformNotice: null,
       appearance: { fontScale: 'md' },
       businessLoaded: false,
       usageLoaded: false,
@@ -240,8 +250,8 @@ export const useAppStore = create<AppState>()(
                 // Plan limits from backend — single source of truth
                 plan_limits: u.plan_limits ?? {
                   free:    { products: 10,  rules: 10, ai_messages: 0,    system_messages: 300, rule_gens: 3,   storage_bytes: 0 },
-                  starter: { products: 100, rules: -1, ai_messages: 1500, system_messages: -1,  rule_gens: 30,  storage_bytes: 524288000 },
-                  pro:     { products: -1,  rules: -1, ai_messages: 5000, system_messages: -1,  rule_gens: 100, storage_bytes: 1073741824 },
+                  starter: { products: 100, rules: -1, ai_messages: 1500, system_messages: -1,  rule_gens: 30,  storage_bytes: 104857600 },
+                  pro:     { products: -1,  rules: -1, ai_messages: 5000, system_messages: -1,  rule_gens: 100, storage_bytes: 524288000 },
                 },
               },
               usageLoaded: true,
@@ -269,6 +279,7 @@ export const useAppStore = create<AppState>()(
               business: get().business
                 ? { ...get().business!, plan: (b.effective_plan ?? b.plan) }
                 : get().business,
+              platformNotice: b.platform_notice ?? null,
             });
           }
         } catch {

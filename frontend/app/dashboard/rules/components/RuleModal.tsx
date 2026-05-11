@@ -70,7 +70,7 @@ export function RuleModal({
   };
 
   const activeMeta = LANG_META[activeResponseLang] ?? {
-    label: activeResponseLang, nativeLabel: '', flag: '', color: 'text-zinc-400', placeholder: '',
+    label: activeResponseLang, nativeLabel: '', flag: '', color: 'text-muted-foreground', placeholder: '',
   };
   const activeIsFilled = !!(form.responses[activeResponseLang]?.trim());
   const isEnabled = botLangs.includes(activeResponseLang);
@@ -84,10 +84,10 @@ export function RuleModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 bg-zinc-900 border border-zinc-800 flex flex-col max-h-[92vh] overflow-y-auto">
+      <div className="w-full max-w-2xl rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 bg-muted border border-border flex flex-col max-h-[92vh] overflow-y-auto">
 
         {/* Header */}
-        <div className="p-6 sticky top-0 bg-zinc-900 border-b border-zinc-800/60 z-10">
+        <div className="p-6 sticky top-0 bg-muted border-b border-border/60 z-10">
           <h2 className="text-xl font-semibold">{title}</h2>
           {mode === 'clone_common' && (
             <p className="text-xs text-blue-400 bg-blue-500/10 p-2 rounded border border-blue-500/20 mt-2 inline-block">
@@ -130,20 +130,20 @@ export function RuleModal({
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="md:col-span-1">
-              <label className="block text-sm mb-1.5 text-zinc-300 font-medium">Category</label>
+              <label className="block text-sm mb-1.5 text-muted-foreground font-medium">Category</label>
               <input
                 required
                 type="text"
                 value={form.category}
                 onChange={e => setForm({ ...form, category: e.target.value })}
                 placeholder="e.g. Shipping"
-                className="w-full px-4 py-2.5 bg-zinc-950 border rounded-xl text-sm outline-none focus:border-zinc-500 border-zinc-800 transition-colors text-white placeholder:text-zinc-600"
+                className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm outline-none focus:border-zinc-500 border-border transition-colors text-foreground placeholder:text-zinc-600"
               />
             </div>
             <div className="md:col-span-3">
-              <label className="block text-sm mb-1.5 text-zinc-300 font-medium">
+              <label className="block text-sm mb-1.5 text-muted-foreground font-medium">
                 Trigger Keywords{' '}
-                <span className="text-xs text-zinc-500 font-normal italic ml-2">(Comma separated)</span>
+                <span className="text-xs text-muted-foreground font-normal italic ml-2">(Comma separated)</span>
               </label>
               <input
                 required
@@ -152,7 +152,7 @@ export function RuleModal({
                 value={form.keywords}
                 onChange={e => setForm({ ...form, keywords: e.target.value })}
                 placeholder={seedOriginalLine ? "Type or click 'Generalize & Draft'..." : 'e.g. delivery, shipping, how long'}
-                className="w-full px-4 py-2.5 bg-zinc-950 border rounded-xl text-sm outline-none focus:border-zinc-500 border-zinc-800 transition-colors text-white placeholder:text-zinc-600"
+                className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm outline-none focus:border-zinc-500 border-border transition-colors text-foreground placeholder:text-zinc-600"
               />
             </div>
           </div>
@@ -166,7 +166,7 @@ export function RuleModal({
                 <button
                   type="button"
                   onClick={() => setDropdownOpen(prev => !prev)}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-zinc-800/60 border border-zinc-700/50 text-sm font-medium hover:border-zinc-600 transition-colors"
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-secondary/60 border border-border/50 text-sm font-medium hover:border-zinc-600 transition-colors"
                 >
                   <span className="flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full shrink-0 ${
@@ -177,17 +177,17 @@ export function RuleModal({
                     <span className="text-base leading-none">{activeMeta.flag}</span>
                     <span className={activeMeta.color}>{activeMeta.label}</span>
                     {activeMeta.nativeLabel && activeMeta.nativeLabel !== activeMeta.label && (
-                      <span className="text-zinc-500 text-[11px]">{activeMeta.nativeLabel}</span>
+                      <span className="text-muted-foreground text-[11px]">{activeMeta.nativeLabel}</span>
                     )}
                   </span>
                   <ChevronDown
                     size={14}
-                    className={`text-zinc-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`}
+                    className={`text-muted-foreground transition-transform ${dropdownOpen ? 'rotate-180' : ''}`}
                   />
                 </button>
 
                 {dropdownOpen && (
-                  <div className="absolute top-full left-0 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-xl z-30 overflow-hidden shadow-2xl">
+                  <div className="absolute top-full left-0 mt-1 w-full bg-muted border border-border rounded-xl z-30 overflow-hidden shadow-2xl">
                     {Object.keys(LANG_META).map(lang => {
                       const enabled  = botLangs.includes(lang);
                       const isFilled = !!(form.responses[lang]?.trim());
@@ -207,13 +207,13 @@ export function RuleModal({
                             !enabled
                               ? 'opacity-35 cursor-not-allowed'
                               : isActive
-                              ? 'bg-zinc-800'
-                              : 'hover:bg-zinc-800/60'
+                              ? 'bg-secondary'
+                              : 'hover:bg-secondary/60'
                           }`}
                         >
                           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isFilled ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
                           <span className="text-base">{m.flag}</span>
-                          <span className={enabled ? m.color : 'text-zinc-500'}>{m.label}</span>
+                          <span className={enabled ? m.color : 'text-muted-foreground'}>{m.label}</span>
                           <span className="text-zinc-600 text-[11px]">{m.nativeLabel}</span>
                           {!enabled && <LockIcon size={10} className="ml-auto text-zinc-600" />}
                           {enabled && isFilled  && <span className="ml-auto text-[10px] text-emerald-400 font-bold">✓</span>}
@@ -231,7 +231,7 @@ export function RuleModal({
                   type="button"
                   onClick={onAutoDraft}
                   disabled={drafting || !form.keywords.trim()}
-                  className="text-[11px] px-2.5 py-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-xl font-medium transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                  className="text-[11px] px-2.5 py-2 bg-white/5 hover:bg-white/10 text-foreground border border-white/10 rounded-xl font-medium transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                 >
                   {drafting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3 text-amber-400" />}
                   Auto-Draft
@@ -250,12 +250,12 @@ export function RuleModal({
                   responses: { ...prev.responses, [activeResponseLang]: e.target.value },
                 }))}
                 placeholder={activeMeta.placeholder || 'Type the bot response...'}
-                className={`w-full px-4 py-3 bg-zinc-950 border rounded-xl text-sm outline-none transition-colors resize-y leading-relaxed ${
+                className={`w-full px-4 py-3 bg-background border rounded-xl text-sm outline-none transition-colors resize-y leading-relaxed ${
                   !isEnabled
-                    ? 'opacity-40 cursor-not-allowed text-zinc-500 border-zinc-800'
+                    ? 'opacity-40 cursor-not-allowed text-muted-foreground border-border'
                     : form.responses[activeResponseLang]?.trim()
-                    ? 'text-zinc-200 border-zinc-700 focus:border-zinc-500'
-                    : 'text-zinc-200 border-amber-500/30 focus:border-amber-500/60'
+                    ? 'text-foreground border-border focus:border-zinc-500'
+                    : 'text-foreground border-amber-500/30 focus:border-amber-500/60'
                 }`}
               />
               {activeResponseLang !== 'en' && isEnabled && (
@@ -280,14 +280,14 @@ export function RuleModal({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between border-t pt-5 mt-2 border-zinc-800">
+          <div className="flex items-center justify-between border-t pt-5 mt-2 border-border">
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
                 id="active-toggle"
                 checked={form.is_active}
                 onChange={e => setForm({ ...form, is_active: e.target.checked })}
-                className="w-4 h-4 rounded border-gray-600 bg-transparent text-white focus:ring-white transition-all accent-white"
+                className="w-4 h-4 rounded border-gray-600 bg-transparent text-foreground focus:ring-white transition-all accent-white"
               />
               <div className="flex flex-col">
                 <label htmlFor="active-toggle" className="text-sm font-medium cursor-pointer select-none">
@@ -341,18 +341,18 @@ export function AIGenerateModal({
 }: AIGenerateModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 bg-zinc-900 border border-zinc-800 flex flex-col overflow-hidden">
-        <div className="px-6 pt-6 pb-4 border-b border-zinc-800/80 bg-zinc-900 relative">
-          <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+      <div className="w-full max-w-lg rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 bg-muted border border-border flex flex-col overflow-hidden">
+        <div className="px-6 pt-6 pb-4 border-b border-border/80 bg-muted relative">
+          <h2 className="text-xl font-bold flex items-center gap-2 text-foreground">
             <Sparkles className="text-amber-400" size={22} /> AI Rule Generator
           </h2>
-          <p className="text-sm text-zinc-400 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Describe the topic, and AI will build the FAQ structure and draft warm, natural responses.
           </p>
         </div>
 
         <form onSubmit={onSubmit} className="p-6">
-          <label className="block text-sm font-medium mb-3 text-zinc-200">
+          <label className="block text-sm font-medium mb-3 text-foreground">
             What should this rule cover?
           </label>
           <textarea
@@ -362,13 +362,13 @@ export function AIGenerateModal({
             value={generateIntent}
             onChange={e => setGenerateIntent(e.target.value)}
             placeholder="e.g. Tell customers we only accept cash on delivery and no bank transfers..."
-            className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-sm outline-none focus:border-amber-500/50 transition-colors resize-none text-zinc-200 leading-relaxed shadow-inner"
+            className="w-full px-4 py-3 bg-background border border-border rounded-xl text-sm outline-none focus:border-amber-500/50 transition-colors resize-none text-foreground leading-relaxed shadow-inner"
           />
 
           <div className="flex items-center justify-between mt-6">
             <div className="flex flex-col">
               <span className="text-[10px] font-bold tracking-widest uppercase text-zinc-600">Pro Feature</span>
-              <span className={`text-[11px] font-medium mt-0.5 ${plan === 'starter' ? 'text-zinc-400' : 'text-amber-500/80'}`}>
+              <span className={`text-[11px] font-medium mt-0.5 ${plan === 'starter' ? 'text-muted-foreground' : 'text-amber-500/80'}`}>
                 {plan === 'starter'
                   ? `${ruleGenerationCount} / 30 generations used`
                   : 'Unlimited Generations'}
@@ -378,7 +378,7 @@ export function AIGenerateModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-white/5 transition-colors text-zinc-300"
+                className="px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-white/5 transition-colors text-muted-foreground"
               >
                 Cancel
               </button>

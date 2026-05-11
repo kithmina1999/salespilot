@@ -23,14 +23,14 @@ export function ChatPanel() {
   const botActive = !!customer && !customer.bot_paused;
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950">
+    <div className="flex flex-col h-full bg-background">
       {activePhone ? (
         <>
           {/* Top Bar */}
-          <div className="h-14 shrink-0 px-4 flex items-center gap-3 border-b border-zinc-800/60 bg-zinc-900/40 backdrop-blur">
+          <div className="h-14 shrink-0 px-4 flex items-center gap-3 border-b border-border/60 bg-muted/40 backdrop-blur">
             <button
               onClick={() => setMobileView('inbox')}
-              className="md:hidden p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+              className="md:hidden p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
             >
               <ArrowLeft size={17} />
             </button>
@@ -39,23 +39,23 @@ export function ChatPanel() {
               {initials(activeSummary?.customer_name) || <UserCircle size={18} />}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-white truncate">
+              <p className="text-sm font-bold text-foreground truncate">
                 {displayName(activeSummary?.customer_name, activePhone ?? undefined)}
               </p>
-              <p className="text-[11px] text-zinc-500 truncate">{formatPhone(activePhone ?? undefined)}</p>
+              <p className="text-[11px] text-muted-foreground truncate">{formatPhone(activePhone ?? undefined)}</p>
             </div>
             {/* Bot status chip */}
             <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold ${
               botActive
                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                : 'bg-zinc-800 border-zinc-700 text-zinc-400'
+                : 'bg-secondary border-border text-muted-foreground'
             }`}>
               {botActive ? <Wifi size={10} /> : <WifiOff size={10} />}
               {botActive ? 'Bot Active' : 'Bot Paused'}
             </div>
             <button
               onClick={() => setMobileView('crm')}
-              className="md:hidden p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+              className="md:hidden p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
             >
               <UserCircle size={17} />
             </button>
@@ -69,10 +69,10 @@ export function ChatPanel() {
                 <Loader2 className="animate-spin text-zinc-600" size={24} />
               </div>
             ) : messages.length === 0 ? (
-              <div className="flex flex-col h-full items-center justify-center gap-3 text-center text-zinc-400">
+              <div className="flex flex-col h-full items-center justify-center gap-3 text-center text-muted-foreground">
                 <MessageSquare size={32} className="text-emerald-400" />
-                <p className="text-sm font-bold text-zinc-100">No messages yet</p>
-                <p className="text-sm text-zinc-400 max-w-xs">This conversation will fill as the customer and bot exchange messages.</p>
+                <p className="text-sm font-bold text-foreground">No messages yet</p>
+                <p className="text-sm text-muted-foreground max-w-xs">This conversation will fill as the customer and bot exchange messages.</p>
               </div>
             ) : (
               [...messages].reverse().map((msg, i) => {
@@ -84,7 +84,7 @@ export function ChatPanel() {
                 if (msg.role === 'system') {
                   return (
                     <div key={i} className="flex justify-center my-2">
-                      <span className="text-[10px] px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-500 font-medium">
+                      <span className="text-[10px] px-3 py-1 rounded-full bg-muted border border-border text-muted-foreground font-medium">
                         {msg.content}
                       </span>
                     </div>
@@ -104,21 +104,21 @@ export function ChatPanel() {
                       </div>
                     )}
                     {isUser && (
-                      <div className="w-7 h-7 rounded-full bg-zinc-700 flex items-center justify-center shrink-0 text-[9px] font-black text-zinc-300">
+                      <div className="w-7 h-7 rounded-full bg-border flex items-center justify-center shrink-0 text-[9px] font-black text-muted-foreground">
                         {initials(customer?.name) || <UserCircle size={14} />}
                       </div>
                     )}
 
                     <div className={`max-w-[70%] flex flex-col gap-1 ${isRight ? 'items-end' : 'items-start'}`}>
                       <span className={`text-[9px] font-bold uppercase tracking-wider px-0.5 ${
-                        isBot ? 'text-emerald-500/60' : isMerchant ? 'text-amber-500/60' : 'text-zinc-500'
+                        isBot ? 'text-emerald-500/60' : isMerchant ? 'text-amber-500/60' : 'text-muted-foreground'
                       }`}>
                         {isBot ? 'AI Bot' : isMerchant ? 'You (Agent)' : displayName(customer?.name, activePhone ?? undefined)}
                       </span>
 
                       <div className={`relative px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words ${
                         isUser
-                          ? 'bg-zinc-800 text-zinc-100 rounded-2xl rounded-br-sm border border-zinc-700/50'
+                          ? 'bg-secondary text-foreground rounded-2xl rounded-br-sm border border-border/50'
                           : isMerchant
                           ? 'bg-amber-500/10 text-amber-50 border border-amber-500/20 rounded-2xl rounded-bl-sm'
                           : 'bg-emerald-500/8 text-emerald-50 border border-emerald-500/15 rounded-2xl rounded-bl-sm'
@@ -140,7 +140,7 @@ export function ChatPanel() {
           </div>
 
           {/* Reply Bar */}
-          <div className="shrink-0 border-t border-zinc-800/60 bg-zinc-900/40 p-3">
+          <div className="shrink-0 border-t border-border/60 bg-muted/40 p-3">
             {!customer?.bot_paused && (
               <div className="flex items-center gap-2 mb-2 px-1">
                 <WifiOff size={11} className="text-amber-400" />
@@ -158,13 +158,13 @@ export function ChatPanel() {
                 onChange={e => { setReplyText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'; }}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(); } }}
                 disabled={!customer?.bot_paused || sending}
-                className="flex-1 resize-none rounded-xl bg-zinc-950 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-200 placeholder-zinc-600 outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed leading-relaxed"
+                className="flex-1 resize-none rounded-xl bg-background border border-border px-4 py-2.5 text-sm text-foreground placeholder-zinc-600 outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed leading-relaxed"
                 style={{ minHeight: '42px' }}
               />
               <button
                 onClick={sendReply}
                 disabled={!replyText.trim() || !customer?.bot_paused || sending}
-                className="h-[42px] w-[42px] shrink-0 rounded-xl bg-emerald-500 hover:bg-emerald-400 flex items-center justify-center text-black transition-all disabled:opacity-40 disabled:bg-zinc-800 disabled:text-zinc-500 active:scale-95"
+                className="h-[42px] w-[42px] shrink-0 rounded-xl bg-emerald-500 hover:bg-emerald-400 flex items-center justify-center text-black transition-all disabled:opacity-40 disabled:bg-secondary disabled:text-muted-foreground active:scale-95"
               >
                 {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
               </button>
@@ -172,12 +172,12 @@ export function ChatPanel() {
           </div>
         </>
       ) : (
-        <div className="flex flex-col h-full items-center justify-center gap-3 text-zinc-400 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+        <div className="flex flex-col h-full items-center justify-center gap-3 text-muted-foreground text-center">
+          <div className="w-16 h-16 rounded-2xl bg-muted border border-border flex items-center justify-center">
             <MessageSquare size={28} className="text-emerald-400" />
           </div>
-          <p className="text-sm font-bold text-zinc-100">Select a conversation</p>
-          <p className="text-sm text-zinc-400">Pick a chat from the inbox to view messages and customer details.</p>
+          <p className="text-sm font-bold text-foreground">Select a conversation</p>
+          <p className="text-sm text-muted-foreground">Pick a chat from the inbox to view messages and customer details.</p>
         </div>
       )}
     </div>

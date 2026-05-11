@@ -46,7 +46,7 @@ const fmtK = (n: number) => n >= 1000 ? `Rs.${(n/1000).toFixed(1)}k` : fmtM(n);
 // ─── Mini Sparkline (SVG path) ────────────────────────────────────────────────
 
 function Sparkline({ data }: { data: ChartPoint[] }) {
-  if (data.length < 2) return <div className="h-32 flex items-center justify-center text-zinc-400 text-xs">Not enough data</div>;
+  if (data.length < 2) return <div className="h-32 flex items-center justify-center text-muted-foreground text-xs">Not enough data</div>;
 
   const W = 600; const H = 120; const PAD = 8;
   const revenues = data.map(d => d.revenue);
@@ -100,9 +100,9 @@ function KpiCard({
   trend?: 'up' | 'down' | null;
 }) {
   return (
-    <div className={`rounded-2xl border border-zinc-800 p-5 ${bg} flex flex-col gap-3`}>
+    <div className={`rounded-2xl border border-border p-5 ${bg} flex flex-col gap-3`}>
       <div className="flex items-center justify-between">
-        <div className={`w-10 h-10 rounded-xl bg-zinc-900/60 border border-zinc-800 flex items-center justify-center`}>
+        <div className={`w-10 h-10 rounded-xl bg-muted/60 border border-border flex items-center justify-center`}>
           <Icon size={18} className={color} />
         </div>
         {trend && (
@@ -156,16 +156,16 @@ export default function FinancePage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-3">
+          <h1 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-3">
             <TrendingUp size={24} className="text-emerald-400" />
             Finance
           </h1>
-          <p className="text-sm text-zinc-500 mt-1">Revenue analytics and order performance for your business.</p>
+          <p className="text-sm text-muted-foreground mt-1">Revenue analytics and order performance for your business.</p>
         </div>
         <button
           onClick={fetchAll}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700 transition-colors disabled:opacity-60 shrink-0"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-secondary border border-border text-muted-foreground hover:bg-border transition-colors disabled:opacity-60 shrink-0"
         >
           {loading ? <Loader2 size={13} className="animate-spin" /> : <BarChart3 size={13} />}
           Refresh
@@ -218,8 +218,8 @@ export default function FinancePage() {
               value={String(stats?.orders_total ?? 0)}
               sub="all statuses"
               icon={ShoppingBag}
-              color="text-zinc-300"
-              bg="bg-zinc-800/50"
+              color="text-muted-foreground"
+              bg="bg-accent"
             />
             <KpiCard
               label="Cancelled"
@@ -244,7 +244,7 @@ export default function FinancePage() {
           </div>
 
           {/* Revenue chart */}
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5">
+          <div className="rounded-2xl border border-border bg-card p-5">
             <DashboardSectionHeader
               className="mb-4"
               title="Daily Revenue"
@@ -258,7 +258,7 @@ export default function FinancePage() {
             {chart.length > 0 ? (
               <>
                 <Sparkline data={chart} />
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-400">
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                   <span>Y-axis: delivered revenue in LKR</span>
                   <span>X-axis: calendar day</span>
                 </div>
@@ -278,8 +278,8 @@ export default function FinancePage() {
           </div>
 
           {/* Top products */}
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5">
-            <h2 className="text-sm font-black text-white mb-4 flex items-center gap-2">
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <h2 className="text-sm font-black text-foreground mb-4 flex items-center gap-2">
               <Award size={14} className="text-amber-400" />
               Top Products by Revenue
             </h2>
@@ -298,17 +298,17 @@ export default function FinancePage() {
                   <div key={p.name} className="flex items-center gap-3">
                     {/* Rank */}
                     <span className={`text-xs font-black w-5 shrink-0 text-center ${
-                      i === 0 ? 'text-amber-400' : i === 1 ? 'text-zinc-400' : i === 2 ? 'text-amber-700' : 'text-zinc-700'
+                      i === 0 ? 'text-amber-400' : i === 1 ? 'text-muted-foreground' : i === 2 ? 'text-amber-700' : 'text-zinc-700'
                     }`}>
                       {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`}
                     </span>
                     {/* Bar + label */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-semibold text-zinc-200 truncate">{p.name}</span>
-                        <span className="text-xs text-zinc-500 shrink-0 ml-2">{p.qty} sold</span>
+                        <span className="text-sm font-semibold text-foreground truncate">{p.name}</span>
+                        <span className="text-xs text-muted-foreground shrink-0 ml-2">{p.qty} sold</span>
                       </div>
-                      <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                      <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
                         <div
                           className="h-full rounded-full bg-linear-to-r from-emerald-500 to-emerald-400 transition-all"
                           style={{ width: `${(p.revenue / maxRev) * 100}%` }}

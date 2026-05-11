@@ -68,13 +68,13 @@ export default function PaymentsTab() {
     setSaving(false);
   }
 
-  const labelCls = 'block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2';
-  const textareaCls = 'w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-sm outline-none focus:border-zinc-600 transition-colors text-zinc-200 placeholder:text-zinc-600 resize-none leading-relaxed';
+  const labelCls = 'block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2';
+  const textareaCls = 'w-full px-4 py-3 bg-background border border-border rounded-xl text-sm outline-none focus:border-zinc-600 transition-colors text-foreground placeholder:text-zinc-600 resize-none leading-relaxed';
 
   if (loading) {
     return (
-      <div className="rounded-2xl bg-zinc-900/50 border border-zinc-800 p-8 flex items-center justify-center">
-        <div className="w-5 h-5 border-2 border-zinc-700 border-t-emerald-400 rounded-full animate-spin" />
+      <div className="rounded-2xl bg-card border border-border p-8 flex items-center justify-center">
+        <div className="w-5 h-5 border-2 border-border border-t-emerald-400 rounded-full animate-spin" />
       </div>
     );
   }
@@ -84,17 +84,17 @@ export default function PaymentsTab() {
       {/* ── Info banner ── */}
       <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-blue-500/5 border border-blue-500/20">
         <Info size={14} className="text-blue-400 mt-0.5 shrink-0" />
-        <p className="text-xs text-zinc-400 leading-relaxed">
+        <p className="text-xs text-muted-foreground leading-relaxed">
           Choose which payment methods your customers can use at checkout.
           Bank Transfer requires customers to upload a payment receipt for manual verification.
         </p>
       </div>
 
       {/* ── Payment Methods card ── */}
-      <div className="rounded-2xl bg-zinc-900/50 border border-zinc-800 overflow-hidden">
-        <div className="px-6 py-4 border-b border-zinc-800 flex items-center gap-2">
+      <div className="rounded-2xl bg-card border border-border overflow-hidden">
+        <div className="px-6 py-4 border-b border-border flex items-center gap-2">
           <Banknote size={16} className="text-emerald-400" />
-          <h2 className="text-sm font-bold text-zinc-200">Accepted Payment Methods</h2>
+          <h2 className="text-sm font-bold text-foreground">Accepted Payment Methods</h2>
         </div>
         <div className="p-6 space-y-4">
 
@@ -122,10 +122,10 @@ export default function PaymentsTab() {
 
       {/* ── Bank Details card (only shown when transfer is enabled) ── */}
       {config.allow_transfer && (
-        <div className="rounded-2xl bg-zinc-900/50 border border-zinc-800 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
-          <div className="px-6 py-4 border-b border-zinc-800 flex items-center gap-2">
+        <div className="rounded-2xl bg-card border border-border overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="px-6 py-4 border-b border-border flex items-center gap-2">
             <Building2 size={16} className="text-blue-400" />
-            <h2 className="text-sm font-bold text-zinc-200">Bank Account Details</h2>
+            <h2 className="text-sm font-bold text-foreground">Bank Account Details</h2>
             <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-md bg-red-500/10 text-red-400 border border-red-500/20">
               Required
             </span>
@@ -181,14 +181,14 @@ function MethodToggle({ icon, title, description, enabled, onToggle, badge, badg
     <div
       className={`flex items-center gap-4 p-4 rounded-xl border transition-all cursor-pointer select-none ${
         enabled
-          ? 'bg-zinc-800/60 border-zinc-700'
-          : 'bg-zinc-950/40 border-zinc-800/60 hover:border-zinc-700/60'
+          ? 'bg-secondary/60 border-border'
+          : 'bg-background/40 border-border/60 hover:border-border/60'
       }`}
       onClick={() => onToggle(!enabled)}
     >
       {/* Icon */}
       <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
-        enabled ? 'bg-zinc-700' : 'bg-zinc-900'
+        enabled ? 'bg-border' : 'bg-muted'
       }`}>
         {icon}
       </div>
@@ -196,7 +196,7 @@ function MethodToggle({ icon, title, description, enabled, onToggle, badge, badg
       {/* Label */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-sm font-semibold transition-colors ${enabled ? 'text-white' : 'text-zinc-400'}`}>
+          <span className={`text-sm font-semibold transition-colors ${enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
             {title}
           </span>
           {badge && (
@@ -205,7 +205,7 @@ function MethodToggle({ icon, title, description, enabled, onToggle, badge, badg
             </span>
           )}
         </div>
-        <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">{description}</p>
+        <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{description}</p>
       </div>
 
       {/* Toggle */}

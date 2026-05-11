@@ -49,12 +49,12 @@ export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selecte
         return (
           <div className="flex flex-wrap gap-1 max-w-[300px]">
             {kws.slice(0, 3).map((kw, i) => (
-              <Badge key={i} variant="outline" className="text-xs font-mono bg-zinc-900 border-zinc-800 text-zinc-300">
+              <Badge key={i} variant="outline" className="text-xs font-mono bg-muted border-border text-muted-foreground">
                 {kw}
               </Badge>
             ))}
             {kws.length > 3 && (
-              <Badge variant="outline" className="text-xs font-mono bg-zinc-900 border-zinc-800 text-zinc-500">
+              <Badge variant="outline" className="text-xs font-mono bg-muted border-border text-muted-foreground">
                 +{kws.length - 3}
               </Badge>
             )}
@@ -78,7 +78,7 @@ export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selecte
         
         return (
           <div className="flex items-center gap-2">
-            <div className="max-w-[350px] truncate text-sm text-zinc-400">
+            <div className="max-w-[350px] truncate text-sm text-muted-foreground">
               {previewText}
             </div>
             <div className="flex gap-1 shrink-0">
@@ -92,7 +92,7 @@ export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selecte
     {
       accessorKey: 'usage_count',
       header: 'Hits',
-      cell: ({ row }) => <span className="font-mono text-zinc-400">{row.getValue('usage_count') || 0}</span>,
+      cell: ({ row }) => <span className="font-mono text-muted-foreground">{row.getValue('usage_count') || 0}</span>,
     },
     {
       accessorKey: 'is_active',
@@ -100,7 +100,7 @@ export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selecte
       cell: ({ row }) => {
         const isActive = row.getValue('is_active') as boolean;
         return (
-          <Badge variant="outline" className={isActive ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}>
+          <Badge variant="outline" className={isActive ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-secondary text-muted-foreground border-border'}>
             {isActive ? 'Active' : 'Paused'}
           </Badge>
         );
@@ -113,10 +113,10 @@ export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selecte
         const rule = row.original;
         return (
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => onToggleStatus(rule)} className="h-8 w-8 text-zinc-400 hover:text-white" title={rule.is_active ? 'Pause Rule' : 'Activate Rule'}>
+            <Button variant="ghost" size="icon" onClick={() => onToggleStatus(rule)} className="h-8 w-8 text-muted-foreground hover:text-foreground" title={rule.is_active ? 'Pause Rule' : 'Activate Rule'}>
               {rule.is_active ? <PowerOff size={14} /> : <Power size={14} />}
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => onEdit(rule)} className="h-8 w-8 text-zinc-400 hover:text-white" title="Edit Rule">
+            <Button variant="ghost" size="icon" onClick={() => onEdit(rule)} className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Edit Rule">
               <Edit2 size={14} />
             </Button>
             <Button variant="ghost" size="icon" onClick={() => onDelete(rule.ID)} className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-400/10" title="Delete Rule">
@@ -146,19 +146,19 @@ export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selecte
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
           <div className="relative w-full sm:w-72">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-zinc-500" />
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search rules..."
               value={globalFilter ?? ''}
               onChange={(e) => setGlobalFilter(e.target.value)}
-              className="pl-8 bg-zinc-900 border-zinc-800 focus-visible:ring-1 focus-visible:ring-zinc-700 h-9"
+              className="pl-8 bg-muted border-border focus-visible:ring-1 focus-visible:ring-zinc-700 h-9"
             />
           </div>
           {onOpenSimulator && (
             <Button 
               variant="outline" 
               onClick={onOpenSimulator}
-              className="border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 w-full sm:w-auto h-9"
+              className="border-border bg-muted hover:bg-secondary text-muted-foreground w-full sm:w-auto h-9"
             >
               <Bot className="w-4 h-4 mr-2 text-amber-500" />
               Test Bot
@@ -167,14 +167,14 @@ export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selecte
         </div>
       </div>
       
-      <div className="rounded-xl border border-zinc-800 bg-zinc-950 overflow-hidden">
+      <div className="rounded-xl border border-border bg-background overflow-hidden">
         <Table>
-          <TableHeader className="bg-zinc-900/50">
+          <TableHeader className="bg-card">
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="border-zinc-800 hover:bg-transparent">
+              <TableRow key={headerGroup.id} className="border-border hover:bg-transparent">
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id} className="text-zinc-400 font-medium h-10">
+                    <TableHead key={header.id} className="text-muted-foreground font-medium h-10">
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -193,7 +193,7 @@ export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selecte
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className="border-zinc-800 hover:bg-zinc-900/50 transition-colors"
+                  className="border-border hover:bg-card transition-colors"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className="py-3">
@@ -204,7 +204,7 @@ export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selecte
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-32 text-center text-zinc-500">
+                <TableCell colSpan={columns.length} className="h-32 text-center text-muted-foreground">
                   No rules found.
                 </TableCell>
               </TableRow>
@@ -214,7 +214,7 @@ export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selecte
       </div>
       
       <div className="flex items-center justify-between">
-        <div className="text-xs text-zinc-500">
+        <div className="text-xs text-muted-foreground">
           Showing {table.getRowModel().rows.length} rules
         </div>
         <div className="flex items-center space-x-2">
@@ -223,7 +223,7 @@ export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selecte
             size="sm"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
-            className="border-zinc-800 bg-zinc-900 text-zinc-300 hover:bg-zinc-800 hover:text-white h-8"
+            className="border-border bg-muted text-muted-foreground hover:bg-secondary hover:text-foreground h-8"
           >
             Previous
           </Button>
@@ -232,7 +232,7 @@ export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selecte
             size="sm"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
-            className="border-zinc-800 bg-zinc-900 text-zinc-300 hover:bg-zinc-800 hover:text-white h-8"
+            className="border-border bg-muted text-muted-foreground hover:bg-secondary hover:text-foreground h-8"
           >
             Next
           </Button>

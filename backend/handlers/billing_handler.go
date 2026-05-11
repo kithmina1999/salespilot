@@ -141,6 +141,15 @@ func BillingStatus(c *gin.Context) {
 		}
 	}
 
+	// Fetch active platform notice
+	var notice *models.PlatformNotice
+	var n models.PlatformNotice
+	// Check for active notice that hasn't expired
+	err := database.DB.Where("is_active = ? AND (expires_at IS NULL OR expires_at > ?)", true, now).Order("created_at desc").First(&n).Error
+	if err == nil {
+		notice = &n
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"plan":                  biz.Plan,
 		"effective_plan":        remaining.EffectivePlan,
@@ -175,6 +184,7 @@ func BillingStatus(c *gin.Context) {
 		"promo_active":        promoIsActive(),
 		"promo_ends_at":       promoEndDate.Format(time.RFC3339),
 		"is_first_activation": biz.BillingCycle == "" && biz.PlanExpiresAt == nil,
+		"platform_notice":     notice,
 	})
 }
 

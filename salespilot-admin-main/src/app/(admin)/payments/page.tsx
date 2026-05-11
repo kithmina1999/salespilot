@@ -8,6 +8,7 @@ import {
   RefreshCw, ZoomIn, X, AlertTriangle, ChevronDown,
   ImageIcon, Loader2,
 } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
 
 type ProofStatus = "pending" | "approved" | "rejected";
 
@@ -67,6 +68,9 @@ export default function PaymentsPage() {
   const [rejecting, setRejecting] = useState<PaymentProof | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectLoading, setRejectLoading] = useState(false);
+
+  const { admin } = useAuth();
+  const isOwner = admin?.role === "owner";
 
   // Filter logic
   useEffect(() => {
@@ -280,14 +284,18 @@ export default function PaymentsPage() {
                     {proof.status === "pending" && (
                       <>
                         <button
+                          disabled={!isOwner}
                           onClick={() => setApproving(proof)}
-                          style={{ display: "flex", alignItems: "center", gap: "0.3rem", padding: "0.35rem 0.75rem", background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: "0.5rem", color: "#4ade80", fontSize: "0.75rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}
+                          style={{ display: "flex", alignItems: "center", gap: "0.3rem", padding: "0.35rem 0.75rem", background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: "0.5rem", color: "#4ade80", fontSize: "0.75rem", fontWeight: 600, cursor: isOwner ? "pointer" : "not-allowed", fontFamily: "inherit", whiteSpace: "nowrap", opacity: isOwner ? 1 : 0.5 }}
+                          title={!isOwner ? "Owner permissions required" : "Approve Payment"}
                         >
                           <CheckCircle size={12} /> Approve
                         </button>
                         <button
+                          disabled={!isOwner}
                           onClick={() => setRejecting(proof)}
-                          style={{ display: "flex", alignItems: "center", gap: "0.3rem", padding: "0.35rem 0.625rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "0.5rem", color: "#f87171", fontSize: "0.75rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                          style={{ display: "flex", alignItems: "center", gap: "0.3rem", padding: "0.35rem 0.625rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "0.5rem", color: "#f87171", fontSize: "0.75rem", fontWeight: 600, cursor: isOwner ? "pointer" : "not-allowed", fontFamily: "inherit", opacity: isOwner ? 1 : 0.5 }}
+                          title={!isOwner ? "Owner permissions required" : "Reject Payment"}
                         >
                           <XCircle size={12} /> Reject
                         </button>

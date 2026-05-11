@@ -7,6 +7,7 @@ import { AdminDataTable, AdminDataTableColumn } from "@/components/admin/data-ta
 import { TableRow, TableCell } from "@/components/ui/table";
 import { PlanBadge } from "@/components/admin/status-badge";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth-context";
 
 export function UsageTable({ 
   businesses, 
@@ -23,6 +24,9 @@ export function UsageTable({
 }) {
   const [sortCol, setSortCol] = useState<string>("ai_pct");
   const [sortDesc, setSortDesc] = useState<boolean>(true);
+
+  const { admin } = useAuth();
+  const isOwner = admin?.role === "owner";
 
   // Helper to get %
   const getPct = (count: number, limit: number) => {
@@ -76,7 +80,7 @@ export function UsageTable({
     return 0;
   });
 
-  const columns: AdminDataTableColumn[] = [
+  const columns: Array<AdminDataTableColumn & { sortable?: boolean }> = [
     { key: "business", header: "Business" },
     { key: "plan", header: "Plan" },
     { key: "ai_pct", header: "AI Usage", sortable: true },
@@ -179,8 +183,9 @@ export function UsageTable({
           <TableCell className="px-4 py-3">
             <div className="flex justify-end gap-1.5">
               <Button
+                disabled={!isOwner}
                 onClick={() => onReset(business)}
-                title="Reset Usage"
+                title={!isOwner ? "Owner permissions required" : "Reset Usage"}
                 variant="outline"
                 size="sm"
                 className="text-amber-500 border-amber-500/30 hover:bg-amber-500/10"

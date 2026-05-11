@@ -24,21 +24,21 @@ func TestGetUsageEntitlementsPaidPlanOverridesActiveTrial(t *testing.T) {
 			plan:        models.PlanStarter,
 			wantAI:      models.StarterAILimit,
 			wantProduct: 100,
-			wantStorage: 500 * 1024 * 1024,
+			wantStorage: 100 * 1024 * 1024,
 		},
 		{
 			name:        "pro uses pro limits while trial timestamp remains",
 			plan:        models.PlanPro,
 			wantAI:      models.ProAILimit,
 			wantProduct: -1,
-			wantStorage: 1024 * 1024 * 1024,
+			wantStorage: 500 * 1024 * 1024,
 			wantVision:  true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ent := getUsageEntitlements(models.Business{
+			ent := GetUsageEntitlements(models.Business{
 				Plan:           tt.plan,
 				TrialExpiresAt: &trialExpiresAt,
 			}, now)
@@ -66,7 +66,7 @@ func TestGetUsageEntitlementsFreeTrialUsesTrialLimits(t *testing.T) {
 	now := time.Date(2026, 5, 3, 12, 0, 0, 0, time.UTC)
 	trialExpiresAt := now.Add(48 * time.Hour)
 
-	ent := getUsageEntitlements(models.Business{
+	ent := GetUsageEntitlements(models.Business{
 		Plan:           models.PlanFree,
 		TrialExpiresAt: &trialExpiresAt,
 	}, now)
@@ -80,11 +80,11 @@ func TestGetUsageEntitlementsFreeTrialUsesTrialLimits(t *testing.T) {
 	if ent.MaxProducts != 50 {
 		t.Fatalf("MaxProducts = %d, want %d", ent.MaxProducts, 50)
 	}
-	if ent.MaxStorageBytes != 0 {
-		t.Fatalf("MaxStorageBytes = %d, want 0", ent.MaxStorageBytes)
+	if ent.MaxStorageBytes != 10*1024*1024 {
+		t.Fatalf("MaxStorageBytes = %d, want 10MB", ent.MaxStorageBytes)
 	}
-	if ent.CanUploadCloudinary {
-		t.Fatalf("free trial should not allow cloudinary uploads")
+	if !ent.CanUploadCloudinary {
+		t.Fatalf("free trial should allow cloudinary uploads")
 	}
 }
 
@@ -92,7 +92,7 @@ func TestGetUsageEntitlementsExpiredPaidPlanFallsBackToFreeLimits(t *testing.T) 
 	now := time.Date(2026, 5, 3, 12, 0, 0, 0, time.UTC)
 	expiredAt := now.Add(-time.Minute)
 
-	ent := getUsageEntitlements(models.Business{
+	ent := GetUsageEntitlements(models.Business{
 		Plan:          models.PlanPro,
 		PlanExpiresAt: &expiredAt,
 	}, now)

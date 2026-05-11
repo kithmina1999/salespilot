@@ -17,6 +17,7 @@ type PaymentProof struct {
 	BusinessPhone  string     `json:"business_phone"`                          // for WhatsApp fallback
 	BusinessEmail  string     `json:"business_email"`                          // for Resend code delivery
 	BillingCycle   string     `json:"billing_cycle"  gorm:"not null"`          // monthly | quarterly | annual
+	Plan           string     `json:"plan"           gorm:"not null;default:'starter'"` // starter | pro
 	Amount         float64    `json:"amount"         gorm:"not null"`          // expected LKR amount shown to user
 	ScreenshotURL  string     `json:"screenshot_url" gorm:"not null"`          // Cloudinary URL
 	Status         string     `json:"status"         gorm:"default:'pending'"` // pending | approved | rejected

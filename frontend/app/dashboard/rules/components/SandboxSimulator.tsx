@@ -66,21 +66,21 @@ export function SandboxSimulator({ onClose }: { onClose?: () => void }) {
   };
 
   return (
-    <div className="w-full h-full flex flex-col bg-zinc-950 border-zinc-800 rounded-none sm:rounded-l-2xl overflow-hidden shadow-2xl relative">
+    <div className="w-full h-full flex flex-col bg-background border-border rounded-none sm:rounded-l-2xl overflow-hidden shadow-2xl relative">
       {/* Header */}
-      <div className="p-4 border-b border-zinc-800 bg-zinc-900/50 flex items-center justify-between shrink-0">
+      <div className="p-4 border-b border-border bg-card flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-linear-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
             <Bot className="w-5 h-5 text-black" />
           </div>
           <div>
-            <h3 className="font-bold text-white text-sm">Sandbox Simulator</h3>
+            <h3 className="font-bold text-foreground text-sm">Sandbox Simulator</h3>
             {profile?.simulation_limit > 0 ? (
               <div className="flex items-center gap-2 mt-0.5">
-                <p className="text-[11px] text-zinc-400">
+                <p className="text-[11px] text-muted-foreground">
                   {profile.simulation_count} / {profile.simulation_limit} tests used
                 </p>
-                <div className="w-16 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                <div className="w-16 h-1.5 bg-secondary rounded-full overflow-hidden">
                   <div 
                     className={`h-full rounded-full ${profile.simulation_count >= profile.simulation_limit ? 'bg-red-500' : 'bg-amber-500'}`}
                     style={{ width: `${Math.min(100, (profile.simulation_count / profile.simulation_limit) * 100)}%` }}
@@ -88,18 +88,18 @@ export function SandboxSimulator({ onClose }: { onClose?: () => void }) {
                 </div>
               </div>
             ) : profile?.simulation_limit === -1 ? (
-              <p className="text-[11px] text-zinc-400">Unlimited testing</p>
+              <p className="text-[11px] text-muted-foreground">Unlimited testing</p>
             ) : (
-              <p className="text-[11px] text-zinc-400">Test your rules safely</p>
+              <p className="text-[11px] text-muted-foreground">Test your rules safely</p>
             )}
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={clearChat} className="p-2 text-zinc-400 hover:text-white transition-colors" title="Refresh">
+          <button onClick={clearChat} className="p-2 text-muted-foreground hover:text-foreground transition-colors" title="Refresh">
             <RefreshCw size={16} />
           </button>
           {onClose && (
-            <button onClick={onClose} className="p-2 text-zinc-400 hover:text-white transition-colors" title="Close">
+            <button onClick={onClose} className="p-2 text-muted-foreground hover:text-foreground transition-colors" title="Close">
               <X size={20} />
             </button>
           )}
@@ -114,8 +114,8 @@ export function SandboxSimulator({ onClose }: { onClose?: () => void }) {
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center opacity-50 px-4">
             <Sparkles className="w-8 h-8 text-amber-500 mb-3" />
-            <p className="text-sm text-zinc-300">Start typing to test your bot!</p>
-            <p className="text-xs text-zinc-500 mt-1">No real messages will be sent.</p>
+            <p className="text-sm text-muted-foreground">Start typing to test your bot!</p>
+            <p className="text-xs text-muted-foreground mt-1">No real messages will be sent.</p>
           </div>
         ) : (
           messages.map((msg: any) => {
@@ -139,26 +139,26 @@ export function SandboxSimulator({ onClose }: { onClose?: () => void }) {
                 <div 
                   className={`max-w-[85%] rounded-2xl text-[13px] leading-relaxed relative flex flex-col ${
                     isBot 
-                      ? 'bg-zinc-800 text-white rounded-tl-sm border border-zinc-700/50' 
-                      : 'bg-emerald-600 text-white rounded-tr-sm'
+                      ? 'bg-secondary text-foreground rounded-tl-sm border border-border/50' 
+                      : 'bg-emerald-600 text-foreground rounded-tr-sm'
                   }`}
                 >
                   <div className="px-4 py-2.5">
                     <p className="whitespace-pre-wrap">{content}</p>
-                    <div className={`text-[9px] mt-1 text-right ${isBot ? 'text-zinc-400' : 'text-emerald-200'}`}>
+                    <div className={`text-[9px] mt-1 text-right ${isBot ? 'text-muted-foreground' : 'text-emerald-200'}`}>
                       {new Date(msg.CreatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
                   </div>
                   
                   {isInteractive && (
-                    <div className="border-t border-zinc-700/50 flex flex-col items-center p-2 gap-1.5 bg-zinc-900/30 rounded-b-2xl">
+                    <div className="border-t border-border/50 flex flex-col items-center p-2 gap-1.5 bg-muted rounded-b-2xl">
                       {interactiveType === 'buttons' ? (
                         <>
-                          <div className="w-full text-center text-amber-500 font-medium py-1.5 text-xs border border-zinc-700/50 rounded-lg bg-zinc-800/50 shadow-sm cursor-not-allowed opacity-80">Interactive Button 1</div>
-                          <div className="w-full text-center text-amber-500 font-medium py-1.5 text-xs border border-zinc-700/50 rounded-lg bg-zinc-800/50 shadow-sm cursor-not-allowed opacity-80">Interactive Button 2</div>
+                          <div className="w-full text-center text-amber-500 font-medium py-1.5 text-xs border border-border/50 rounded-lg bg-accent shadow-sm cursor-not-allowed opacity-80">Interactive Button 1</div>
+                          <div className="w-full text-center text-amber-500 font-medium py-1.5 text-xs border border-border/50 rounded-lg bg-accent shadow-sm cursor-not-allowed opacity-80">Interactive Button 2</div>
                         </>
                       ) : (
-                        <div className="w-full text-center text-amber-500 font-medium py-2 text-xs border border-zinc-700/50 rounded-lg bg-zinc-800/50 shadow-sm cursor-not-allowed opacity-80 flex items-center justify-center gap-1">
+                        <div className="w-full text-center text-amber-500 font-medium py-2 text-xs border border-border/50 rounded-lg bg-accent shadow-sm cursor-not-allowed opacity-80 flex items-center justify-center gap-1">
                           <span className="w-3 h-3 bg-zinc-600 rounded-sm inline-block"></span>
                           List Selection Menu
                         </div>
@@ -173,7 +173,7 @@ export function SandboxSimulator({ onClose }: { onClose?: () => void }) {
       </div>
 
       {/* Input Area */}
-      <div className="p-3 bg-zinc-900 border-t border-zinc-800 shrink-0">
+      <div className="p-3 bg-muted border-t border-border shrink-0">
         <form onSubmit={handleSend} className="relative flex items-center">
           <input
             type="text"
@@ -181,7 +181,7 @@ export function SandboxSimulator({ onClose }: { onClose?: () => void }) {
             onChange={(e) => setMessage(e.target.value)}
             disabled={sending}
             placeholder="Type a test message..."
-            className="w-full bg-zinc-950 border border-zinc-800 text-sm text-white rounded-full pl-5 pr-12 py-3 outline-none focus:border-amber-500/50 transition-colors disabled:opacity-50"
+            className="w-full bg-background border border-border text-sm text-foreground rounded-full pl-5 pr-12 py-3 outline-none focus:border-amber-500/50 transition-colors disabled:opacity-50"
           />
           <button
             type="submit"

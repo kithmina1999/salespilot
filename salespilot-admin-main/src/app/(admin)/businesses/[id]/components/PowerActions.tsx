@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
-import { ShieldAlert, Save } from "lucide-react";
+import { ShieldAlert, Save, Lock } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
 
 function getApiErrorMessage(err: any) {
   if (typeof err === "object" && err !== null && "response" in err) {
@@ -26,6 +27,9 @@ export function PowerActions({ business, id, mutate }: { business: any, id: stri
   const [suspendConfirm, setSuspendConfirm] = useState("");
   const [suspending, setSuspending] = useState(false);
   const [suspendMessage, setSuspendMessage] = useState("");
+
+  const { admin } = useAuth();
+  const isOwner = admin?.role === "owner";
 
   const handleOverride = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,13 +107,21 @@ export function PowerActions({ business, id, mutate }: { business: any, id: stri
           Force a plan change without payment. This action is logged to the audit trail.
         </p>
 
+        {!isOwner && (
+          <div className="mb-4 bg-muted/50 border border-border rounded-lg p-3 flex items-center gap-2">
+            <Lock size={14} className="text-muted-foreground" />
+            <p className="text-xs font-semibold text-muted-foreground">Owner permissions required</p>
+          </div>
+        )}
+
         <form onSubmit={handleOverride} className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
             <label className="text-[0.8rem] font-bold text-muted-foreground">Force Plan</label>
             <select
+              disabled={!isOwner}
               value={plan}
               onChange={(e) => setPlan(e.target.value)}
-              className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-primary transition-colors"
+              className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="free">Free</option>
               <option value="starter">Starter</option>
@@ -120,9 +132,10 @@ export function PowerActions({ business, id, mutate }: { business: any, id: stri
           <div className="flex flex-col gap-1.5">
             <label className="text-[0.8rem] font-bold text-muted-foreground">Billing Cycle</label>
             <select
+              disabled={!isOwner}
               value={cycle}
               onChange={(e) => setCycle(e.target.value)}
-              className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-primary transition-colors"
+              className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">None (Free)</option>
               <option value="monthly">Monthly</option>
@@ -136,10 +149,11 @@ export function PowerActions({ business, id, mutate }: { business: any, id: stri
               Expiry Date <span className="text-muted-foreground/60 font-normal">(leave empty = infinite)</span>
             </label>
             <input
+              disabled={!isOwner}
               type="date"
               value={expiry}
               onChange={(e) => setExpiry(e.target.value)}
-              className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-primary transition-colors"
+              className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -148,12 +162,13 @@ export function PowerActions({ business, id, mutate }: { business: any, id: stri
               Reason <span className="text-destructive">*</span>
             </label>
             <input
+              disabled={!isOwner}
               required
               type="text"
               placeholder="e.g. Complimentary early adopter"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-primary transition-colors"
+              className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <p className="text-[0.7rem] text-muted-foreground/80">Required for audit log. Be descriptive.</p>
           </div>
@@ -163,18 +178,19 @@ export function PowerActions({ business, id, mutate }: { business: any, id: stri
               Confirm Override <span className="text-destructive">*</span>
             </label>
             <input
+              disabled={!isOwner}
               required
               type="text"
               placeholder="Type FORCE PLAN to confirm"
               value={confirmAction}
               onChange={(e) => setConfirmAction(e.target.value)}
-              className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-destructive transition-colors"
+              className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-destructive transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
 
           <button
             type="submit"
-            disabled={saving || !reason}
+            disabled={saving || !reason || !isOwner}
             className="w-full mt-2 py-2.5 bg-destructive/10 border border-destructive/20 text-destructive rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50 disabled:hover:bg-destructive/10 disabled:hover:text-destructive cursor-pointer outline-none"
           >
             <Save size={15} />
@@ -203,14 +219,22 @@ export function PowerActions({ business, id, mutate }: { business: any, id: stri
             : "Suspend this account. Their bot will stop answering, and their dashboard will go into read-only mode."}
         </p>
 
+        {!isOwner && (
+          <div className="mb-4 bg-muted/50 border border-border rounded-lg p-3 flex items-center gap-2">
+            <Lock size={14} className="text-muted-foreground" />
+            <p className="text-xs font-semibold text-muted-foreground">Owner permissions required</p>
+          </div>
+        )}
+
         <form onSubmit={business.suspended_at ? handleUnsuspend : handleSuspend} className="flex flex-col gap-3">
           {!business.suspended_at && (
             <div className="flex flex-col gap-1.5">
               <label className="text-[0.8rem] font-bold text-muted-foreground">Suspension Type</label>
               <select
+                disabled={!isOwner}
                 value={suspendType}
                 onChange={(e) => setSuspendType(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-primary transition-colors"
+                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="billing">Billing/Payment Expired</option>
                 <option value="abuse">Policy/Abuse Violation</option>
@@ -224,12 +248,13 @@ export function PowerActions({ business, id, mutate }: { business: any, id: stri
               Reason <span className="text-destructive">*</span>
             </label>
             <input
+              disabled={!isOwner}
               required
               type="text"
               placeholder={business.suspended_at ? "e.g. Paid via bank transfer" : "e.g. Overdue invoice"}
               value={suspendReason}
               onChange={(e) => setSuspendReason(e.target.value)}
-              className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-primary transition-colors"
+              className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -238,18 +263,19 @@ export function PowerActions({ business, id, mutate }: { business: any, id: stri
               Confirm Action <span className="text-destructive">*</span>
             </label>
             <input
+              disabled={!isOwner}
               required
               type="text"
-              placeholder={`Type ${business.suspended_at ? "UNSUSPEND" : "SUSPEND"} to confirm`}
+              placeholder={`Type ${business.suspended_at ? "UNSUSPEND BUSINESS" : "SUSPEND BUSINESS"} to confirm`}
               value={suspendConfirm}
               onChange={(e) => setSuspendConfirm(e.target.value)}
-              className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-destructive transition-colors"
+              className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-destructive transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
 
           <button
             type="submit"
-            disabled={suspending || !suspendReason || !suspendConfirm}
+            disabled={suspending || !suspendReason || !suspendConfirm || !isOwner}
             className="w-full mt-2 py-2.5 bg-destructive/10 border border-destructive/20 text-destructive rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50 disabled:hover:bg-destructive/10 disabled:hover:text-destructive cursor-pointer outline-none"
           >
             <ShieldAlert size={15} />

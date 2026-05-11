@@ -35,27 +35,27 @@ export default function GeneralTab({ settings, setSettings, billing }: Props) {
     setSettings({ ...settings, [k]: v });
   }
 
-  const inputCls = 'w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm outline-none focus:border-zinc-600 transition-colors text-zinc-200 placeholder:text-zinc-600';
-  const labelCls = 'block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2';
+  const inputCls = 'w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm outline-none focus:border-zinc-600 transition-colors text-foreground placeholder:text-zinc-600';
+  const labelCls = 'block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2';
 
   return (
     <div className="space-y-6">
       {/* ── Current Plan card — compact, links to /usage ── */}
       {billing && (
-        <div className="p-5 rounded-2xl bg-zinc-900/50 border border-zinc-800 flex items-center justify-between gap-4">
+        <div className="p-5 rounded-2xl bg-card border border-border flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
               <CreditCard size={16} className="text-amber-400" />
             </div>
             <div>
-              <p className="text-sm font-bold text-white capitalize">
+              <p className="text-sm font-bold text-foreground capitalize">
                 {billing.plan === 'free' && billing.trial_days_remaining && billing.trial_days_remaining > 0
                   ? 'Starter Trial'
                   : billing.plan === 'starter' || billing.plan === 'pro'
                   ? `${billing.plan.charAt(0).toUpperCase() + billing.plan.slice(1)} Plan`
                   : 'Free Plan'}
               </p>
-              <p className="text-xs text-zinc-500 mt-0.5 flex items-center gap-1">
+              <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
                 {billing.plan === 'starter' || billing.plan === 'pro' ? (
                   <><Clock size={10} className="text-emerald-500" /> Renews in {billing.days_remaining} days</>
                 ) : billing.trial_days_remaining && billing.trial_days_remaining > 0 ? (
@@ -68,7 +68,7 @@ export default function GeneralTab({ settings, setSettings, billing }: Props) {
           </div>
           <Link
             href="/dashboard/usage"
-            className="shrink-0 text-xs font-bold px-4 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors"
+            className="shrink-0 text-xs font-bold px-4 py-2 rounded-lg bg-secondary border border-border text-muted-foreground hover:bg-border hover:text-foreground transition-colors"
           >
             Manage Plan
           </Link>
@@ -76,10 +76,10 @@ export default function GeneralTab({ settings, setSettings, billing }: Props) {
       )}
 
       {/* ── Business & Bot Settings ── */}
-      <div className="rounded-2xl bg-zinc-900/50 border border-zinc-800 overflow-hidden">
-        <div className="px-6 py-4 border-b border-zinc-800 flex items-center gap-2">
+      <div className="rounded-2xl bg-card border border-border overflow-hidden">
+        <div className="px-6 py-4 border-b border-border flex items-center gap-2">
           <UserCog size={16} className="text-emerald-400" />
-          <h2 className="text-sm font-bold text-zinc-200">Business Profile & AI Settings</h2>
+          <h2 className="text-sm font-bold text-foreground">Business Profile & AI Settings</h2>
         </div>
         <div className="p-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -131,21 +131,21 @@ export default function GeneralTab({ settings, setSettings, billing }: Props) {
               className={`${inputCls} resize-none leading-relaxed`}
             />
             <div className="mt-2 space-y-1.5">
-              <p className="text-[11px] text-zinc-500">
+              <p className="text-[11px] text-muted-foreground">
                 Define how the AI behaves and speaks across all languages. The AI will automatically translate this persona.
               </p>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => update('bot_personality', "You are a friendly and casual sales assistant. Keep your answers extremely short, natural, and use emojis. Encourage the customer to ask questions.")}
-                  className="text-[10px] px-2 py-1 rounded bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
+                  className="text-[10px] px-2 py-1 rounded bg-secondary text-muted-foreground hover:text-foreground hover:bg-border transition-colors"
                 >
                   Use Friendly Default
                 </button>
                 <button
                   type="button"
                   onClick={() => update('bot_personality', "You are a highly professional and polite customer support agent. Provide clear, direct, and formal answers without emojis.")}
-                  className="text-[10px] px-2 py-1 rounded bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
+                  className="text-[10px] px-2 py-1 rounded bg-secondary text-muted-foreground hover:text-foreground hover:bg-border transition-colors"
                 >
                   Use Professional Default
                 </button>

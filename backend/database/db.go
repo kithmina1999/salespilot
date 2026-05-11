@@ -74,6 +74,7 @@ func Init(dsn string) {
 		&models.SuperAdminSession{},
 		&models.PipelineLog{},
 		&models.PipelineSignalLog{},
+		&models.PlatformNotice{},
 	)
 	if err != nil {
 		log.Fatalf("❌ Failed to migrate database: %v", err)

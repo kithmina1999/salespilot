@@ -23,23 +23,23 @@ export function InboxPanel() {
   const totalUnread = inbox.reduce((s, c) => s + (c.unread_count || 0), 0);
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950 border-r border-zinc-800/60">
+    <div className="flex flex-col h-full bg-background border-r border-border/60">
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-zinc-800/60 shrink-0">
+      <div className="px-4 pt-4 pb-3 border-b border-border/60 shrink-0">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <MessageSquare size={16} className="text-emerald-400" />
-            <span className="font-bold text-sm text-white">Conversations</span>
+            <span className="font-bold text-sm text-foreground">Conversations</span>
             {totalUnread > 0 && (
               <span
                 title={`${totalUnread} unread message${totalUnread > 1 ? 's' : ''} from customers`}
-                className="text-[10px] font-black bg-red-500/90 text-white px-1.5 py-0.5 rounded-full leading-none cursor-default"
+                className="text-[10px] font-black bg-red-500/90 text-foreground px-1.5 py-0.5 rounded-full leading-none cursor-default"
               >
                 {totalUnread}
               </span>
             )}
           </div>
-          <span className="text-[10px] font-bold text-zinc-600 bg-zinc-900 px-2 py-0.5 rounded-full border border-zinc-800">
+          <span className="text-[10px] font-bold text-zinc-600 bg-muted px-2 py-0.5 rounded-full border border-border">
             {inbox.length}
           </span>
         </div>
@@ -59,7 +59,7 @@ export function InboxPanel() {
           <div className="flex flex-col items-center justify-center gap-3 text-center p-6 mt-4">
             <MessageSquare size={24} className="text-zinc-700" />
             <div>
-              <p className="text-sm font-bold text-zinc-400">No conversations yet</p>
+              <p className="text-sm font-bold text-muted-foreground">No conversations yet</p>
               <p className="text-xs text-zinc-600 mt-1">Connect WhatsApp to start receiving customer messages.</p>
             </div>
             <Link href="/dashboard/connect" className="dash-secondary-action">Connect WhatsApp</Link>
@@ -68,7 +68,7 @@ export function InboxPanel() {
         {/* Search returned no results */}
         {inbox.length > 0 && filteredInbox.length === 0 && (
           <div className="flex flex-col items-center justify-center gap-2 p-8 text-center">
-            <p className="text-xs font-bold text-zinc-500">No results for &ldquo;{searchTerm}&rdquo;</p>
+            <p className="text-xs font-bold text-muted-foreground">No results for &ldquo;{searchTerm}&rdquo;</p>
             <p className="text-[11px] text-zinc-600">Try a different name or phone number.</p>
           </div>
         )}
@@ -80,22 +80,22 @@ export function InboxPanel() {
             <button
               key={chat.phone}
               onClick={() => { loadChat(chat.phone, true, true); setMobileView('chat'); }}
-              className={`w-full text-left px-4 py-3 border-b border-zinc-800/40 transition-all relative ${
+              className={`w-full text-left px-4 py-3 border-b border-border/40 transition-all relative ${
                 active
                   ? 'bg-emerald-500/5 border-l-2 border-l-emerald-500'
-                  : 'hover:bg-zinc-900/60 border-l-2 border-l-transparent'
+                  : 'hover:bg-muted/60 border-l-2 border-l-transparent'
               }`}
             >
               <div className="flex items-start gap-3">
                 {/* Avatar */}
                 <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-black ${
-                  active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-400'
+                  active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-secondary text-muted-foreground'
                 }`}>
                   {initials(chat.customer_name) || <UserCircle size={18} />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-0.5">
-                    <span className={`text-sm truncate pr-2 ${hasUnread ? 'font-bold text-white' : 'text-zinc-300'}`}>
+                    <span className={`text-sm truncate pr-2 ${hasUnread ? 'font-bold text-foreground' : 'text-muted-foreground'}`}>
                       {name}
                     </span>
                     <span className={`text-[10px] shrink-0 ${hasUnread ? 'text-emerald-400 font-bold' : 'text-zinc-600'}`}>
@@ -103,7 +103,7 @@ export function InboxPanel() {
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <p className={`text-xs truncate pr-2 ${hasUnread ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                    <p className={`text-xs truncate pr-2 ${hasUnread ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                       {chat.latest_message || 'No messages'}
                     </p>
                     <div className="flex items-center gap-1 shrink-0">

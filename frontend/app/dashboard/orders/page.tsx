@@ -111,56 +111,56 @@ function ConfirmDialog({ order, targetStatus, onConfirm, onCancel, loading }: Co
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative z-10 w-full max-w-sm mx-4 rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl p-6">
+      <div className="relative z-10 w-full max-w-sm mx-4 rounded-2xl border border-border bg-muted shadow-2xl p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-lg">
+          <div className="w-10 h-10 rounded-xl bg-secondary border border-border flex items-center justify-center text-lg">
             {col?.emoji}
           </div>
           <div>
-            <h3 className="font-bold text-white text-sm">Move to {col?.label}?</h3>
-            <p className="text-xs text-zinc-500">Order #{order.order_num || order.id} · {order.customer_name || order.customer_phone}</p>
+            <h3 className="font-bold text-foreground text-sm">Move to {col?.label}?</h3>
+            <p className="text-xs text-muted-foreground">Order #{order.order_num || order.id} · {order.customer_name || order.customer_phone}</p>
           </div>
         </div>
 
         {targetStatus === 'shipped' && (
           <div className="mb-4">
-            <label className="text-xs font-semibold text-zinc-400 block mb-1.5">Tracking Number (optional)</label>
+            <label className="text-xs font-semibold text-muted-foreground block mb-1.5">Tracking Number (optional)</label>
             <input
               value={tracking}
               onChange={e => setTracking(e.target.value)}
               placeholder="e.g. PRIOMAIL123456"
-              className="w-full px-3 py-2.5 rounded-xl text-sm bg-zinc-800 border border-zinc-700 text-zinc-200 placeholder-zinc-600 outline-none focus:border-emerald-500/50 transition-colors"
+              className="w-full px-3 py-2.5 rounded-xl text-sm bg-secondary border border-border text-foreground placeholder-zinc-600 outline-none focus:border-emerald-500/50 transition-colors"
             />
           </div>
         )}
 
         {targetStatus === 'cancelled' && (
           <div className="mb-4">
-            <label className="text-xs font-semibold text-zinc-400 block mb-1.5">Cancel Reason (optional)</label>
+            <label className="text-xs font-semibold text-muted-foreground block mb-1.5">Cancel Reason (optional)</label>
             <input
               value={reason}
               onChange={e => setReason(e.target.value)}
               placeholder="e.g. Customer requested, out of stock..."
-              className="w-full px-3 py-2.5 rounded-xl text-sm bg-zinc-800 border border-zinc-700 text-zinc-200 placeholder-zinc-600 outline-none focus:border-red-500/50 transition-colors"
+              className="w-full px-3 py-2.5 rounded-xl text-sm bg-secondary border border-border text-foreground placeholder-zinc-600 outline-none focus:border-red-500/50 transition-colors"
             />
           </div>
         )}
 
-        <p className="text-xs text-zinc-500 mb-4">
+        <p className="text-xs text-muted-foreground mb-4">
           A WhatsApp notification will be sent to {order.customer_phone}.
         </p>
 
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-zinc-400 bg-zinc-800 border border-zinc-700 hover:bg-zinc-750 transition-colors"
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-muted-foreground bg-secondary border border-border hover:bg-zinc-750 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={() => onConfirm(tracking, reason)}
             disabled={loading}
-            className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
+            className="flex-1 py-2.5 rounded-xl text-sm font-bold text-foreground bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
           >
             {loading ? <Loader2 size={14} className="animate-spin" /> : null}
             Confirm
@@ -196,7 +196,7 @@ function ProofReviewSection({ order, onActionComplete }: { order: Order; onActio
   );
 
   if (proofs.length === 0) return (
-    <div className="rounded-xl border border-dashed border-zinc-700 p-4 text-center">
+    <div className="rounded-xl border border-dashed border-border p-4 text-center">
       <BanknoteIcon size={18} className="text-zinc-700 mx-auto mb-2" />
       <p className="text-xs text-zinc-600">No payment proof submitted yet.</p>
       <p className="text-[10px] text-zinc-700 mt-0.5">Customer will send a bank transfer screenshot via WhatsApp.</p>
@@ -253,9 +253,9 @@ function ProofReviewSection({ order, onActionComplete }: { order: Order; onActio
 
           {/* Gemini description */}
           {proof.description && (
-            <div className="rounded-lg bg-black/20 border border-zinc-800 p-3">
+            <div className="rounded-lg bg-black/20 border border-border p-3">
               <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-600 mb-1">AI Analysis</p>
-              <p className="text-xs text-zinc-300 leading-relaxed">{proof.description}</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">{proof.description}</p>
             </div>
           )}
 
@@ -269,15 +269,15 @@ function ProofReviewSection({ order, onActionComplete }: { order: Order; onActio
 
           {/* Amount */}
           <div className="flex items-center justify-between text-xs">
-            <span className="text-zinc-500">Expected Amount</span>
-            <span className="font-bold text-zinc-200">Rs. {Number(proof.amount).toLocaleString()}</span>
+            <span className="text-muted-foreground">Expected Amount</span>
+            <span className="font-bold text-foreground">Rs. {Number(proof.amount).toLocaleString()}</span>
           </div>
 
           {/* Rejection note */}
           {proof.status === 'rejected' && proof.merchant_note && (
             <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-2">
               <p className="text-[10px] font-bold text-red-400 mb-0.5">Rejection Reason</p>
-              <p className="text-xs text-zinc-400">{proof.merchant_note}</p>
+              <p className="text-xs text-muted-foreground">{proof.merchant_note}</p>
             </div>
           )}
 
@@ -309,7 +309,7 @@ function ProofReviewSection({ order, onActionComplete }: { order: Order; onActio
                     onChange={e => setRejectNote(e.target.value)}
                     placeholder="Rejection reason (shown to customer)…"
                     rows={2}
-                    className="w-full px-3 py-2 rounded-xl text-xs bg-zinc-900 border border-red-500/30 text-zinc-200 placeholder-zinc-600 outline-none focus:border-red-500/60 resize-none transition-colors"
+                    className="w-full px-3 py-2 rounded-xl text-xs bg-muted border border-red-500/30 text-foreground placeholder-zinc-600 outline-none focus:border-red-500/60 resize-none transition-colors"
                   />
                   <div className="flex gap-2">
                     <button
@@ -322,7 +322,7 @@ function ProofReviewSection({ order, onActionComplete }: { order: Order; onActio
                     </button>
                     <button
                       onClick={() => { setShowRejectInput(false); setRejectNote(''); }}
-                      className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-500 bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 transition-colors"
+                      className="px-4 py-2 rounded-xl text-xs font-semibold text-muted-foreground bg-secondary border border-border hover:bg-border transition-colors"
                     >
                       Cancel
                     </button>
@@ -368,50 +368,50 @@ function OrderModal({ order, onClose, onProofAction }: { order: Order; onClose: 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl">
+      <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-muted shadow-2xl">
         {/* Header */}
-        <div className="sticky top-0 flex items-center justify-between p-5 border-b border-zinc-800 bg-zinc-900 rounded-t-2xl">
+        <div className="sticky top-0 flex items-center justify-between p-5 border-b border-border bg-muted rounded-t-2xl">
           <div className="flex items-center gap-3">
             <div className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${style.badge}`}>
               {col?.emoji} {col?.label}
             </div>
-            <span className="text-sm font-bold text-white">Order #{order.order_num || order.id}</span>
+            <span className="text-sm font-bold text-foreground">Order #{order.order_num || order.id}</span>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-xl bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center transition-colors">
-            <X size={14} className="text-zinc-400" />
+          <button onClick={onClose} className="w-8 h-8 rounded-xl bg-secondary hover:bg-border flex items-center justify-center transition-colors">
+            <X size={14} className="text-muted-foreground" />
           </button>
         </div>
 
         <div className="p-5 space-y-5">
           {/* Customer */}
-          <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-4 space-y-2">
-            <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3">Customer</p>
-            <div className="flex items-center gap-2 text-sm text-zinc-300">
-              <User size={13} className="text-zinc-500" />
+          <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-2">
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3">Customer</p>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <User size={13} className="text-muted-foreground" />
               <span className="font-semibold">{order.customer_name || 'Anonymous'}</span>
             </div>
-            <div className="flex items-center gap-2 text-sm text-zinc-400 font-mono">
-              <Phone size={13} className="text-zinc-500" />
+            <div className="flex items-center gap-2 text-sm text-muted-foreground font-mono">
+              <Phone size={13} className="text-muted-foreground" />
               {order.customer_phone}
             </div>
           </div>
 
           {/* Items */}
-          <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3">Items Ordered</p>
+          <div className="rounded-xl border border-border bg-secondary/30 p-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3">Items Ordered</p>
             <div className="space-y-2">
               {items.map((item, i) => (
                 <div key={i} className="flex justify-between items-center text-sm">
-                  <span className="text-zinc-300">
-                    <span className="text-zinc-500 font-bold mr-1">{item.qty}×</span>
+                  <span className="text-muted-foreground">
+                    <span className="text-muted-foreground font-bold mr-1">{item.qty}×</span>
                     {item.name}
-                    {item.size && <span className="text-zinc-500 ml-1">({item.size})</span>}
+                    {item.size && <span className="text-muted-foreground ml-1">({item.size})</span>}
                   </span>
-                  <span className="text-zinc-400 font-mono">{fmtMoney(item.subtotal)}</span>
+                  <span className="text-muted-foreground font-mono">{fmtMoney(item.subtotal)}</span>
                 </div>
               ))}
-              <div className="flex justify-between items-center pt-2 border-t border-zinc-700 text-sm font-bold">
-                <span className="text-zinc-300">Total</span>
+              <div className="flex justify-between items-center pt-2 border-t border-border text-sm font-bold">
+                <span className="text-muted-foreground">Total</span>
                 <span className="text-emerald-400 font-black">{fmtMoney(order.total_price)}</span>
               </div>
             </div>
@@ -419,25 +419,25 @@ function OrderModal({ order, onClose, onProofAction }: { order: Order; onClose: 
 
           {/* Address */}
           {order.address && (
-            <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-4">
-              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">
+            <div className="rounded-xl border border-border bg-secondary/30 p-4">
+              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">
                 <MapPin size={10} /> Delivery Address
               </div>
-              <p className="text-sm text-zinc-300 leading-relaxed">{order.address}</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">{order.address}</p>
             </div>
           )}
 
           {/* Payment */}
-          <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-4 grid grid-cols-2 gap-4">
+          <div className="rounded-xl border border-border bg-secondary/30 p-4 grid grid-cols-2 gap-4">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1">Payment Method</p>
-              <p className="text-sm text-zinc-300 font-semibold flex items-center gap-1.5">
-                <CreditCard size={13} className="text-zinc-500" />
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Payment Method</p>
+              <p className="text-sm text-muted-foreground font-semibold flex items-center gap-1.5">
+                <CreditCard size={13} className="text-muted-foreground" />
                 {order.payment_method === 'bank_transfer' ? '🏦 Bank Transfer' : '💵 Cash on Delivery'}
               </p>
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1">Payment Status</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Payment Status</p>
               <span className={`text-xs font-bold px-2 py-0.5 rounded-md border ${
                 order.payment_status === 'approved'             ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' :
                 order.payment_status === 'awaiting_verification'? 'bg-orange-500/15 text-orange-400 border-orange-500/30' :
@@ -454,8 +454,8 @@ function OrderModal({ order, onClose, onProofAction }: { order: Order; onClose: 
 
           {/* Bank Transfer Proof Review — only for bank_transfer orders */}
           {order.payment_method === 'bank_transfer' && (
-            <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-4">
-              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3 flex items-center gap-1.5">
+            <div className="rounded-xl border border-border bg-secondary/30 p-4">
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-1.5">
                 <BanknoteIcon size={10} /> Payment Proof
               </p>
               <ProofReviewSection order={order} onActionComplete={onProofAction} />
@@ -468,20 +468,20 @@ function OrderModal({ order, onClose, onProofAction }: { order: Order; onClose: 
               <p className="text-[10px] font-black uppercase tracking-widest text-violet-400 mb-1">
                 <Truck size={10} className="inline mr-1" />Tracking Number
               </p>
-              <p className="text-sm font-mono text-zinc-200">{order.tracking_number}</p>
+              <p className="text-sm font-mono text-foreground">{order.tracking_number}</p>
             </div>
           )}
 
           {/* ── Late Delivery Alert Toggle (shipped orders only) ─────────────── */}
           {order.status === 'shipped' && (
-            <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-4">
+            <div className="rounded-xl border border-border bg-secondary/30 p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 flex items-center gap-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1">
                     <Truck size={10} className="text-zinc-600" />
                     Late Delivery Alert
                   </p>
-                  <p className="text-xs text-zinc-500 leading-relaxed">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
                     {alertEnabled
                       ? 'Cron will alert you if this order isn\'t delivered within 5 days of shipping.'
                       : 'Alerts suppressed — you won\'t be notified if this order is late.'}
@@ -495,12 +495,12 @@ function OrderModal({ order, onClose, onProofAction }: { order: Order; onClose: 
                   aria-label="Toggle late delivery alert"
                 >
                   {alertSaving
-                    ? <Loader2 size={16} className="animate-spin text-zinc-500" />
+                    ? <Loader2 size={16} className="animate-spin text-muted-foreground" />
                     : (
                       <div className={`w-11 h-6 rounded-full border-2 transition-all duration-200 ${
                         alertEnabled
                           ? 'bg-violet-500/30 border-violet-500/60'
-                          : 'bg-zinc-800 border-zinc-700'
+                          : 'bg-secondary border-border'
                       }`}>
                         <div className={`w-4 h-4 rounded-full mt-0.5 transition-all duration-200 ${
                           alertEnabled
@@ -517,11 +517,11 @@ function OrderModal({ order, onClose, onProofAction }: { order: Order; onClose: 
 
           {/* Notes */}
           {order.notes && (
-            <div className="rounded-xl border border-zinc-800 bg-zinc-800/30 p-4">
-              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1">
+            <div className="rounded-xl border border-border bg-secondary/30 p-4">
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">
                 <StickyNote size={10} className="inline mr-1" />Notes
               </p>
-              <p className="text-sm text-zinc-300 leading-relaxed">{order.notes}</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">{order.notes}</p>
             </div>
           )}
 
@@ -531,7 +531,7 @@ function OrderModal({ order, onClose, onProofAction }: { order: Order; onClose: 
               <p className="text-[10px] font-black uppercase tracking-widest text-red-400 mb-1">
                 <AlertTriangle size={10} className="inline mr-1" />Cancellation Reason
               </p>
-              <p className="text-sm text-zinc-300">{order.cancel_reason}</p>
+              <p className="text-sm text-muted-foreground">{order.cancel_reason}</p>
             </div>
           )}
 
@@ -574,7 +574,7 @@ function OrderCard({ order, onDragStart, onClick }: CardProps) {
       onDragStart={e => onDragStart(e, order)}
       onClick={() => onClick(order)}
       className={`group rounded-2xl border cursor-grab active:cursor-grabbing transition-all hover:shadow-lg select-none ${
-        isOverdue ? 'border-red-500/50 bg-red-950/20 hover:bg-red-950/40' : 'border-zinc-800 bg-zinc-900/60 hover:bg-zinc-900'
+        isOverdue ? 'border-red-500/50 bg-red-950/20 hover:bg-red-950/40' : 'border-border bg-muted/60 hover:bg-muted'
       } ${style.card}`}
     >
       {/* Card header */}
@@ -582,19 +582,19 @@ function OrderCard({ order, onDragStart, onClick }: CardProps) {
         <div>
           <div className="flex items-center gap-1.5 mb-1">
             <Hash size={10} className="text-zinc-600" />
-            <span className="text-[10px] font-black text-zinc-500 tracking-wider">
+            <span className="text-[10px] font-black text-muted-foreground tracking-wider">
               {order.order_num ? `#${order.order_num}` : `ID:${order.id}`}
             </span>
           </div>
-          <p className="font-bold text-sm text-zinc-100 leading-tight">
+          <p className="font-bold text-sm text-foreground leading-tight">
             {order.customer_name || 'Anonymous'}
           </p>
-          <p className="text-[11px] text-zinc-500 font-mono mt-0.5">{order.customer_phone}</p>
+          <p className="text-[11px] text-muted-foreground font-mono mt-0.5">{order.customer_phone}</p>
         </div>
         {isOverdue ? (
           <AlertTriangle size={14} className="text-red-500 mt-1 shrink-0" />
         ) : (
-          <ChevronRight size={14} className="text-zinc-700 group-hover:text-zinc-500 transition-colors mt-1 shrink-0" />
+          <ChevronRight size={14} className="text-zinc-700 group-hover:text-muted-foreground transition-colors mt-1 shrink-0" />
         )}
       </div>
 
@@ -602,8 +602,8 @@ function OrderCard({ order, onDragStart, onClick }: CardProps) {
       <div className="px-4 pb-3 space-y-1">
         {items.slice(0, 2).map((item, i) => (
           <div key={i} className="flex justify-between text-xs">
-            <span className="text-zinc-400">{item.qty}× {item.name}{item.size ? ` (${item.size})` : ''}</span>
-            <span className="text-zinc-500 font-mono">{fmtMoney(item.price)}</span>
+            <span className="text-muted-foreground">{item.qty}× {item.name}{item.size ? ` (${item.size})` : ''}</span>
+            <span className="text-muted-foreground font-mono">{fmtMoney(item.price)}</span>
           </div>
         ))}
         {items.length > 2 && (
@@ -612,7 +612,7 @@ function OrderCard({ order, onDragStart, onClick }: CardProps) {
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-800/60">
+      <div className="flex items-center justify-between px-4 py-3 border-t border-border/60">
         <span className="text-sm font-black text-emerald-400">{fmtMoney(order.total_price)}</span>
         <div className="flex items-center gap-2">
           {/* Payment badge — only for bank transfers */}
@@ -658,7 +658,7 @@ function KanbanColumn({ colKey, label, emoji, orders, onDragStart, onDrop, onCar
   return (
     <div
       className={`flex flex-col min-w-[280px] w-[280px] rounded-2xl border transition-all duration-150 ${
-        isOver ? style.drop + ' scale-[1.01]' : 'border-zinc-800 bg-zinc-900/30'
+        isOver ? style.drop + ' scale-[1.01]' : 'border-border bg-muted'
       }`}
       onDragOver={e => { e.preventDefault(); setIsOver(true); }}
       onDragLeave={() => setIsOver(false)}
@@ -668,7 +668,7 @@ function KanbanColumn({ colKey, label, emoji, orders, onDragStart, onDrop, onCar
       <div className={`flex items-center justify-between p-4 rounded-t-2xl border-b ${style.header}`}>
         <div className="flex items-center gap-2">
           <span className="text-base">{emoji}</span>
-          <span className="font-black text-sm text-white">{label}</span>
+          <span className="font-black text-sm text-foreground">{label}</span>
         </div>
         <div className="flex items-center gap-2">
           {colKey === 'shipped' && overdueCount > 0 && (
@@ -692,8 +692,8 @@ function KanbanColumn({ colKey, label, emoji, orders, onDragStart, onDrop, onCar
         {orders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="text-2xl mb-2 opacity-30">{emoji}</div>
-            <p className="text-xs text-zinc-400 font-medium">No {label.toLowerCase()} orders</p>
-            {isOver && <p className="text-xs text-zinc-500 mt-1">Drop to move here</p>}
+            <p className="text-xs text-muted-foreground font-medium">No {label.toLowerCase()} orders</p>
+            {isOver && <p className="text-xs text-muted-foreground mt-1">Drop to move here</p>}
           </div>
         ) : (
           orders.map(order => (
@@ -857,7 +857,7 @@ export default function OrdersPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-3">
+          <h1 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-3">
             <ShoppingBag size={24} className="text-emerald-400" />
             {t('orders.title')}
             {pendingReviewCount > 0 && (
@@ -866,14 +866,14 @@ export default function OrdersPage() {
               </span>
             )}
           </h1>
-          <p className="text-sm text-zinc-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             {t('orders.drag_hint')}
           </p>
         </div>
         <button
           onClick={fetchOrders}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700 transition-colors disabled:opacity-60 shrink-0"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-secondary border border-border text-muted-foreground hover:bg-border transition-colors disabled:opacity-60 shrink-0"
         >
           {loading ? <Loader2 size={13} className="animate-spin" /> : <Package size={13} />}
           Refresh
@@ -883,13 +883,13 @@ export default function OrdersPage() {
       {/* Stats row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: t('orders.total'),    value: totalOrders,       icon: Package,    color: 'text-zinc-400',    bg: 'bg-zinc-800/50'    },
+          { label: t('orders.total'),    value: totalOrders,       icon: Package,    color: 'text-muted-foreground',    bg: 'bg-accent'    },
           { label: t('common.active'),   value: activeOrders,      icon: Clock,      color: 'text-amber-400',   bg: 'bg-amber-500/10'   },
           { label: t('dashboard.revenue'),value: fmtMoney(revenue), icon: TrendingUp, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
           { label: t('orders.cancelled'),value: cancelled,         icon: XCircle,    color: 'text-red-400',     bg: 'bg-red-500/10'     },
         ].map(({ label, value, icon: Icon, color, bg }) => (
-          <div key={label} className={`flex items-center gap-3 p-4 rounded-2xl border border-zinc-800 ${bg}`}>
-            <div className="w-9 h-9 rounded-xl bg-zinc-900/60 border border-zinc-800 flex items-center justify-center shrink-0">
+          <div key={label} className={`flex items-center gap-3 p-4 rounded-2xl border border-border ${bg}`}>
+            <div className="w-9 h-9 rounded-xl bg-muted/60 border border-border flex items-center justify-center shrink-0">
               <Icon size={16} className={color} />
             </div>
             <div>
@@ -912,7 +912,7 @@ export default function OrdersPage() {
 
         <div className="flex items-center gap-3">
           {search && (
-            <span className="text-xs font-medium text-zinc-400">
+            <span className="text-xs font-medium text-muted-foreground">
               Showing {filtered.length} of {totalOrders}
             </span>
           )}

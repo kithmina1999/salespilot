@@ -54,7 +54,7 @@ function OTPInput({ value, onChange }: { value: string; onChange: (v: string) =>
               (e.currentTarget.previousElementSibling as HTMLInputElement).focus();
             }
           }}
-          className="w-11 h-12 text-center text-xl font-bold bg-zinc-900 border border-zinc-700 rounded-xl text-white outline-none focus:border-emerald-500 focus:bg-zinc-800 transition-all"
+          className="w-11 h-12 text-center text-xl font-bold bg-muted border border-border rounded-xl text-foreground outline-none focus:border-emerald-500 focus:bg-secondary transition-all"
         />
       ))}
     </div>
@@ -75,16 +75,16 @@ function AccordionCard({
   return (
     <div className={`rounded-xl border overflow-hidden transition-all duration-200 ${
       danger
-        ? isOpen ? 'border-red-500/30 bg-red-500/5' : 'border-zinc-800 bg-transparent hover:border-red-500/20'
-        : isOpen ? 'border-zinc-700 bg-zinc-900/60 shadow-sm' : 'border-zinc-800 bg-transparent hover:border-zinc-700'
+        ? isOpen ? 'border-red-500/30 bg-red-500/5' : 'border-border bg-transparent hover:border-red-500/20'
+        : isOpen ? 'border-border bg-muted/60 shadow-sm' : 'border-border bg-transparent hover:border-border'
     }`}>
       {/* ── Trigger ─────────────────────────────────────────── */}
       <button
         onClick={onToggle}
         className={`w-full flex items-center gap-4 px-5 py-4 text-left transition-colors ${
           isOpen
-            ? danger ? 'bg-red-500/5' : 'bg-zinc-800/40'
-            : 'hover:bg-zinc-800/20'
+            ? danger ? 'bg-red-500/5' : 'bg-secondary/40'
+            : 'hover:bg-secondary/20'
         }`}
       >
         {/* Icon badge */}
@@ -95,24 +95,24 @@ function AccordionCard({
         {/* Text */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`font-semibold text-sm ${danger ? 'text-red-400' : 'text-zinc-100'}`}>
+            <span className={`font-semibold text-sm ${danger ? 'text-red-400' : 'text-foreground'}`}>
               {title}
             </span>
             {badge}
           </div>
-          <p className="text-xs text-zinc-500 mt-0.5 truncate">{subtitle}</p>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">{subtitle}</p>
         </div>
 
         {/* Chevron */}
         <ChevronDown
           size={15}
-          className={`shrink-0 text-zinc-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          className={`shrink-0 text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>
 
       {/* ── Divider (only when open) ─────────────────────────── */}
       {isOpen && (
-        <div className={`border-t ${danger ? 'border-red-500/15' : 'border-zinc-700/50'}`} />
+        <div className={`border-t ${danger ? 'border-red-500/15' : 'border-border/50'}`} />
       )}
 
       {/* ── Content ─────────────────────────────────────────── */}
@@ -127,7 +127,7 @@ function AccordionCard({
 
 // ── Coming Soon pill ─────────────────────────────────────────────────────────
 const ComingSoon = () => (
-  <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-500 border border-zinc-700">
+  <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">
     Coming Soon
   </span>
 );
@@ -208,14 +208,14 @@ export default function SecurityTab() {
       {/* ── 1. Change Password ────────────────────────────────────── */}
       <AccordionCard
         isOpen={open.password} onToggle={() => toggle('password')}
-        icon={Key} iconBg="bg-zinc-800" iconColor="text-zinc-300"
+        icon={Key} iconBg="bg-secondary" iconColor="text-muted-foreground"
         title="Change Password"
         subtitle="Send a one-time code to your email to set a new password"
       >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-zinc-950 border border-zinc-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-background border border-border">
           <div>
-            <p className="text-sm font-semibold text-zinc-200">Update Login Password</p>
-            <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
+            <p className="text-sm font-semibold text-foreground">Update Login Password</p>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
               A 6-digit verification code will be sent to your registered email address.
             </p>
           </div>
@@ -236,14 +236,14 @@ export default function SecurityTab() {
         subtitle="Enhanced login verification via WhatsApp OTP"
         badge={<ComingSoon />}
       >
-        <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-950 border border-zinc-800 gap-4">
+        <div className="flex items-center justify-between p-4 rounded-xl bg-background border border-border gap-4">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
               <MessageSquare size={15} className="text-emerald-400" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-white">WhatsApp OTP</p>
-              <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">
+              <p className="text-sm font-semibold text-foreground">WhatsApp OTP</p>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                 Requires a verified Meta business account to send outbound auth messages.
               </p>
             </div>
@@ -265,12 +265,12 @@ export default function SecurityTab() {
             { device: 'Windows PC · Chrome', location: 'Colombo, Sri Lanka', current: true,  Icon: Laptop },
             { device: 'iPhone 14 · Safari',  location: 'Kandy, Sri Lanka · Last active 2h ago', current: false, Icon: Smartphone },
           ].map((s, i) => (
-            <div key={i} className="flex items-center gap-3 p-4 rounded-xl bg-zinc-950 border border-zinc-800">
-              <div className={`p-2.5 rounded-xl shrink-0 ${s.current ? 'bg-blue-500/10 text-blue-400' : 'bg-zinc-800 text-zinc-500'}`}>
+            <div key={i} className="flex items-center gap-3 p-4 rounded-xl bg-background border border-border">
+              <div className={`p-2.5 rounded-xl shrink-0 ${s.current ? 'bg-blue-500/10 text-blue-400' : 'bg-secondary text-muted-foreground'}`}>
                 <s.Icon size={17} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white flex items-center gap-2 flex-wrap">
+                <p className="text-sm font-semibold text-foreground flex items-center gap-2 flex-wrap">
                   {s.device}
                   {s.current && (
                     <span className="text-[9px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
@@ -278,7 +278,7 @@ export default function SecurityTab() {
                     </span>
                   )}
                 </p>
-                <p className="text-xs text-zinc-500 mt-0.5">{s.location}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{s.location}</p>
               </div>
             </div>
           ))}
@@ -293,9 +293,9 @@ export default function SecurityTab() {
         subtitle="Review recent sign-in activity for anomalies"
         badge={<ComingSoon />}
       >
-        <div className="overflow-x-auto rounded-xl border border-zinc-800">
+        <div className="overflow-x-auto rounded-xl border border-border">
           <table className="w-full text-left">
-            <thead className="text-[10px] font-bold uppercase tracking-widest text-zinc-600 bg-zinc-950 border-b border-zinc-800">
+            <thead className="text-[10px] font-bold uppercase tracking-widest text-zinc-600 bg-background border-b border-border">
               <tr>
                 <th className="px-4 py-3">Date & Time</th>
                 <th className="px-4 py-3">Device</th>
@@ -303,15 +303,15 @@ export default function SecurityTab() {
                 <th className="px-4 py-3 text-right">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/50 bg-zinc-950">
+            <tbody className="divide-y divide-zinc-800/50 bg-background">
               {[
                 { time: 'Today, 09:41 AM',           device: 'Windows PC · Chrome', ip: '112.134.78.11',  ok: true  },
                 { time: 'Yesterday, 14:22 PM',        device: 'iPhone 14 · Safari',  ip: '175.157.19.220', ok: true  },
                 { time: '05 Apr 2026, 21:05 PM',      device: 'Unknown · Firefox',   ip: '104.28.192.11',  ok: false },
               ].map((r, i) => (
-                <tr key={i} className="hover:bg-zinc-900/40 transition-colors">
-                  <td className="px-4 py-3 text-xs text-zinc-400 whitespace-nowrap">{r.time}</td>
-                  <td className="px-4 py-3 text-xs text-zinc-400">{r.device}</td>
+                <tr key={i} className="hover:bg-muted/40 transition-colors">
+                  <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{r.time}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{r.device}</td>
                   <td className="px-4 py-3 text-xs font-mono text-zinc-600">{r.ip}</td>
                   <td className="px-4 py-3 text-right">
                     <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
@@ -332,16 +332,16 @@ export default function SecurityTab() {
       {/* ══ Password Modal ═══════════════════════════════════════════════════ */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-md rounded-2xl bg-zinc-950 border border-zinc-800 shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden">
+          <div className="w-full max-w-md rounded-2xl bg-background border border-border shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
                   <Lock size={14} className="text-emerald-400" />
                 </div>
-                <p className="font-bold text-white text-sm">Change Password</p>
+                <p className="font-bold text-foreground text-sm">Change Password</p>
               </div>
-              <button onClick={closeModal} className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors">
+              <button onClick={closeModal} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
                 <XCircle size={16} />
               </button>
             </div>
@@ -350,12 +350,12 @@ export default function SecurityTab() {
               {/* Step 1: idle / sending */}
               {(step === 'idle' || step === 'sending') && (
                 <div className="text-center space-y-5">
-                  <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto">
-                    <Lock size={24} className="text-zinc-400" />
+                  <div className="w-14 h-14 rounded-2xl bg-muted border border-border flex items-center justify-center mx-auto">
+                    <Lock size={24} className="text-muted-foreground" />
                   </div>
                   <div>
-                    <p className="font-bold text-white text-base mb-1">Verify it's you</p>
-                    <p className="text-sm text-zinc-400 leading-relaxed">
+                    <p className="font-bold text-foreground text-base mb-1">Verify it's you</p>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
                       We'll send a 6-digit code to your registered email to confirm your identity before changing the password.
                     </p>
                   </div>
@@ -373,9 +373,9 @@ export default function SecurityTab() {
               {(step === 'otp' || step === 'verifying') && (
                 <div className="space-y-5">
                   <div className="text-center">
-                    <p className="font-bold text-white text-base mb-1">Enter verification code</p>
-                    <p className="text-sm text-zinc-400">
-                      Sent to <span className="text-zinc-200 font-mono">{maskedEmail}</span>
+                    <p className="font-bold text-foreground text-base mb-1">Enter verification code</p>
+                    <p className="text-sm text-muted-foreground">
+                      Sent to <span className="text-foreground font-mono">{maskedEmail}</span>
                       <br /><span className="text-zinc-600 text-xs">Valid for 10 minutes</span>
                     </p>
                   </div>
@@ -390,7 +390,7 @@ export default function SecurityTab() {
                   </button>
                   <button
                     onClick={() => { setStep('idle'); setOtp(''); setOtpError(''); }}
-                    className="w-full text-xs text-zinc-600 hover:text-zinc-400 transition-colors py-1 text-center"
+                    className="w-full text-xs text-zinc-600 hover:text-muted-foreground transition-colors py-1 text-center"
                   >
                     Didn't receive it? Send again
                   </button>
@@ -401,29 +401,29 @@ export default function SecurityTab() {
               {(step === 'password' || step === 'saving') && (
                 <div className="space-y-4">
                   <div className="text-center">
-                    <p className="font-bold text-white text-base mb-1">Set new password</p>
-                    <p className="text-sm text-zinc-400">Choose a strong password for your account.</p>
+                    <p className="font-bold text-foreground text-base mb-1">Set new password</p>
+                    <p className="text-sm text-muted-foreground">Choose a strong password for your account.</p>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">New Password</label>
+                    <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">New Password</label>
                     <input
                       type="password"
                       placeholder="Min. 8 chars, 1 uppercase, 1 number"
                       value={newPass}
                       onChange={e => setNewPass(e.target.value)}
-                      className="w-full px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-xl text-sm outline-none focus:border-emerald-500 transition-colors text-white"
+                      className="w-full px-4 py-3 bg-muted border border-border rounded-xl text-sm outline-none focus:border-emerald-500 transition-colors text-foreground"
                     />
                     <PasswordStrength password={newPass} />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Confirm Password</label>
+                    <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Confirm Password</label>
                     <input
                       type="password"
                       placeholder="Repeat new password"
                       value={confirmPass}
                       onChange={e => setConfirmPass(e.target.value)}
-                      className={`w-full px-4 py-3 bg-zinc-900 rounded-xl text-sm outline-none transition-colors text-white border ${
-                        confirmPass && confirmPass !== newPass ? 'border-red-500/50 focus:border-red-500' : 'border-zinc-800 focus:border-emerald-500'
+                      className={`w-full px-4 py-3 bg-muted rounded-xl text-sm outline-none transition-colors text-foreground border ${
+                        confirmPass && confirmPass !== newPass ? 'border-red-500/50 focus:border-red-500' : 'border-border focus:border-emerald-500'
                       }`}
                     />
                     {confirmPass && confirmPass !== newPass && (
@@ -446,8 +446,8 @@ export default function SecurityTab() {
                   <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto">
                     <Check size={28} className="text-emerald-400" />
                   </div>
-                  <p className="font-bold text-white text-base">Password Updated</p>
-                  <p className="text-sm text-zinc-400">Your password has been changed successfully.</p>
+                  <p className="font-bold text-foreground text-base">Password Updated</p>
+                  <p className="text-sm text-muted-foreground">Your password has been changed successfully.</p>
                 </div>
               )}
             </div>

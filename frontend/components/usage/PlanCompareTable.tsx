@@ -39,7 +39,7 @@ function PlanHeader({ name, badge, accent }: { name: string; badge?: string; acc
           {badge}
         </div>
       )}
-      <p className={`text-base font-black ${badge ? 'text-white' : 'text-zinc-500'}`}>{name}</p>
+      <p className={`text-base font-black ${badge ? 'text-foreground' : 'text-muted-foreground'}`}>{name}</p>
     </div>
   );
 }
@@ -55,11 +55,11 @@ function FeatureRow({
   pro: React.ReactNode;
 }) {
   return (
-    <div className="grid grid-cols-[2fr_1fr_1.5fr_1.5fr] items-center py-2.5 border-b border-zinc-800/60 last:border-0">
-      <span className="text-sm text-zinc-400">{label}</span>
+    <div className="grid grid-cols-[2fr_1fr_1.5fr_1.5fr] items-center py-2.5 border-b border-border/60 last:border-0">
+      <span className="text-sm text-muted-foreground">{label}</span>
       <span className="text-xs text-zinc-600 text-center">{free}</span>
-      <span className="text-xs text-center font-semibold text-zinc-300">{starter}</span>
-      <span className="text-xs text-center font-semibold text-zinc-300">{pro}</span>
+      <span className="text-xs text-center font-semibold text-muted-foreground">{starter}</span>
+      <span className="text-xs text-center font-semibold text-muted-foreground">{pro}</span>
     </div>
   );
 }
@@ -69,7 +69,7 @@ function FeatureRow({
 function PlanCTA({ label, onClick, variant }: { label: string; onClick: () => void; variant: 'emerald' | 'purple' }) {
   const styles = variant === 'emerald'
     ? 'bg-emerald-500 hover:bg-emerald-400 shadow-emerald-500/20 text-black'
-    : 'bg-purple-500 hover:bg-purple-400 shadow-purple-500/20 text-white';
+    : 'bg-purple-500 hover:bg-purple-400 shadow-purple-500/20 text-foreground';
   return (
     <button
       onClick={onClick}
@@ -108,11 +108,11 @@ export default function PlanCompareTable({ onUpgrade }: Props) {
   const pro     = pl?.pro;
 
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
+    <div className="bg-card border border-border rounded-2xl p-6">
 
       {/* Column headers */}
       <div className="grid grid-cols-[2fr_1fr_1.5fr_1.5fr] mb-5 items-end">
-        <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Features</p>
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Features</p>
         <PlanHeader name="Free" accent="" />
         <PlanHeader name="Starter" badge="⭐ Popular" accent="bg-emerald-500/20 text-emerald-400 border-emerald-500/30" />
         <PlanHeader name="Pro"     badge="⚡ Power"   accent="bg-purple-500/20 text-purple-400 border-purple-500/30" />
@@ -158,8 +158,8 @@ export default function PlanCompareTable({ onUpgrade }: Props) {
       <FeatureRow
         label="Storage"
         free={<X size={13} className="text-zinc-700 mx-auto" />}
-        starter={fmtBytes(starter?.storage_bytes ?? 524288000)}
-        pro={fmtBytes(pro?.storage_bytes ?? 1073741824)}
+        starter={fmtBytes(starter?.storage_bytes ?? 104857600)}
+        pro={fmtBytes(pro?.storage_bytes ?? 524288000)}
       />
 
       {/* Pricing rows */}
@@ -167,13 +167,13 @@ export default function PlanCompareTable({ onUpgrade }: Props) {
         label="Monthly"
         free="Free"
         starter={
-          <span className="text-white font-black">
-            {formatLKR(starterMonthly)}<span className="text-zinc-500 text-[10px] font-normal">/mo</span>
+          <span className="text-foreground font-black">
+            {formatLKR(starterMonthly)}<span className="text-muted-foreground text-[10px] font-normal">/mo</span>
           </span>
         }
         pro={
-          <span className="text-white font-black">
-            {formatLKR(proMonthly)}<span className="text-zinc-500 text-[10px] font-normal">/mo</span>
+          <span className="text-foreground font-black">
+            {formatLKR(proMonthly)}<span className="text-muted-foreground text-[10px] font-normal">/mo</span>
           </span>
         }
       />
@@ -205,7 +205,7 @@ export default function PlanCompareTable({ onUpgrade }: Props) {
       <div className="mt-4 text-center">
         <button
           onClick={() => router.push('/dashboard/upgrade')}
-          className="text-xs text-zinc-600 hover:text-zinc-400 flex items-center gap-1 mx-auto transition-colors"
+          className="text-xs text-zinc-600 hover:text-muted-foreground flex items-center gap-1 mx-auto transition-colors"
         >
           See full plan comparison <ChevronRight size={12} />
         </button>

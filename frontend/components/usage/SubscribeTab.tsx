@@ -157,8 +157,8 @@ export default function SubscribeTab({ paymentStatus, onRefresh, onActivateTab, 
         <form onSubmit={handleSubmit} className="space-y-5">
 
           {/* How it works */}
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
-            <p className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-4">How to subscribe</p>
+          <div className="rounded-2xl border border-border bg-card p-6">
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">How to subscribe</p>
             <ol className="space-y-3">
               {[
                 { n: '1', t: 'Pick a plan & cycle', d: 'Choose Starter or Pro, and whether to pay monthly or annually.' },
@@ -171,8 +171,8 @@ export default function SubscribeTab({ paymentStatus, onRefresh, onActivateTab, 
                     {s.n}
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-zinc-200">{s.t}</p>
-                    <p className="text-xs text-zinc-500 mt-0.5">{s.d}</p>
+                    <p className="text-sm font-bold text-foreground">{s.t}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{s.d}</p>
                   </div>
                 </li>
               ))}
@@ -180,8 +180,8 @@ export default function SubscribeTab({ paymentStatus, onRefresh, onActivateTab, 
           </div>
 
           {/* Plan selector (Starter / Pro) */}
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
-            <p className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-4">Choose plan</p>
+          <div className="rounded-2xl border border-border bg-card p-6">
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">Choose plan</p>
             <div className="grid grid-cols-2 gap-3 mb-5">
               {(Object.keys(plans) as PlanKey[]).map(pk => (
                 <button
@@ -191,16 +191,16 @@ export default function SubscribeTab({ paymentStatus, onRefresh, onActivateTab, 
                   className={`relative p-4 rounded-xl border text-left transition-all ${
                     selectedPlan === pk
                       ? 'border-emerald-500 bg-emerald-500/10'
-                      : 'border-zinc-800 bg-black/40 hover:border-zinc-700'
+                      : 'border-border bg-black/40 hover:border-border'
                   }`}
                 >
                   {pk === 'starter' && (
-                    <span className={`absolute -top-2.5 left-3 text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${selectedPlan === pk ? 'bg-emerald-500 text-black' : 'bg-zinc-800 text-zinc-500'}`}>
+                    <span className={`absolute -top-2.5 left-3 text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${selectedPlan === pk ? 'bg-emerald-500 text-black' : 'bg-secondary text-muted-foreground'}`}>
                       Popular
                     </span>
                   )}
-                  <p className="text-sm font-black text-white mt-1">{plans[pk].label}</p>
-                  <p className="text-xs text-zinc-500 mt-0.5">
+                  <p className="text-sm font-black text-foreground mt-1">{plans[pk].label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     From {formatLKR(plans[pk].monthly)}/mo
                   </p>
                 </button>
@@ -208,7 +208,7 @@ export default function SubscribeTab({ paymentStatus, onRefresh, onActivateTab, 
             </div>
 
             {/* Cycle selector (Monthly / Annual) */}
-            <p className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-3">Billing cycle</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Billing cycle</p>
             <div className="grid grid-cols-2 gap-3">
               {(['monthly', 'annual'] as Cycle[]).map(c => {
                 // Each button shows ITS OWN price, not the selected cycle's price
@@ -223,18 +223,18 @@ export default function SubscribeTab({ paymentStatus, onRefresh, onActivateTab, 
                     className={`relative p-4 rounded-xl border text-left transition-all ${
                       cycle === c
                         ? 'border-emerald-500 bg-emerald-500/10 shadow-[0_0_20px_rgba(16,185,129,0.08)]'
-                        : 'border-zinc-800 bg-black/40 hover:border-zinc-700'
+                        : 'border-border bg-black/40 hover:border-border'
                     }`}
                   >
                     {c === 'annual' && (
-                      <span className={`absolute -top-3.5 left-3 text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${cycle === c ? 'bg-emerald-500 text-black' : 'bg-zinc-800 text-zinc-500'} whitespace-nowrap`}>
+                      <span className={`absolute -top-3.5 left-3 text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${cycle === c ? 'bg-emerald-500 text-black' : 'bg-secondary text-muted-foreground'} whitespace-nowrap`}>
                         2 months free · {savingsPct}% off
                       </span>
                     )}
-                    <p className="text-xs font-bold text-zinc-400 mb-1 capitalize mt-1">{c}</p>
-                    <p className="text-xl font-black text-white">{formatLKR(btnPrice)}</p>
+                    <p className="text-xs font-bold text-muted-foreground mb-1 capitalize mt-1">{c}</p>
+                    <p className="text-xl font-black text-foreground">{formatLKR(btnPrice)}</p>
                     {c === 'annual' && (
-                      <p className="text-[10px] text-zinc-500 mt-0.5">{formatLKR(btnMonthlyEquiv)}/mo</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{formatLKR(btnMonthlyEquiv)}/mo</p>
                     )}
                   </button>
                 );
@@ -243,8 +243,8 @@ export default function SubscribeTab({ paymentStatus, onRefresh, onActivateTab, 
           </div>
 
           {/* Bank details */}
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 space-y-4">
-            <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Bank Account Details</p>
+          <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Bank Account Details</p>
             <div className="grid grid-cols-2 gap-4 text-sm">
               {[
                 ['Bank', process.env.NEXT_PUBLIC_BANK_NAME || 'Commercial Bank of Ceylon'],
@@ -254,41 +254,41 @@ export default function SubscribeTab({ paymentStatus, onRefresh, onActivateTab, 
               ].map(([label, val]) => (
                 <div key={label}>
                   <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-wider mb-0.5">{label}</p>
-                  <p className="text-zinc-200 font-mono font-bold">{val}</p>
+                  <p className="text-foreground font-mono font-bold">{val}</p>
                 </div>
               ))}
             </div>
-            <div className="pt-3 border-t border-zinc-800 text-xs text-zinc-500 space-y-1">
-              <p className='text-white text-lg'><span className="text-emerald-400 text-lg font-bold">Transfer Amount: </span>{formatLKR(price)}/=</p>
+            <div className="pt-3 border-t border-border text-xs text-muted-foreground space-y-1">
+              <p className='text-foreground text-lg'><span className="text-emerald-400 text-lg font-bold">Transfer Amount: </span>{formatLKR(price)}/=</p>
               <p><span className="text-emerald-400 font-bold">Reference: </span>Your WhatsApp number (e.g. 0771234567)</p>
             </div>
           </div>
 
           {/* Screenshot upload */}
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 space-y-4">
-            <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Upload Payment Screenshot</p>
+          <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Upload Payment Screenshot</p>
 
             <div
               onClick={() => fileInputRef.current?.click()}
               className={`cursor-pointer rounded-xl border-2 border-dashed transition-all ${
                 preview
                   ? 'border-emerald-500/50 bg-emerald-500/5'
-                  : 'border-zinc-700 hover:border-zinc-600 bg-zinc-950'
+                  : 'border-border hover:border-zinc-600 bg-background'
               } flex flex-col items-center justify-center min-h-[150px] p-6`}
             >
               {preview ? (
                 <div className="flex flex-col items-center gap-3">
                   <img src={preview} alt="Preview" className="max-h-40 rounded-lg object-contain shadow-lg" />
-                  <p className="text-xs text-zinc-400 flex items-center gap-1.5"><FileImage size={12} /> {file?.name}</p>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5"><FileImage size={12} /> {file?.name}</p>
                   <p className="text-xs text-emerald-400 font-bold">Click to change</p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-3 text-center">
-                  <div className="w-12 h-12 rounded-xl bg-zinc-800 flex items-center justify-center">
-                    <Upload size={20} className="text-zinc-500" />
+                  <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center">
+                    <Upload size={20} className="text-muted-foreground" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-zinc-300">Click to upload screenshot</p>
+                    <p className="text-sm font-bold text-muted-foreground">Click to upload screenshot</p>
                     <p className="text-xs text-zinc-600 mt-1">JPG, PNG — Max 5 MB</p>
                   </div>
                 </div>
@@ -299,7 +299,7 @@ export default function SubscribeTab({ paymentStatus, onRefresh, onActivateTab, 
             <button
               type="submit"
               disabled={uploading || !file}
-              className="w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-black text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20 disabled:shadow-none"
+              className="w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:bg-secondary disabled:text-zinc-600 text-black font-black text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20 disabled:shadow-none"
             >
               {uploading
                 ? <><Loader2 size={16} className="animate-spin" /> Submitting...</>

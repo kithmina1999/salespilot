@@ -259,7 +259,7 @@ function RulesContent() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-semibold">{t('rules.title')}</h1>
-          <p className="text-sm mt-1 text-zinc-400">{t('rules.subtitle')}</p>
+          <p className="text-sm mt-1 text-muted-foreground">{t('rules.subtitle')}</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
           {/* AI Generate button */}
@@ -283,7 +283,7 @@ function RulesContent() {
           )}
           <button
             onClick={() => setBulkModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 sm:py-2 rounded-lg text-sm font-bold bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-white shadow-sm transition-transform hover:scale-105 flex-1 sm:flex-none justify-center"
+            className="flex items-center gap-2 px-4 py-2.5 sm:py-2 rounded-lg text-sm font-bold bg-muted border border-border hover:bg-secondary text-foreground shadow-sm transition-transform hover:scale-105 flex-1 sm:flex-none justify-center"
             style={{ minHeight: '44px' }}
           >
             <Wand2 size={16} className="text-amber-500" /> Bulk Translate
@@ -300,19 +300,19 @@ function RulesContent() {
 
       {/* ── Stats row ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5 flex flex-col justify-center">
-          <span className="text-zinc-400 text-xs font-bold mb-1">Total FAQs</span>
-          <span className="text-2xl font-black text-white">{customRules.length}</span>
+        <div className="rounded-2xl border border-border bg-card p-5 flex flex-col justify-center">
+          <span className="text-muted-foreground text-xs font-bold mb-1">Total FAQs</span>
+          <span className="text-2xl font-black text-foreground">{customRules.length}</span>
         </div>
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5 flex flex-col justify-center">
-          <span className="text-zinc-400 text-xs font-bold mb-1">Total Hits</span>
-          <span className="text-2xl font-black text-white">
+        <div className="rounded-2xl border border-border bg-card p-5 flex flex-col justify-center">
+          <span className="text-muted-foreground text-xs font-bold mb-1">Total Hits</span>
+          <span className="text-2xl font-black text-foreground">
             {customRules.reduce((sum, r) => sum + (r.usage_count || 0), 0)}
           </span>
         </div>
         <div className="rounded-2xl border bg-green-500/10 border-green-500/20 p-5 flex flex-col justify-center relative overflow-hidden">
           <span className="text-green-400 text-xs font-bold mb-1">FAQ Contribution</span>
-          <span className="text-2xl font-black text-white relative z-10">
+          <span className="text-2xl font-black text-foreground relative z-10">
             {stats.system_quota_used + stats.ai_quota_used === 0
               ? '0%'
               : Math.round((stats.system_quota_used / (stats.system_quota_used + stats.ai_quota_used)) * 100) + '%'}
@@ -320,13 +320,13 @@ function RulesContent() {
           <span className="text-[10px] text-green-500/60 mt-1 relative z-10">Queries handled without AI</span>
           <Cpu className="absolute -right-4 -bottom-4 w-20 h-20 text-green-500/5 rotate-12" />
         </div>
-        <div className={`rounded-2xl border p-5 flex flex-col justify-center ${stats.no_sinhala_coverage > 0 ? 'bg-amber-500/10 border-amber-500/20' : 'bg-zinc-900/50 border-zinc-800'}`}>
-          <span className={`${stats.no_sinhala_coverage > 0 ? 'text-amber-400' : 'text-zinc-400'} text-xs font-bold mb-1 flex items-center gap-1.5`}>
+        <div className={`rounded-2xl border p-5 flex flex-col justify-center ${stats.no_sinhala_coverage > 0 ? 'bg-amber-500/10 border-amber-500/20' : 'bg-card border-border'}`}>
+          <span className={`${stats.no_sinhala_coverage > 0 ? 'text-amber-400' : 'text-muted-foreground'} text-xs font-bold mb-1 flex items-center gap-1.5`}>
             {stats.no_sinhala_coverage > 0 ? <AlertTriangle size={12} /> : null}
             No Sinhala Coverage
           </span>
-          <span className="text-2xl font-black text-white">{stats.no_sinhala_coverage}</span>
-          <span className={`text-[10px] mt-1 ${stats.no_sinhala_coverage > 0 ? 'text-amber-500/60' : 'text-zinc-500'}`}>
+          <span className="text-2xl font-black text-foreground">{stats.no_sinhala_coverage}</span>
+          <span className={`text-[10px] mt-1 ${stats.no_sinhala_coverage > 0 ? 'text-amber-500/60' : 'text-muted-foreground'}`}>
             {stats.no_sinhala_coverage > 0 ? 'Update these for better bot UX' : 'All good!'}
           </span>
         </div>
@@ -346,7 +346,7 @@ function RulesContent() {
                       {stats.top_unmatched.length} Fails
                     </span>
                   </div>
-                  <p className="text-sm text-zinc-400">
+                  <p className="text-sm text-muted-foreground">
                     Your bot failed to answer these questions recently. Convert them to rules to guarantee 24/7 resolution.
                   </p>
                 </div>
@@ -359,7 +359,7 @@ function RulesContent() {
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-amber-500 mb-2 truncate pr-16">Unanswered Query</h4>
-                      <p className="text-sm text-zinc-200 leading-relaxed italic line-clamp-3">&quot;{um.message}&quot;</p>
+                      <p className="text-sm text-foreground leading-relaxed italic line-clamp-3">&quot;{um.message}&quot;</p>
                     </div>
                     <button
                       onClick={() => {
@@ -381,16 +381,16 @@ function RulesContent() {
 
         {/* ── Main Rules Engine UI (Tabs) ── */}
         <Tabs defaultValue="your-rules" className="w-full">
-          <TabsList className="bg-zinc-900 border-zinc-800 w-full justify-start p-1 mb-6 rounded-xl">
-            <TabsTrigger value="your-rules" className="data-[state=active]:bg-zinc-800 rounded-lg px-6 py-2">
+          <TabsList className="bg-muted border-border w-full justify-start p-1 mb-6 rounded-xl">
+            <TabsTrigger value="your-rules" className="data-[state=active]:bg-secondary rounded-lg px-6 py-2">
               <MessageSquare size={16} className="mr-2" />
               Your Rules
-              <span className="ml-2 bg-zinc-700 text-xs px-2 py-0.5 rounded-full">{customRules.length}</span>
+              <span className="ml-2 bg-border text-xs px-2 py-0.5 rounded-full">{customRules.length}</span>
             </TabsTrigger>
-            <TabsTrigger value="templates" className="data-[state=active]:bg-zinc-800 rounded-lg px-6 py-2">
+            <TabsTrigger value="templates" className="data-[state=active]:bg-secondary rounded-lg px-6 py-2">
               <Library size={16} className="mr-2" />
               Template Library
-              <span className="ml-2 bg-zinc-700 text-xs px-2 py-0.5 rounded-full">{commonRules.length}</span>
+              <span className="ml-2 bg-border text-xs px-2 py-0.5 rounded-full">{commonRules.length}</span>
             </TabsTrigger>
           </TabsList>
 
@@ -399,17 +399,17 @@ function RulesContent() {
               <div className="flex flex-col md:flex-row gap-6 flex-1 w-full">
                 {/* Category Sidebar */}
                 <div className="w-full md:w-56 shrink-0">
-                  <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 sticky top-6">
-                    <h3 className="text-sm font-semibold text-zinc-400 mb-4 px-2 uppercase tracking-wider">Categories</h3>
+                  <div className="bg-background border border-border rounded-xl p-4 sticky top-6">
+                    <h3 className="text-sm font-semibold text-muted-foreground mb-4 px-2 uppercase tracking-wider">Categories</h3>
                     <div className="flex flex-col gap-1">
                       {categories.map(cat => (
                         <button
                           key={cat}
                           onClick={() => setSelectedCategory(cat)}
-                          className={`text-left px-3 py-2 rounded-lg text-sm transition-colors ${selectedCategory === cat ? 'bg-zinc-800 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'}`}
+                          className={`text-left px-3 py-2 rounded-lg text-sm transition-colors ${selectedCategory === cat ? 'bg-secondary text-foreground font-medium' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
                         >
                           {cat}
-                          <span className="float-right text-xs bg-zinc-800 px-2 py-0.5 rounded-full text-zinc-500">
+                          <span className="float-right text-xs bg-secondary px-2 py-0.5 rounded-full text-muted-foreground">
                             {cat === 'All' ? customRules.length : customRules.filter(r => (r.category || 'General') === cat).length}
                           </span>
                         </button>
@@ -421,7 +421,7 @@ function RulesContent() {
                 {/* Data Table */}
                 <div className="flex-1 min-w-0">
                   {loading ? (
-                    <div className="p-12 text-center border rounded-xl border-zinc-800 text-zinc-500 bg-zinc-950">Loading rules...</div>
+                    <div className="p-12 text-center border rounded-xl border-border text-muted-foreground bg-background">Loading rules...</div>
                   ) : (
                     <RulesDataTable
                       data={customRules}
@@ -441,19 +441,19 @@ function RulesContent() {
           <TabsContent value="templates" className="mt-0">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {loading ? (
-                <div className="p-8 text-center text-sm border rounded-xl opacity-50 col-span-full border-zinc-800">Loading...</div>
+                <div className="p-8 text-center text-sm border rounded-xl opacity-50 col-span-full border-border">Loading...</div>
               ) : commonRules.length === 0 ? (
-                <div className="p-10 border border-dashed rounded-xl flex items-center justify-center opacity-50 col-span-full border-zinc-800">
+                <div className="p-10 border border-dashed rounded-xl flex items-center justify-center opacity-50 col-span-full border-border">
                   <p className="text-sm">No templates available yet.</p>
                 </div>
               ) : commonRules.map(r => {
                 const isOverridden = customRules.some(cr => cr.keywords === r.keywords);
                 return (
-                  <div key={r.ID} className={`p-5 border rounded-2xl flex flex-col transition-all border-zinc-800 bg-zinc-900/50 shadow-sm ${isOverridden ? 'opacity-30 grayscale' : 'opacity-80 hover:opacity-100 hover:border-zinc-700'}`}>
+                  <div key={r.ID} className={`p-5 border rounded-2xl flex flex-col transition-all border-border bg-card shadow-sm ${isOverridden ? 'opacity-30 grayscale' : 'opacity-80 hover:opacity-100 hover:border-border'}`}>
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex flex-wrap gap-1.5 max-w-[70%]">
                         {r.keywords.split(',').map((kw, i) => (
-                          <span key={i} className="px-2 py-0.5 rounded-full text-[11px] border bg-transparent text-gray-400 border-zinc-800">
+                          <span key={i} className="px-2 py-0.5 rounded-full text-[11px] border bg-transparent text-gray-400 border-border">
                             {kw.trim()}
                           </span>
                         ))}
@@ -461,7 +461,7 @@ function RulesContent() {
                       {!isOverridden ? (
                         <button
                           onClick={() => openEditModal(r as any, true)}
-                          className="flex items-center gap-1.5 text-[11px] text-white border px-2 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors border-zinc-700"
+                          className="flex items-center gap-1.5 text-[11px] text-foreground border px-2 py-1 rounded-lg bg-secondary hover:bg-border transition-colors border-border"
                         >
                           <Edit2 size={12} /> Clone
                         </button>
@@ -539,7 +539,7 @@ function RulesContent() {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function RulesPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-zinc-400">Loading Rules Engine...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading Rules Engine...</div>}>
       <RulesContent />
     </Suspense>
   );

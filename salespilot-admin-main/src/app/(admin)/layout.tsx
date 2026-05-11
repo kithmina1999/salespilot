@@ -7,12 +7,10 @@ import {
   BookOpen,
   Building2,
   ChevronRight,
-  DollarSign,
   KeyRound,
   LayoutDashboard,
   LogOut,
   ScrollText,
-  Settings2,
   Shield,
   BarChart3,
 } from "lucide-react"
@@ -50,9 +48,7 @@ const navItems = [
   { href: "/usage", label: "Usage & Quotas", icon: BarChart3, section: "main" },
   { href: "/activation-codes", label: "Activation Codes", icon: KeyRound, section: "main" },
   { href: "/audit-logs", label: "Audit Logs", icon: ScrollText, section: "main" },
-  { href: "/revenue", label: "Revenue", icon: DollarSign, section: "main" },
   { href: "/global-rules", label: "Global Rules", icon: BookOpen, section: "system" },
-  { href: "/platform-settings", label: "Platform Settings", icon: Settings2, section: "system" },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

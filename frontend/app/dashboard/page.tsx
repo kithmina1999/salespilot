@@ -85,7 +85,7 @@ function fmtPct(v: number | undefined | null): string {
 function GrowthBadge({ current, prev, invert = false }: { current: number; prev: number; invert?: boolean }) {
   const pct = pctChange(current, prev);
   const positive = invert ? pct < 0 : pct >= 0;
-  if (Math.abs(pct) < 0.1) return <span className="text-xs text-zinc-500">—</span>;
+  if (Math.abs(pct) < 0.1) return <span className="text-xs text-muted-foreground">—</span>;
   return (
     <span className={`inline-flex items-center gap-0.5 text-xs font-bold px-1.5 py-0.5 rounded-full ${
       positive ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'
@@ -107,18 +107,18 @@ function KpiCard({
   return (
     <div
       onClick={onClick}
-      className={`rounded-2xl border p-5 flex flex-col gap-3 bg-zinc-900/50 ${border} transition-all duration-200 hover:bg-zinc-800/70 hover:scale-[1.01] ${onClick ? 'cursor-pointer' : ''}`}
+      className={`rounded-2xl border p-5 flex flex-col gap-3 bg-card ${border} transition-all duration-200 hover:bg-secondary/70 hover:scale-[1.01] ${onClick ? 'cursor-pointer' : ''}`}
     >
       <div className="flex items-center justify-between">
-        <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">{label}</span>
+        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{label}</span>
         <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${bg} ${color}`}>
           {icon}
         </div>
       </div>
       <div>
-        <p className="text-3xl font-black text-white">{valueStr ?? value}</p>
+        <p className="text-3xl font-black text-foreground">{valueStr ?? value}</p>
         <div className="flex items-center gap-2 mt-1">
-          <p className="text-xs text-zinc-500 font-medium">{sub}</p>
+          <p className="text-xs text-muted-foreground font-medium">{sub}</p>
           {growth && <GrowthBadge current={growth.current} prev={growth.prev} invert={invertGrowth} />}
         </div>
       </div>
@@ -143,9 +143,9 @@ function DonutTooltip({ active, payload }: any) {
   if (active && payload && payload.length) {
     const d = payload[0].payload;
     return (
-      <div className="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-sm">
-        <p className="font-bold text-white">{ORDER_STATUS_LABELS[d.status] ?? d.status}</p>
-        <p className="text-zinc-400">{d.count} orders</p>
+      <div className="bg-muted border border-border rounded-xl px-3 py-2 text-sm">
+        <p className="font-bold text-foreground">{ORDER_STATUS_LABELS[d.status] ?? d.status}</p>
+        <p className="text-muted-foreground">{d.count} orders</p>
       </div>
     );
   }
@@ -183,7 +183,7 @@ export default function OverviewPage() {
       <div className="flex items-center justify-center h-64">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
-          <p className="text-zinc-400 text-sm">{t('common.loading')}…</p>
+          <p className="text-muted-foreground text-sm">{t('common.loading')}…</p>
         </div>
       </div>
     );
@@ -226,15 +226,15 @@ export default function OverviewPage() {
       {/* ── Header ── */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+          <h1 className="text-3xl font-extrabold text-foreground tracking-tight flex items-center gap-3">
             <Sparkles className="w-8 h-8 text-emerald-400" />
             {t('dashboard.title')}
           </h1>
-          <p className="text-zinc-400 mt-1 text-sm max-w-lg">
+          <p className="text-muted-foreground mt-1 text-sm max-w-lg">
             {t('dashboard.subtitle')}
           </p>
         </div>
-        <div className="text-xs text-zinc-200 font-mono bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-800">
+        <div className="text-xs text-foreground font-mono bg-muted px-3 py-1.5 rounded-lg border border-border">
           {new Date().toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: 'numeric' })}
         </div>
       </div>
@@ -297,7 +297,7 @@ export default function OverviewPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* 30-Day Trend Chart (2 cols) */}
-        <div className="lg:col-span-2 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 flex flex-col">
+        <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-6 flex flex-col">
           <DashboardSectionHeader
             className="mb-4"
             title="30-Day Performance"
@@ -325,13 +325,13 @@ export default function OverviewPage() {
                       <stop offset="95%" stopColor="#10b981" stopOpacity={0.1} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#27272a" />
-                  <XAxis dataKey="name" stroke="#52525b" fontSize={11} tickLine={false} axisLine={false} interval={4} />
-                  <YAxis yAxisId="rev" stroke="#52525b" fontSize={11} tickLine={false} axisLine={false}
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                  <XAxis dataKey="name" stroke="var(--muted-foreground)" fontSize={11} tickLine={false} axisLine={false} interval={4} />
+                  <YAxis yAxisId="rev" stroke="var(--muted-foreground)" fontSize={11} tickLine={false} axisLine={false}
                     tickFormatter={v => v >= 1000 ? `${v/1000}K` : v} />
-                  <YAxis yAxisId="ord" orientation="right" stroke="#52525b" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis yAxisId="ord" orientation="right" stroke="var(--muted-foreground)" fontSize={11} tickLine={false} axisLine={false} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '12px', color: '#fff', fontSize: 12 }}
+                    contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', borderRadius: '12px', color: 'var(--foreground)', fontSize: 12 }}
                     formatter={((value: any, name: any) => [
                       name === 'revenue' ? `Rs. ${Number(value).toLocaleString()}` : value,
                       name === 'revenue' ? 'Revenue' : 'Orders'
@@ -361,7 +361,7 @@ export default function OverviewPage() {
         </div>
 
         {/* Order Status Donut (1 col) */}
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 flex flex-col">
+        <div className="rounded-2xl border border-border bg-card p-6 flex flex-col">
           <DashboardSectionHeader
             className="mb-4"
             title="Order Status"
@@ -392,8 +392,8 @@ export default function OverviewPage() {
                 </ResponsiveContainer>
                 {/* Center label */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <p className="text-2xl font-black text-white">{totalDonutOrders}</p>
-                  <p className="text-xs text-zinc-500">orders</p>
+                  <p className="text-2xl font-black text-foreground">{totalDonutOrders}</p>
+                  <p className="text-xs text-muted-foreground">orders</p>
                 </div>
               </div>
               <div className="mt-3 space-y-1.5">
@@ -401,9 +401,9 @@ export default function OverviewPage() {
                   <div key={s.status} className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
                       <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ORDER_STATUS_COLORS[s.status] }} />
-                      <span className="text-zinc-400 capitalize">{ORDER_STATUS_LABELS[s.status] ?? s.status}</span>
+                      <span className="text-muted-foreground capitalize">{ORDER_STATUS_LABELS[s.status] ?? s.status}</span>
                     </div>
-                    <span className="font-bold text-zinc-200">{s.count}</span>
+                    <span className="font-bold text-foreground">{s.count}</span>
                   </div>
                 ))}
               </div>
@@ -425,43 +425,43 @@ export default function OverviewPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
         {/* Customer Growth */}
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 flex flex-col gap-4">
+        <div className="rounded-2xl border border-border bg-card p-6 flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-bold text-white">Customer Growth</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">New contacts this month</p>
+              <h3 className="text-sm font-bold text-foreground">Customer Growth</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">New contacts this month</p>
             </div>
             <div className="w-9 h-9 bg-purple-500/10 text-purple-400 rounded-xl flex items-center justify-center">
               <Users className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <p className="text-4xl font-black text-white">{stats.new_customers_this_month ?? 0}</p>
+            <p className="text-4xl font-black text-foreground">{stats.new_customers_this_month ?? 0}</p>
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs text-zinc-500">vs last month</span>
+              <span className="text-xs text-muted-foreground">vs last month</span>
               <GrowthBadge current={stats.new_customers_this_month ?? 0} prev={stats.new_customers_last_month ?? 0} />
             </div>
           </div>
           {/* Weekly mini comparison */}
-          <div className="flex gap-3 mt-auto pt-3 border-t border-zinc-800">
+          <div className="flex gap-3 mt-auto pt-3 border-t border-border">
             <div className="flex-1 text-center">
-              <p className="text-xl font-black text-white">{stats.new_customers_this_week ?? 0}</p>
-              <p className="text-xs text-zinc-500 mt-0.5">This week</p>
+              <p className="text-xl font-black text-foreground">{stats.new_customers_this_week ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">This week</p>
             </div>
-            <div className="w-px bg-zinc-800" />
+            <div className="w-px bg-secondary" />
             <div className="flex-1 text-center">
-              <p className="text-xl font-black text-zinc-400">{stats.new_customers_last_week ?? 0}</p>
-              <p className="text-xs text-zinc-500 mt-0.5">Last week</p>
+              <p className="text-xl font-black text-muted-foreground">{stats.new_customers_last_week ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Last week</p>
             </div>
           </div>
         </div>
 
         {/* Bot Efficiency Gauges */}
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 flex flex-col gap-4">
+        <div className="rounded-2xl border border-border bg-card p-6 flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-bold text-white">Bot Efficiency</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">AI performance gauges</p>
+              <h3 className="text-sm font-bold text-foreground">Bot Efficiency</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">AI performance gauges</p>
             </div>
             <div className="w-9 h-9 bg-cyan-500/10 text-cyan-400 rounded-xl flex items-center justify-center">
               <Activity className="w-4 h-4" />
@@ -477,37 +477,37 @@ export default function OverviewPage() {
                 startAngle={180}
                 endAngle={0}
               >
-                <RadialBar dataKey="value" cornerRadius={8} background={{ fill: '#27272a' }} />
+                <RadialBar dataKey="value" cornerRadius={8} background={{ fill: 'var(--muted)' }} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '12px', fontSize: 12 }}
+                  contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', borderRadius: '12px', fontSize: 12 }}
                   formatter={((v: any, name: any) => [`${v}%`, name ?? '']) as any}
                 />
                 <Legend
                   iconSize={10}
-                  formatter={(value) => <span className="text-xs text-zinc-400">{value}</span>}
+                  formatter={(value) => <span className="text-xs text-muted-foreground">{value}</span>}
                 />
               </RadialBarChart>
             </ResponsiveContainer>
           </div>
-          <div className="flex gap-3 border-t border-zinc-800 pt-3">
+          <div className="flex gap-3 border-t border-border pt-3">
             <div className="flex-1 text-center">
               <p className="text-lg font-black text-emerald-400">{(stats.ai_resolution_rate ?? 0).toFixed(0)}%</p>
-              <p className="text-xs text-zinc-500 mt-0.5">Resolution</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Resolution</p>
             </div>
-            <div className="w-px bg-zinc-800" />
+            <div className="w-px bg-secondary" />
             <div className="flex-1 text-center">
               <p className="text-lg font-black text-indigo-400">{(stats.bot_automation_pct ?? 0).toFixed(0)}%</p>
-              <p className="text-xs text-zinc-500 mt-0.5">Automation</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Automation</p>
             </div>
           </div>
         </div>
 
         {/* Knowledge Base Score */}
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 flex flex-col gap-4">
+        <div className="rounded-2xl border border-border bg-card p-6 flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-bold text-white">Knowledge Score</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">FAQ & Sinhala coverage</p>
+              <h3 className="text-sm font-bold text-foreground">Knowledge Score</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">FAQ & Sinhala coverage</p>
             </div>
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${kbScore >= 70 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
               <BarChart3 className="w-4 h-4" />
@@ -517,7 +517,7 @@ export default function OverviewPage() {
           <div className="flex items-center gap-4">
             <div className="relative w-20 h-20 shrink-0">
               <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#27272a" strokeWidth="3" />
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--border)" strokeWidth="3" />
                 <circle
                   cx="18" cy="18" r="15.9" fill="none"
                   stroke={kbScore >= 70 ? '#10b981' : '#f59e0b'}
@@ -532,17 +532,17 @@ export default function OverviewPage() {
             </div>
             <div className="space-y-2 flex-1">
               <div className="flex justify-between text-xs">
-                <span className="text-zinc-500">Total FAQs</span>
-                <span className="font-bold text-zinc-200">{stats.total_rules}</span>
+                <span className="text-muted-foreground">Total FAQs</span>
+                <span className="font-bold text-foreground">{stats.total_rules}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-zinc-500">Sinhala gaps</span>
+                <span className="text-muted-foreground">Sinhala gaps</span>
                 <span className={`font-bold ${stats.no_sinhala_coverage > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
                   {stats.no_sinhala_coverage}
                 </span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-zinc-500">Unresolved Q's</span>
+                <span className="text-muted-foreground">Unresolved Q's</span>
                 <span className={`font-bold ${stats.top_unmatched?.length > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
                   {stats.top_unmatched?.length ?? 0}
                 </span>
@@ -567,7 +567,7 @@ export default function OverviewPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* Traffic Chart */}
-        <div className="lg:col-span-2 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 flex flex-col h-[340px]">
+        <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-6 flex flex-col h-[340px]">
           <DashboardSectionHeader
             className="mb-4"
             title="7-Day Message Traffic"
@@ -587,10 +587,10 @@ export default function OverviewPage() {
                       <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#27272a" />
-                  <XAxis dataKey="name" stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '8px', color: '#fff' }} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                  <XAxis dataKey="name" stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
+                  <Tooltip contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', borderRadius: '8px', color: 'var(--foreground)' }} />
                   <Area type="monotone" dataKey="Customers" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorCust)" />
                   <Area type="monotone" dataKey="AI"        stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorAI)" />
                 </AreaChart>
@@ -609,23 +609,23 @@ export default function OverviewPage() {
         </div>
 
         {/* Missing Knowledge Feed */}
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 flex flex-col h-[340px]">
-          <h3 className="text-sm font-bold text-white mb-1 flex items-center justify-between">
+        <div className="rounded-2xl border border-border bg-card p-6 flex flex-col h-[340px]">
+          <h3 className="text-sm font-bold text-foreground mb-1 flex items-center justify-between">
             Missing Knowledge
             {(stats.top_unmatched?.length ?? 0) > 0 && (
               <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">Needs Action</span>
             )}
           </h3>
-          <p className="text-xs text-zinc-400 mb-4">Unanswered questions — Create FAQs to fix!</p>
+          <p className="text-xs text-muted-foreground mb-4">Unanswered questions — Create FAQs to fix!</p>
           <div className="flex-1 overflow-y-auto space-y-2 pr-1">
             {stats.top_unmatched?.length > 0 ? (
               stats.top_unmatched.map((um, idx) => (
-                <div key={idx} className="bg-zinc-800/50 border border-zinc-700/50 rounded-xl p-3 flex items-start gap-3">
-                  <div className="bg-zinc-900 px-2 py-1 rounded-lg text-xs font-black text-zinc-400 border border-zinc-800 shrink-0">
+                <div key={idx} className="bg-accent border border-border/50 rounded-xl p-3 flex items-start gap-3">
+                  <div className="bg-muted px-2 py-1 rounded-lg text-xs font-black text-muted-foreground border border-border shrink-0">
                     {um.count}x
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-zinc-200 truncate">{um.message}</p>
+                    <p className="text-sm font-medium text-foreground truncate">{um.message}</p>
                     <button
                       onClick={() => setQuickFaqMsg(um.message)}
                       className="text-xs text-emerald-400 hover:text-emerald-300 font-bold mt-1 inline-flex items-center gap-1 transition-colors"
@@ -640,8 +640,8 @@ export default function OverviewPage() {
                 <div className="w-12 h-12 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center">
                   <CheckCircle2 className="w-6 h-6" />
                 </div>
-                <p className="text-zinc-300 text-sm font-bold">Fully covered!</p>
-                <p className="text-xs text-zinc-500">All recent queries were answered successfully.</p>
+                <p className="text-muted-foreground text-sm font-bold">Fully covered!</p>
+                <p className="text-xs text-muted-foreground">All recent queries were answered successfully.</p>
               </div>
             )}
           </div>

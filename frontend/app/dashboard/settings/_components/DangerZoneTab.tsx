@@ -9,19 +9,19 @@ export default function DangerZoneTab() {
         <h2 className="text-sm font-bold text-red-400">Danger Zone</h2>
       </div>
       <div className="p-6 space-y-4">
-        <p className="text-xs text-zinc-500 leading-relaxed">
+        <p className="text-xs text-muted-foreground leading-relaxed">
           These actions are irreversible. Please be certain before proceeding.
         </p>
 
         {/* Export data */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-zinc-950/60 border border-zinc-800 gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-background/60 border border-border gap-4">
           <div>
-            <p className="text-sm font-bold text-zinc-200">Export Account Data</p>
-            <p className="text-xs text-zinc-500 mt-1">Download all your profile data, chat logs, and configurations as a JSON file.</p>
+            <p className="text-sm font-bold text-foreground">Export Account Data</p>
+            <p className="text-xs text-muted-foreground mt-1">Download all your profile data, chat logs, and configurations as a JSON file.</p>
           </div>
           <button
             disabled
-            className="flex items-center gap-2 px-4 py-2 bg-zinc-800 text-zinc-400 font-bold text-xs rounded-lg border border-zinc-700 opacity-50 cursor-not-allowed justify-center shrink-0"
+            className="flex items-center gap-2 px-4 py-2 bg-secondary text-muted-foreground font-bold text-xs rounded-lg border border-border opacity-50 cursor-not-allowed justify-center shrink-0"
             title="Coming soon"
           >
             <Download size={13} /> Request Export
@@ -29,7 +29,7 @@ export default function DangerZoneTab() {
         </div>
 
         {/* Delete account */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-zinc-950/60 border border-red-500/15 hover:border-red-500/25 transition-colors gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-background/60 border border-red-500/15 hover:border-red-500/25 transition-colors gap-4">
           <div>
             <p className="text-sm font-bold text-red-400">Delete Account</p>
             <p className="text-xs text-red-400/60 mt-1">

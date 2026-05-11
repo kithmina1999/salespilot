@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
@@ -13,14 +14,15 @@ func GetSystemMetrics(c *gin.Context) {
 	var totalBusinesses, freePlanCount, starterPlanCount, proPlanCount, activeTrials, expiredPlans int64
 	var waConnected, waDisconnected, waNotConnected int64
 	var nearAiLimit, nearSimLimit, expiredPaid int64
+	var pendingPayments, suspendedTenants int64
 
 	// Business Plan & Status
 	database.DB.Model(&models.Business{}).Count(&totalBusinesses)
 	database.DB.Model(&models.Business{}).Where("plan = ?", models.PlanFree).Count(&freePlanCount)
 	database.DB.Model(&models.Business{}).Where("plan = ?", models.PlanStarter).Count(&starterPlanCount)
 	database.DB.Model(&models.Business{}).Where("plan = ?", models.PlanPro).Count(&proPlanCount)
-	database.DB.Model(&models.Business{}).Where("trial_expires_at > DATETIME('now')").Count(&activeTrials)
-	database.DB.Model(&models.Business{}).Where("plan != ? AND plan_expires_at < DATETIME('now')", models.PlanFree).Count(&expiredPlans)
+	database.DB.Model(&models.Business{}).Where("trial_expires_at > ?", time.Now()).Count(&activeTrials)
+	database.DB.Model(&models.Business{}).Where("plan != ? AND plan_expires_at < ?", models.PlanFree, time.Now()).Count(&expiredPlans)
 
 	// WhatsApp Status
 	database.DB.Model(&models.Business{}).Where("wa_status = ?", "connected").Count(&waConnected)
@@ -36,12 +38,14 @@ func GetSystemMetrics(c *gin.Context) {
 		TotalSimulation int `gorm:"column:total_sim"`
 	}
 	var usage UsageSum
-	database.DB.Model(&models.Business{}).Select("IFNULL(SUM(system_message_count), 0) as total_system, IFNULL(SUM(ai_message_count), 0) as total_ai, IFNULL(SUM(faq_reply_count), 0) as total_faq, IFNULL(SUM(rule_generation_count), 0) as total_rule_gen, IFNULL(SUM(simulation_count), 0) as total_sim").Scan(&usage)
+	database.DB.Model(&models.Business{}).Select("COALESCE(SUM(system_message_count), 0) as total_system, COALESCE(SUM(ai_message_count), 0) as total_ai, COALESCE(SUM(faq_reply_count), 0) as total_faq, COALESCE(SUM(rule_generation_count), 0) as total_rule_gen, COALESCE(SUM(simulation_count), 0) as total_sim").Scan(&usage)
 
-	// Risk Alerts
+	// Risk Alerts & Action Queue
 	database.DB.Model(&models.Business{}).Where("ai_message_limit > 0 AND CAST(ai_message_count AS FLOAT) / CAST(ai_message_limit AS FLOAT) >= 0.8").Count(&nearAiLimit)
 	database.DB.Model(&models.Business{}).Where("simulation_limit > 0 AND CAST(simulation_count AS FLOAT) / CAST(simulation_limit AS FLOAT) >= 0.8").Count(&nearSimLimit)
-	database.DB.Model(&models.Business{}).Where("plan != ? AND plan_expires_at < DATETIME('now')", models.PlanFree).Count(&expiredPaid)
+	database.DB.Model(&models.Business{}).Where("plan != ? AND plan_expires_at < ?", models.PlanFree, time.Now()).Count(&expiredPaid)
+	database.DB.Model(&models.PaymentProof{}).Where("status = ?", models.PaymentStatusPending).Count(&pendingPayments)
+	database.DB.Model(&models.Business{}).Where("suspended_at IS NOT NULL").Count(&suspendedTenants)
 
 	// MRR Estimate (Very simple: 1490 for starter, 3490 for pro)
 	mrr := (starterPlanCount * 1490) + (proPlanCount * 3490)
@@ -78,6 +82,13 @@ func GetSystemMetrics(c *gin.Context) {
 			"near_ai_limit_count":         nearAiLimit,
 			"near_simulation_limit_count": nearSimLimit,
 			"expired_paid_count":          expiredPaid,
+		},
+		"action_queue": gin.H{
+			"pending_payments":      pendingPayments,
+			"expired_paid_plans":    expiredPaid,
+			"near_quota_tenants":    nearAiLimit + nearSimLimit,
+			"disconnected_whatsapp": waDisconnected,
+			"suspended_tenants":     suspendedTenants,
 		},
 	})
 }

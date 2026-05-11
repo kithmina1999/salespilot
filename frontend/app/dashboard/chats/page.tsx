@@ -13,7 +13,7 @@ function ChatsLayout() {
     <>
       {/* Desktop: three columns */}
       <div
-        className="hidden md:flex rounded-2xl overflow-hidden border border-zinc-800/60 shadow-2xl"
+        className="hidden md:flex rounded-2xl overflow-hidden border border-border/60 shadow-2xl"
         style={{ height: 'calc(100vh - 130px)' }}
       >
         <div className="w-[260px] lg:w-[290px] shrink-0"><InboxPanel /></div>
@@ -23,14 +23,14 @@ function ChatsLayout() {
 
       {/* Mobile: single panel */}
       <div
-        className="md:hidden flex flex-col rounded-2xl overflow-hidden border border-zinc-800/60 shadow-2xl"
+        className="md:hidden flex flex-col rounded-2xl overflow-hidden border border-border/60 shadow-2xl"
         style={{ height: 'calc(100svh - 130px)' }}
       >
         {mobileView === 'inbox' && <InboxPanel />}
         {mobileView === 'chat'  && <ChatPanel />}
         {mobileView === 'crm'   && (
           activePhone ? <CRMPanel /> : (
-            <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm">
+            <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
               Select a conversation first
             </div>
           )

@@ -53,7 +53,7 @@ function TrialUpsellModal({ expiresAt, daysLeft, variant, onClose }: TrialUpsell
         {!isExpired && (
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-1.5 rounded-lg text-zinc-600 hover:text-zinc-300 hover:bg-white/5 transition-all"
+            className="absolute top-4 right-4 p-1.5 rounded-lg text-zinc-600 hover:text-muted-foreground hover:bg-white/5 transition-all"
             aria-label="Close"
           >
             <X size={16} />
@@ -75,13 +75,13 @@ function TrialUpsellModal({ expiresAt, daysLeft, variant, onClose }: TrialUpsell
               {isExpired ? 'Trial Ended · AI is Offline' : `${daysLeft} Day${daysLeft !== 1 ? 's' : ''} Left`}
             </div>
 
-            <h2 className="text-2xl font-black text-white tracking-tight leading-tight">
+            <h2 className="text-2xl font-black text-foreground tracking-tight leading-tight">
               {isExpired
                 ? <>Your customers are getting <span className="text-red-400">no response</span> right now.</>
                 : <>Don't let your <span className="text-amber-400">AI switch off</span> mid-conversation.</>}
             </h2>
 
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-muted-foreground">
               {isExpired
                 ? 'Every message sent to your business right now is going unanswered. Reactivate to bring your AI assistant back online instantly.'
                 : `Your Starter trial ends ${daysLeft === 1 ? 'tomorrow' : `in ${daysLeft} days`}. After that, these features will stop working until you subscribe.`}
@@ -96,8 +96,8 @@ function TrialUpsellModal({ expiresAt, daysLeft, variant, onClose }: TrialUpsell
                   {f.icon}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-bold text-zinc-200">{f.label}</p>
-                  <p className="text-xs text-zinc-500 truncate">{f.desc}</p>
+                  <p className="text-sm font-bold text-foreground">{f.label}</p>
+                  <p className="text-xs text-muted-foreground truncate">{f.desc}</p>
                 </div>
                 {isExpired
                   ? <span className="ml-auto shrink-0 text-[10px] font-black text-red-400 bg-red-400/10 border border-red-400/20 px-2 py-0.5 rounded-full">Offline</span>
@@ -112,16 +112,16 @@ function TrialUpsellModal({ expiresAt, daysLeft, variant, onClose }: TrialUpsell
             style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
           >
             <div>
-              <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Starter Plan</p>
+              <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-0.5">Starter Plan</p>
               <div className="flex items-baseline gap-1">
-                <span className="text-3xl font-black text-white">LKR 4,500</span>
-                <span className="text-sm text-zinc-500 font-medium">/month</span>
+                <span className="text-3xl font-black text-foreground">LKR 4,500</span>
+                <span className="text-sm text-muted-foreground font-medium">/month</span>
               </div>
               <p className="text-xs text-zinc-600 mt-0.5">or LKR 3,900/mo on quarterly · LKR 3,300/mo annual</p>
             </div>
             <div className="space-y-1 text-right">
               {['3,000 AI replies/mo', '100 AI rule gens/mo', 'Priority support'].map(f => (
-                <p key={f} className="flex items-center justify-end gap-1 text-xs text-zinc-400">
+                <p key={f} className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
                   <Check size={11} className="text-green-400" /> {f}
                 </p>
               ))}
@@ -148,7 +148,7 @@ function TrialUpsellModal({ expiresAt, daysLeft, variant, onClose }: TrialUpsell
             {!isExpired && (
               <button
                 onClick={onClose}
-                className="w-full py-2.5 text-sm font-medium text-zinc-600 hover:text-zinc-400 transition-colors"
+                className="w-full py-2.5 text-sm font-medium text-zinc-600 hover:text-muted-foreground transition-colors"
               >
                 Maybe later — I'll risk losing these features
               </button>

@@ -91,12 +91,12 @@ export default function UsagePage() {
       <div className="max-w-3xl mx-auto">
 
       {/* Page header */}
-      <div className="pb-6 mb-8 border-b border-zinc-800">
-        <h1 className="text-3xl font-black tracking-tight text-zinc-100 flex items-center gap-3">
+      <div className="pb-6 mb-8 border-b border-border">
+        <h1 className="text-3xl font-black tracking-tight text-foreground flex items-center gap-3">
           <TrendingUp className="w-7 h-7 text-emerald-400" />
           Usage &amp; Plan
         </h1>
-        <p className="text-sm text-zinc-500 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Monitor monthly limits, subscribe to a plan, or activate an approved billing code.
         </p>
       </div>

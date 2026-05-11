@@ -110,7 +110,7 @@ export default function TrialBanner() {
         {style.dismissible && (
           <button
             onClick={() => setDismissed(true)}
-            className="p-1.5 rounded-lg text-zinc-600 hover:text-zinc-400 hover:bg-white/5 transition-all shrink-0"
+            className="p-1.5 rounded-lg text-zinc-600 hover:text-muted-foreground hover:bg-white/5 transition-all shrink-0"
             aria-label="Dismiss"
           >
             <X size={14} />
@@ -123,13 +123,13 @@ export default function TrialBanner() {
         {/* Message */}
         <div className="flex-1 min-w-0">
           {phase === 'comfortable' && (
-            <p className="text-sm font-semibold text-zinc-300">
+            <p className="text-sm font-semibold text-muted-foreground">
               <span style={{ color: style.accent }}>{daysLeft} days</span> of full access remaining.
               <span className="text-zinc-600 text-xs font-normal ml-1">· LKR {monthlyPrice}/mo</span>
             </p>
           )}
           {phase === 'urgent' && (
-            <p className="text-sm font-bold text-zinc-200">
+            <p className="text-sm font-bold text-foreground">
               Only <span style={{ color: style.accent }}>{daysLeft} day{daysLeft !== 1 ? 's' : ''} left</span> — AI features stop working soon.
             </p>
           )}
@@ -192,7 +192,7 @@ export default function TrialBanner() {
         {/* Main message */}
         <div className="flex-1 min-w-0">
           {phase === 'comfortable' && (
-            <p className="text-sm font-semibold text-zinc-300">
+            <p className="text-sm font-semibold text-muted-foreground">
               Your AI assistant is running.{' '}
               <span style={{ color: style.accent }}>{daysLeft} days of full access remaining.</span>
               <span className="text-zinc-600 text-xs font-normal ml-2">· LKR {monthlyPrice}/mo to continue</span>
@@ -200,7 +200,7 @@ export default function TrialBanner() {
           )}
           {phase === 'urgent' && (
             <div>
-              <p className="text-sm font-bold text-zinc-200">
+              <p className="text-sm font-bold text-foreground">
                 Only <span style={{ color: style.accent }}>{daysLeft} day{daysLeft !== 1 ? 's' : ''} left</span> —
                 {' '}these features will stop working:
               </p>
@@ -262,7 +262,7 @@ export default function TrialBanner() {
         {style.dismissible && (
           <button
             onClick={() => setDismissed(true)}
-            className="p-1.5 rounded-lg text-zinc-700 hover:text-zinc-400 hover:bg-white/5 transition-all shrink-0"
+            className="p-1.5 rounded-lg text-zinc-700 hover:text-muted-foreground hover:bg-white/5 transition-all shrink-0"
             aria-label="Dismiss"
           >
             <X size={14} />

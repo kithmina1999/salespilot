@@ -141,6 +141,11 @@ func main() {
 		system.POST("/payments/:id/approve", middleware.RequireSuperPermission(middleware.PermBillingManage), middleware.HighRiskRoute("approve_payment"), handlers.ApprovePayment)
 		system.POST("/payments/:id/reject", middleware.RequireSuperPermission(middleware.PermBillingManage), middleware.HighRiskRoute("reject_payment"), handlers.RejectPayment)
 
+		// Platform Notices
+		system.GET("/notices", middleware.RequireSuperPermission(middleware.PermBusinessView), handlers.ListPlatformNotices)
+		system.POST("/notices", middleware.RequireSuperPermission(middleware.PermBusinessManage), handlers.CreatePlatformNotice)
+		system.DELETE("/notices/:id", middleware.RequireSuperPermission(middleware.PermBusinessManage), handlers.DeactivatePlatformNotice)
+
 		// Global Rule management (DROP + Context Bridge + FAQ defaults)
 		system.GET("/global-rules", middleware.RequireSuperPermission(middleware.PermBusinessView), handlers.ListGlobalRules)
 		system.POST("/global-rules", middleware.RequireSuperPermission(middleware.PermBusinessManage), handlers.CreateGlobalRule)

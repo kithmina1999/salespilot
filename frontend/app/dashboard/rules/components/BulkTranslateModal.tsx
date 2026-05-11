@@ -94,14 +94,14 @@ export function BulkTranslateModal({ rules, targetLang, sourceLang, onClose, onA
   if (rulesToTranslate.length === 0) {
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 backdrop-blur-sm bg-black/40">
-        <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+        <div className="bg-background border border-border rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
           <div className="text-center">
             <div className="w-12 h-12 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
               <Check size={24} />
             </div>
-            <h3 className="text-lg font-bold text-white mb-2">All Caught Up!</h3>
-            <p className="text-sm text-zinc-400 mb-6">There are no missing translations for {LANG_META[targetLang]?.label || targetLang}.</p>
-            <button onClick={onClose} className="w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl transition-colors font-semibold">
+            <h3 className="text-lg font-bold text-foreground mb-2">All Caught Up!</h3>
+            <p className="text-sm text-muted-foreground mb-6">There are no missing translations for {LANG_META[targetLang]?.label || targetLang}.</p>
+            <button onClick={onClose} className="w-full py-2.5 bg-muted hover:bg-secondary text-foreground rounded-xl transition-colors font-semibold">
               Close
             </button>
           </div>
@@ -112,19 +112,19 @@ export function BulkTranslateModal({ rules, targetLang, sourceLang, onClose, onA
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 backdrop-blur-sm bg-black/40 animate-in fade-in duration-200">
-      <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-4xl shadow-2xl relative flex flex-col max-h-[90vh]">
+      <div className="bg-background border border-border rounded-2xl w-full max-w-4xl shadow-2xl relative flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-5 sm:p-6 border-b border-zinc-800 flex items-center justify-between shrink-0">
+        <div className="p-5 sm:p-6 border-b border-border flex items-center justify-between shrink-0">
           <div>
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
               <Wand2 className="text-amber-500" />
               Bulk Review & Translate
             </h2>
-            <p className="text-sm text-zinc-400 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               Translating {rulesToTranslate.length} rules from {LANG_META[sourceLang]?.label} to {LANG_META[targetLang]?.label}
             </p>
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white p-2 rounded-xl hover:bg-zinc-900 transition-colors">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-2 rounded-xl hover:bg-muted transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -132,18 +132,18 @@ export function BulkTranslateModal({ rules, targetLang, sourceLang, onClose, onA
         {/* Content */}
         <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider">{LANG_META[sourceLang]?.label} (Original)</span>
-            <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider">{LANG_META[targetLang]?.label} (Translation)</span>
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{LANG_META[sourceLang]?.label} (Original)</span>
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{LANG_META[targetLang]?.label} (Translation)</span>
           </div>
 
           {rulesToTranslate.map(rule => (
-            <div key={rule.ID} className="grid grid-cols-2 gap-4 items-start p-4 bg-zinc-900/50 rounded-xl border border-zinc-800/50">
-              <div className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed opacity-80">
+            <div key={rule.ID} className="grid grid-cols-2 gap-4 items-start p-4 bg-card rounded-xl border border-border/50">
+              <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed opacity-80">
                 {getSourceText(rule)}
               </div>
               <div className="relative">
                 {loadingIds.has(rule.ID) ? (
-                  <div className="flex items-center justify-center h-24 bg-zinc-900 rounded-xl border border-zinc-800">
+                  <div className="flex items-center justify-center h-24 bg-muted rounded-xl border border-border">
                     <Loader2 className="w-5 h-5 text-amber-500 animate-spin" />
                   </div>
                 ) : (
@@ -151,7 +151,7 @@ export function BulkTranslateModal({ rules, targetLang, sourceLang, onClose, onA
                     value={translations[rule.ID] || ''}
                     onChange={(e) => setTranslations(prev => ({ ...prev, [rule.ID]: e.target.value }))}
                     placeholder={`Awaiting translation...`}
-                    className="w-full h-24 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-sm text-zinc-200 outline-none focus:border-amber-500/50 resize-y"
+                    className="w-full h-24 px-3 py-2 bg-muted border border-border rounded-xl text-sm text-foreground outline-none focus:border-amber-500/50 resize-y"
                   />
                 )}
               </div>
@@ -160,7 +160,7 @@ export function BulkTranslateModal({ rules, targetLang, sourceLang, onClose, onA
         </div>
 
         {/* Footer */}
-        <div className="p-5 sm:p-6 border-t border-zinc-800 flex items-center justify-between shrink-0 bg-zinc-950/90 backdrop-blur rounded-b-2xl">
+        <div className="p-5 sm:p-6 border-t border-border flex items-center justify-between shrink-0 bg-background/90 backdrop-blur rounded-b-2xl">
           <button
             onClick={handleTranslateAll}
             disabled={loadingIds.size > 0 || rulesToTranslate.every(r => translations[r.ID])}
