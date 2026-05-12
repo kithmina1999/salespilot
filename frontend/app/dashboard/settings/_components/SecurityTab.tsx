@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import Toggle from '@/components/Toggle';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+import { API_URL } from '@/hooks/_shared';
 
 // ── Password strength ────────────────────────────────────────────────────────
 function PasswordStrength({ password }: { password: string }) {

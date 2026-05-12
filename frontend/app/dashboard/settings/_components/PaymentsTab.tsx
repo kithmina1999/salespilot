@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Banknote, Truck, Building2, Info, ToggleLeft, ToggleRight } from 'lucide-react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+import { API_URL } from '@/hooks/_shared';
 
 interface PaymentConfig {
   allow_cod: boolean;

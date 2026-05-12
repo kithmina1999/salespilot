@@ -1,4 +1,5 @@
 import useSWR from 'swr';
+import { API_URL } from './_shared';
 
 export interface NotificationSummary {
   total_unread: number;
@@ -23,7 +24,7 @@ const fetcher = async (url: string) => {
 };
 
 export function useNotificationQuery() {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+  const apiUrl = API_URL;
   
   return useSWR<NotificationSummary>(
     `${apiUrl}/api/v1/dashboard/notifications`,

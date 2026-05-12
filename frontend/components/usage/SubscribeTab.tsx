@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Upload, Clock, CheckCircle2, AlertCircle, FileImage, ChevronRight, Loader2 } from 'lucide-react';
+import { API_URL } from '@/hooks/_shared';
 import { toast } from 'sonner';
 import { useAppStore } from '@/lib/store';
 
@@ -89,7 +90,7 @@ export default function SubscribeTab({ paymentStatus, onRefresh, onActivateTab, 
       form.append('billing_cycle', cycle);
       form.append('plan', selectedPlan);
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/billing/submit-proof`,
+        `${API_URL}/api/v1/billing/submit-proof`,
         { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form }
       );
       const data = await res.json();

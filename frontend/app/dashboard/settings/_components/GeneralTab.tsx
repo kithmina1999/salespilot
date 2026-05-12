@@ -5,7 +5,7 @@ import { UserCog, CreditCard, Clock, Zap } from 'lucide-react';
 import Link from 'next/link';
 import type { BusinessSettings, BillingStatus } from '../page';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+import { API_URL } from '@/hooks/_shared';
 
 interface Props {
   settings: BusinessSettings;

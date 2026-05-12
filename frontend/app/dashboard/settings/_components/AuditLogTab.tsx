@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { History, Download, RefreshCw, Activity, Box, ShoppingCart, FileText, Zap } from 'lucide-react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+import { API_URL } from '@/hooks/_shared';
 
 interface AuditLog {
   id: number; actor_type: string; actor_id: number; action: string;

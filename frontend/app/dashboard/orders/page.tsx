@@ -74,7 +74,8 @@ const COL_STYLE: Record<string, { header: string; card: string; badge: string; d
   cancelled: { header: 'border-red-500/40    bg-red-500/5',     card: 'hover:border-red-500/30',    badge: 'bg-red-500/15 text-red-400 border-red-500/30',          drop: 'border-red-400/60 bg-red-500/10' },
 };
 
-const API = 'http://localhost:8080/api/v1';
+import { API_URL } from '@/hooks/_shared';
+const API = `${API_URL}/api/v1`;
 const token = () => localStorage.getItem('token') || '';
 const headers = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` });
 

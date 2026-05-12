@@ -10,7 +10,7 @@ import { useLocale } from '@/lib/locale';
 import { useProducts } from '@/hooks/useProducts';
 import { ToolbarSearch } from '@/components/dashboard';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+import { API_URL } from '@/hooks/_shared';
 
 interface Product {
   id: number;

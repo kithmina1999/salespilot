@@ -22,7 +22,8 @@ interface TopProduct  { name: string; revenue: number; qty: number; }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const API  = 'http://localhost:8080/api/v1';
+import { API_URL } from '@/hooks/_shared';
+const API  = `${API_URL}/api/v1`;
 const auth = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token') || ''}` });
 
 type Range = '7d' | '30d' | '90d';

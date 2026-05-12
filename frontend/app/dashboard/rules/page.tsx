@@ -11,6 +11,7 @@ import UpgradeBanner from '@/components/UpgradeBanner';
 import { toast } from 'sonner';
 import { useLocale } from '@/lib/locale';
 import { useRulesPage } from '@/hooks/useRulesPage';
+import { API_URL } from '@/hooks/_shared';
 
 import { Rule, parseResponses } from './types';
 import { RuleModal, AIGenerateModal } from './components/RuleModal';
@@ -123,7 +124,7 @@ function RulesContent() {
     e.preventDefault();
     const token = localStorage.getItem('token');
     const isPost = modalMode === 'create' || modalMode === 'clone_common';
-    const url    = isPost ? 'http://localhost:8080/api/v1/rules' : `http://localhost:8080/api/v1/rules/${editTargetId}`;
+    const url    = isPost ? `${API_URL}/api/v1/rules` : `${API_URL}/api/v1/rules/${editTargetId}`;
     const method = isPost ? 'POST' : 'PUT';
 
     try {
@@ -156,7 +157,7 @@ function RulesContent() {
     setGenerating(true);
     const token = localStorage.getItem('token');
     try {
-      const res  = await fetch('http://localhost:8080/api/v1/rules/generate', {
+      const res  = await fetch(`${API_URL}/api/v1/rules/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ intent: generateIntent }),
@@ -197,7 +198,7 @@ function RulesContent() {
     setDrafting(true);
     const token = localStorage.getItem('token');
     try {
-      const res  = await fetch('http://localhost:8080/api/v1/faqs/draft', {
+      const res  = await fetch(`${API_URL}/api/v1/faqs/draft`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ message: messageToSend, from_inbox: isInboxMode }),

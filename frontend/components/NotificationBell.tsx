@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
+import { API_URL } from '@/hooks/_shared';
 import { Bell, MessageSquare, X, CheckCheck } from 'lucide-react';
 import { useNotificationStore, type NotifItem } from '@/hooks/useNotificationStore';
 import { useNotificationQuery } from '@/hooks/useNotificationQuery';
@@ -80,7 +81,7 @@ export default function NotificationBell({ collapsed, mobile = false }: Notifica
     
     try {
       const token = localStorage.getItem('token');
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/dashboard/notifications/mark-read`, {
+      await fetch(`${API_URL}/api/v1/dashboard/notifications/mark-read`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });

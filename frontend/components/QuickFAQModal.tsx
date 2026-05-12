@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const API = 'http://localhost:8080';
+import { API_URL } from '@/hooks/_shared';
+const API = API_URL;
 
 interface QuickFAQModalProps {
   unmatchedMessage: string;
