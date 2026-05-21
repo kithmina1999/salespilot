@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
+import { API_URL } from '@/hooks/_shared';
 import { Bell, MessageSquare, X, CheckCheck } from 'lucide-react';
 import { useNotificationStore, type NotifItem } from '@/hooks/useNotificationStore';
 import { useNotificationQuery } from '@/hooks/useNotificationQuery';
@@ -80,7 +81,7 @@ export default function NotificationBell({ collapsed, mobile = false }: Notifica
     
     try {
       const token = localStorage.getItem('token');
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/dashboard/notifications/mark-read`, {
+      await fetch(`${API_URL}/api/v1/dashboard/notifications/mark-read`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -98,7 +99,7 @@ export default function NotificationBell({ collapsed, mobile = false }: Notifica
           className={`group relative w-full flex items-center gap-3 px-2.5 py-2.5 rounded-lg text-sm transition-all duration-150 ${
             open
               ? 'bg-emerald-500/10 text-emerald-400'
-              : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted'
           }`}
         >
           {/* Bell icon with badge */}
@@ -118,7 +119,7 @@ export default function NotificationBell({ collapsed, mobile = false }: Notifica
 
           {/* Collapsed tooltip */}
           {collapsed && !mobile && (
-            <span className="pointer-events-none absolute left-full ml-3 px-2 py-1 rounded-md bg-zinc-800 border border-zinc-700 text-xs text-zinc-200 font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity shadow-xl z-50">
+            <span className="pointer-events-none absolute left-full ml-3 px-2 py-1 rounded-md bg-secondary border border-border text-xs text-foreground font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity shadow-xl z-50">
               Notifications
             </span>
           )}
@@ -145,13 +146,13 @@ export default function NotificationBell({ collapsed, mobile = false }: Notifica
               left: mobile ? '16px' : collapsed ? '68px' : '232px',
             }}
           >
-            <div className="bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
+            <div className="bg-background border border-border rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
 
               {/* Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/80">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border/80">
                 <div className="flex items-center gap-2">
                   <Bell size={14} className="text-emerald-400" />
-                  <span className="text-sm font-bold text-white">Notifications</span>
+                  <span className="text-sm font-bold text-foreground">Notifications</span>
                   {unreadCount > 0 && (
                     <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-black px-1.5 py-0.5 rounded-full">
                       {unreadCount} new
@@ -162,7 +163,7 @@ export default function NotificationBell({ collapsed, mobile = false }: Notifica
                   {unreadCount > 0 && (
                     <button
                       onClick={handleMarkAll}
-                      className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-emerald-400 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-800/50 font-bold"
+                      className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-emerald-400 transition-colors px-2 py-1 rounded-lg hover:bg-accent font-bold"
                       title="Mark all as read"
                     >
                       <CheckCheck size={12} />
@@ -171,7 +172,7 @@ export default function NotificationBell({ collapsed, mobile = false }: Notifica
                   )}
                   <button
                     onClick={() => setOpen(false)}
-                    className="p-1 text-zinc-500 hover:text-white transition-colors rounded-lg hover:bg-zinc-800"
+                    className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-secondary"
                   >
                     <X size={14} />
                   </button>
@@ -182,10 +183,10 @@ export default function NotificationBell({ collapsed, mobile = false }: Notifica
               <div className="max-h-[400px] overflow-y-auto">
                 {notifications.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 gap-3">
-                    <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-full bg-muted border border-border flex items-center justify-center">
                       <Bell size={20} className="text-zinc-600" />
                     </div>
-                    <p className="text-sm text-zinc-500 font-medium">No notifications yet</p>
+                    <p className="text-sm text-muted-foreground font-medium">No notifications yet</p>
                     <p className="text-xs text-zinc-600 text-center px-6">
                       You'll be notified when customers need manual attention.
                     </p>
@@ -196,7 +197,7 @@ export default function NotificationBell({ collapsed, mobile = false }: Notifica
                       <button
                         key={notif.id}
                         onClick={() => handleNotifClick(notif)}
-                        className={`w-full text-left px-4 py-3 hover:bg-zinc-900/80 transition-colors flex items-start gap-3 group bg-emerald-500/4`}
+                        className={`w-full text-left px-4 py-3 hover:bg-muted/80 transition-colors flex items-start gap-3 group bg-emerald-500/4`}
                       >
                         {/* Icon */}
                         <div className={`mt-0.5 w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-emerald-500/15 text-emerald-400`}>
@@ -206,14 +207,14 @@ export default function NotificationBell({ collapsed, mobile = false }: Notifica
                         {/* Content */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
-                            <p className={`text-sm font-bold truncate text-white`}>
+                            <p className={`text-sm font-bold truncate text-foreground`}>
                               {notif.title}
                             </p>
                             <span className="text-[10px] text-zinc-600 shrink-0">
                               {timeAgo(notif.timestamp)}
                             </span>
                           </div>
-                          <p className="text-xs text-zinc-500 mt-0.5 line-clamp-2 leading-relaxed">
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
                             {notif.preview}
                           </p>
                           <p className="text-[10px] text-emerald-500/70 mt-1 font-medium group-hover:text-emerald-400 transition-colors">
@@ -231,10 +232,10 @@ export default function NotificationBell({ collapsed, mobile = false }: Notifica
 
               {/* Footer */}
               {notifications.length > 0 && (
-                <div className="border-t border-zinc-800/80 px-4 py-2.5">
+                <div className="border-t border-border/80 px-4 py-2.5">
                   <button
                     onClick={() => { setOpen(false); router.push('/dashboard/chats'); }}
-                    className="w-full text-center text-xs text-zinc-500 hover:text-emerald-400 transition-colors font-bold py-0.5"
+                    className="w-full text-center text-xs text-muted-foreground hover:text-emerald-400 transition-colors font-bold py-0.5"
                   >
                     Go to Chat Logs
                   </button>

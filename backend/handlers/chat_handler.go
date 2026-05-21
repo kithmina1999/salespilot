@@ -99,11 +99,16 @@ func GetChatProfile(c *gin.Context) {
 	var orders []models.Order
 	database.DB.Where("customer_phone = ? AND business_id = ?", phone, businessID).Order("created_at DESC").Find(&orders)
 
+	var b models.Business
+	database.DB.Select("simulation_count, simulation_limit").First(&b, businessID)
+
 	// Build the response payload
 	c.JSON(http.StatusOK, gin.H{
-		"messages": messages,
-		"customer": customer, // If ID is 0, it means no profile exists yet
-		"orders":   orders,
+		"messages":         messages,
+		"customer":         customer, // If ID is 0, it means no profile exists yet
+		"orders":           orders,
+		"simulation_count": b.SimulationCount,
+		"simulation_limit": b.SimulationLimit,
 	})
 }
 

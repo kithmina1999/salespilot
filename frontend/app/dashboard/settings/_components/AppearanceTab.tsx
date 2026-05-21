@@ -28,12 +28,12 @@ export default function AppearanceTab() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-1 duration-300">
-      <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-6">
-        <h2 className="text-xl font-bold text-zinc-100 mb-1 flex items-center gap-2">
-          <Monitor size={20} className="text-zinc-400" />
+      <div className="bg-card border border-border/50 rounded-2xl p-6">
+        <h2 className="text-xl font-bold text-foreground mb-1 flex items-center gap-2">
+          <Monitor size={20} className="text-muted-foreground" />
           Theme Preferences
         </h2>
-        <p className="text-sm text-zinc-400 mb-6">Choose how SalesPilot looks to you.</p>
+        <p className="text-sm text-muted-foreground mb-6">Choose how SalesPilot looks to you.</p>
 
         <RadioGroup
           value={theme || 'system'}
@@ -43,53 +43,53 @@ export default function AppearanceTab() {
           {/* Light Theme */}
           <Label
             htmlFor="theme-light"
-            className={`cursor-pointer flex flex-col items-center justify-between rounded-xl border-2 p-4 transition-all hover:bg-zinc-800/50 ${
-              theme === 'light' ? 'border-emerald-500 bg-emerald-500/5' : 'border-zinc-800'
+            className={`cursor-pointer flex flex-col items-center justify-between rounded-xl border-2 p-4 transition-all hover:bg-accent ${
+              theme === 'light' ? 'border-emerald-500 bg-emerald-500/5' : 'border-border'
             }`}
           >
             <RadioGroupItem value="light" id="theme-light" className="sr-only" />
-            <div className="w-full flex justify-center mb-3 text-zinc-300">
+            <div className="w-full flex justify-center mb-3 text-muted-foreground">
               <Sun size={32} />
             </div>
-            <span className="font-semibold text-zinc-200">Light</span>
+            <span className="font-semibold text-foreground">Light</span>
           </Label>
 
           {/* Dark Theme */}
           <Label
             htmlFor="theme-dark"
-            className={`cursor-pointer flex flex-col items-center justify-between rounded-xl border-2 p-4 transition-all hover:bg-zinc-800/50 ${
-              theme === 'dark' ? 'border-emerald-500 bg-emerald-500/5' : 'border-zinc-800'
+            className={`cursor-pointer flex flex-col items-center justify-between rounded-xl border-2 p-4 transition-all hover:bg-accent ${
+              theme === 'dark' ? 'border-emerald-500 bg-emerald-500/5' : 'border-border'
             }`}
           >
             <RadioGroupItem value="dark" id="theme-dark" className="sr-only" />
-            <div className="w-full flex justify-center mb-3 text-zinc-300">
+            <div className="w-full flex justify-center mb-3 text-muted-foreground">
               <Moon size={32} />
             </div>
-            <span className="font-semibold text-zinc-200">Dark</span>
+            <span className="font-semibold text-foreground">Dark</span>
           </Label>
 
           {/* System Theme */}
           <Label
             htmlFor="theme-system"
-            className={`cursor-pointer flex flex-col items-center justify-between rounded-xl border-2 p-4 transition-all hover:bg-zinc-800/50 ${
-              theme === 'system' ? 'border-emerald-500 bg-emerald-500/5' : 'border-zinc-800'
+            className={`cursor-pointer flex flex-col items-center justify-between rounded-xl border-2 p-4 transition-all hover:bg-accent ${
+              theme === 'system' ? 'border-emerald-500 bg-emerald-500/5' : 'border-border'
             }`}
           >
             <RadioGroupItem value="system" id="theme-system" className="sr-only" />
-            <div className="w-full flex justify-center mb-3 text-zinc-300">
+            <div className="w-full flex justify-center mb-3 text-muted-foreground">
               <Monitor size={32} />
             </div>
-            <span className="font-semibold text-zinc-200">System</span>
+            <span className="font-semibold text-foreground">System</span>
           </Label>
         </RadioGroup>
       </div>
 
-      <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-6">
-        <h2 className="text-xl font-bold text-zinc-100 mb-1 flex items-center gap-2">
-          <Type size={20} className="text-zinc-400" />
+      <div className="bg-card border border-border/50 rounded-2xl p-6">
+        <h2 className="text-xl font-bold text-foreground mb-1 flex items-center gap-2">
+          <Type size={20} className="text-muted-foreground" />
           Interface Scale
         </h2>
-        <p className="text-sm text-zinc-400 mb-6">
+        <p className="text-sm text-muted-foreground mb-6">
           Adjust the size of text and UI elements. This setting only affects your current device.
         </p>
 
@@ -104,7 +104,7 @@ export default function AppearanceTab() {
             }}
             className="w-full"
           />
-          <div className="flex justify-between text-xs font-semibold text-zinc-500">
+          <div className="flex justify-between text-xs font-semibold text-muted-foreground">
             {FONT_OPTIONS.map((opt) => (
               <span key={opt.value}>{opt.label}</span>
             ))}

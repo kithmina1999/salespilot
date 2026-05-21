@@ -83,19 +83,19 @@ export default function LanguageTab({ settings }: { settings: BusinessSettings }
     }
   }
 
-  const card = 'bg-zinc-900/60 border border-zinc-800 rounded-2xl p-5 mb-4';
-  const sectionTitle = 'text-sm font-semibold text-zinc-100 mb-1';
-  const sectionSub   = 'text-xs text-zinc-500 mb-4';
+  const card = 'bg-muted/60 border border-border rounded-2xl p-5 mb-4';
+  const sectionTitle = 'text-sm font-semibold text-foreground mb-1';
+  const sectionSub   = 'text-xs text-muted-foreground mb-4';
 
   return (
     <div>
       {/* Header */}
       <div className="mb-6">
-        <h2 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
+        <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
           <Globe size={20} className="text-emerald-400" />
           Language Settings
         </h2>
-        <p className="text-sm text-zinc-500 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Dashboard language and bot reply language are independent — set each to match your needs.
         </p>
       </div>
@@ -245,8 +245,8 @@ export default function LanguageTab({ settings }: { settings: BusinessSettings }
           })}
         </div>
 
-        <div className="mt-3 p-3 rounded-xl bg-zinc-800/50 border border-zinc-700/50">
-          <p className="text-xs text-zinc-400">
+        <div className="mt-3 p-3 rounded-xl bg-accent border border-border/50">
+          <p className="text-xs text-muted-foreground">
             <strong className="text-emerald-400">Auto-detection:</strong> When a customer writes in Sinhala, Tamil, Arabic, or Thai script,
             the bot always detects it regardless of this setting. This list controls which languages get dedicated FAQ responses.
           </p>

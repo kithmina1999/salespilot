@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/kithmina1999/salespilot/models"
+	"github.com/kithmina1999/salespilot/platform"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -49,25 +50,41 @@ func Init(dsn string) {
 			&models.UnmatchedMessage{}, &models.User{}, &models.AuditLog{},
 			&models.BlacklistedNumber{}, &models.ActivationCode{},
 			&models.Cart{}, &models.SavedAddress{},
+			&models.SuperAdminUser{}, &models.SuperAdminSession{},
+			&models.PipelineLog{}, &models.PipelineSignalLog{},
+			&models.PlatformBillingSettings{}, &models.SubscriptionPlan{},
+			&models.BillingPaymentAttempt{}, &models.BillingAddon{},
+			&models.PaymentProofLineItem{}, &models.BillingServicePurchase{},
 		)
 	}
 
 	// Auto-migrate all models (creates/updates tables in Postgres)
 	err = DB.AutoMigrate(
 		&models.Business{}, &models.User{}, &models.Product{}, &models.Order{},
-		&models.Customer{}, &models.Rule{}, &models.Message{},
+		&models.Customer{}, &models.Rule{}, &models.RuleTemplate{}, &models.Message{},
 		&models.UnmatchedMessage{}, &models.AuditLog{},
 		&models.BlacklistedNumber{}, &models.ActivationCode{},
-		&models.PasswordResetToken{},        // WhatsApp OTP password reset
+		&models.PasswordResetToken{}, // WhatsApp OTP password reset
 		&models.EmailVerificationToken{},
-		&models.PaymentProof{},              // Bank transfer proof submissions
-		&models.TeamInvite{},                // Multi-user RBAC invitations
-		&models.MonthlyReport{},             // AI-generated monthly business intelligence reports
-		&models.Cart{},                      // In-progress customer order sessions
-		&models.SavedAddress{},              // Customer saved delivery addresses
-		&models.PasswordChangeToken{},       // Authenticated email-OTP password change flow
-		&models.UserSession{},               // Login session tracking (active sessions + login history)
-		&models.OrderPaymentProof{},         // Customer bank-transfer receipt submissions (Slice 3)
+		&models.PaymentProof{},        // Bank transfer proof submissions
+		&models.TeamInvite{},          // Multi-user RBAC invitations
+		&models.MonthlyReport{},       // AI-generated monthly business intelligence reports
+		&models.Cart{},                // In-progress customer order sessions
+		&models.SavedAddress{},        // Customer saved delivery addresses
+		&models.PasswordChangeToken{}, // Authenticated email-OTP password change flow
+		&models.UserSession{},         // Login session tracking (active sessions + login history)
+		&models.OrderPaymentProof{},   // Customer bank-transfer receipt submissions (Slice 3)
+		&models.SuperAdminUser{},
+		&models.SuperAdminSession{},
+		&models.PipelineLog{},
+		&models.PipelineSignalLog{},
+		&models.PlatformNotice{},
+		&models.PlatformBillingSettings{},
+		&models.SubscriptionPlan{},
+		&models.BillingPaymentAttempt{},
+		&models.BillingAddon{},
+		&models.PaymentProofLineItem{},
+		&models.BillingServicePurchase{},
 	)
 	if err != nil {
 		log.Fatalf("❌ Failed to migrate database: %v", err)
@@ -75,8 +92,31 @@ func Init(dsn string) {
 
 	log.Println("✅ PostgreSQL connected and migrated successfully")
 
+	if err := platform.EnsureBillingDefaults(DB); err != nil {
+		log.Fatalf("Failed to seed billing catalog defaults: %v", err)
+	}
+
 	if os.Getenv("SEED_DB") == "true" {
 		seedDemoData()
+	}
+
+	// Auto-seed super admin fallback
+	var adminCount int64
+	DB.Model(&models.SuperAdminUser{}).Count(&adminCount)
+	if adminCount == 0 && os.Getenv("SUPER_ADMIN_EMAIL") != "" {
+		email := os.Getenv("SUPER_ADMIN_EMAIL")
+		password := os.Getenv("SUPER_ADMIN_INITIAL_PASSWORD")
+		if password != "" {
+			hashed, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+			DB.Create(&models.SuperAdminUser{
+				Name:         "Super Admin",
+				Email:        email,
+				PasswordHash: string(hashed),
+				Role:         models.SuperRoleOwner,
+				IsActive:     true,
+			})
+			log.Println("⚠️ Auto-seeded super admin — change password immediately")
+		}
 	}
 }
 
@@ -103,7 +143,7 @@ func seedDemoData() {
 		DB.Create(&models.User{
 			BusinessID:      defaultBiz.ID,
 			Email:           "admin@byteshift.lk", // TODO: REPLACE BEFORE PRODUCTION
-			Phone:           "+94771234567",        // TODO: REPLACE BEFORE PRODUCTION
+			Phone:           "+94771234567",       // TODO: REPLACE BEFORE PRODUCTION
 			PasswordHash:    string(hashed),
 			Role:            "admin",
 			IsEmailVerified: true, // skip email verification for demo account
@@ -254,10 +294,11 @@ func seedDemoData() {
 			},
 		}
 		for i := range globalRules {
-			globalRules[i].BusinessID = nil
+			globalRules[i].BusinessID = &defaultBiz.ID
+			globalRules[i].Category = "General"
 			DB.Create(&globalRules[i])
 		}
-		log.Printf("✅ Seeded %d production global FAQ rules", len(globalRules))
+		log.Printf("✅ Seeded %d rules for demo business", len(globalRules))
 
 		// ── TIER 1: Hard DROP Rules ────────────────────────────────────────────
 		dropRules := []models.Rule{
@@ -266,10 +307,11 @@ func seedDemoData() {
 			{Keywords: "test,testing,1,2,3,asdf,qwerty,aaa,bbb,abc,xyz,hello test", IsDropRule: true, IsActive: true},
 		}
 		for i := range dropRules {
-			dropRules[i].BusinessID = nil
+			dropRules[i].BusinessID = &defaultBiz.ID
+			dropRules[i].Category = "System"
 			DB.Create(&dropRules[i])
 		}
-		log.Printf("🔇 Seeded %d global Tier 1 DROP rules", len(dropRules))
+		log.Printf("🔇 Seeded %d Tier 1 DROP rules for demo business", len(dropRules))
 
 		// ── TIER 2: Context Bridge Rules ──────────────────────────────────────
 		bridgeRules := []models.Rule{
@@ -278,10 +320,29 @@ func seedDemoData() {
 			{Keywords: "hm,hmm,right,exactly,correct,true,i see,makes sense", IsContextBridge: true, IsActive: true},
 		}
 		for i := range bridgeRules {
-			bridgeRules[i].BusinessID = nil
+			bridgeRules[i].BusinessID = &defaultBiz.ID
+			bridgeRules[i].Category = "System"
 			DB.Create(&bridgeRules[i])
 		}
-		log.Printf("🔄 Seeded %d global Tier 2 Context Bridge rules", len(bridgeRules))
+		log.Printf("🔄 Seeded %d Tier 2 Context Bridge rules for demo business", len(bridgeRules))
+
+		// ── RULE TEMPLATES (SaaS-wide) ───────────────────────────────────────────
+		templates := []models.RuleTemplate{
+			{
+				Category:  "Shipping",
+				Keywords:  "shipping,delivery,courier,postage",
+				Responses: `{"en": "We offer island-wide delivery within 2-4 working days. Delivery fee starts at Rs. 350."}`,
+			},
+			{
+				Category:  "Payments",
+				Keywords:  "payment,pay,bank transfer,cod",
+				Responses: `{"en": "We accept Bank Transfer and Cash on Delivery (COD)."}`,
+			},
+		}
+		for i := range templates {
+			DB.Create(&templates[i])
+		}
+		log.Printf("📚 Seeded %d Rule Templates", len(templates))
 
 		log.Println("🚀 Demo data seeding complete")
 	}

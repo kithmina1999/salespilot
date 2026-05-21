@@ -37,7 +37,7 @@ export default function LangPills({
           const meta        = LANG_META[l];
 
           const borderCls = !enabled
-            ? 'border-zinc-700/40'
+            ? 'border-border/40'
             : !hasCoverage
             ? 'border-amber-700/50'
             : isActive
@@ -45,12 +45,12 @@ export default function LangPills({
             : 'border-emerald-600/40 hover:border-emerald-400/70';
 
           const styleCls = !enabled
-            ? 'bg-zinc-900 text-zinc-600 opacity-25 cursor-not-allowed grayscale'
+            ? 'bg-muted text-zinc-600 opacity-25 cursor-not-allowed grayscale'
             : !hasCoverage
             ? 'bg-amber-950/20 text-amber-500/60 opacity-50 cursor-default'
             : isActive
             ? `bg-white/10 ${meta.color} cursor-pointer`
-            : `bg-zinc-900 ${meta.color} hover:bg-zinc-800 cursor-pointer`;
+            : `bg-muted ${meta.color} hover:bg-secondary cursor-pointer`;
 
           const marginCls = idx === 0 ? 'ml-0' : '-ml-[9px]';
 
@@ -102,12 +102,12 @@ export default function LangPills({
                 'flex shrink-0 items-center gap-1 px-2 py-1 rounded-full border',
                 'text-[10px] font-bold active:scale-95 transition-transform',
                 !enabled
-                  ? 'opacity-25 border-zinc-800 text-zinc-600 grayscale'
+                  ? 'opacity-25 border-border text-zinc-600 grayscale'
                   : !hasCoverage
                   ? 'opacity-40 border-amber-900/40 text-amber-600'
                   : isActive
                   ? `${meta.color} border-white/20 bg-white/10`
-                  : 'text-zinc-400 border-zinc-700 bg-zinc-900 active:bg-white/10',
+                  : 'text-muted-foreground border-border bg-muted active:bg-white/10',
               ].join(' ')}
             >
               {meta.flag}

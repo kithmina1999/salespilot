@@ -14,23 +14,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
+	"github.com/kithmina1999/salespilot/platform"
 	"github.com/kithmina1999/salespilot/utils"
 
 	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 )
-
-var proofBillingAmounts = map[string]float64{
-	models.BillingMonthly:   4500,
-	models.BillingQuarterly: 11700,
-	models.BillingAnnual:    39600,
-}
-
-var proofBillingDays = map[string]int{
-	models.BillingMonthly:   30,
-	models.BillingQuarterly: 90,
-	models.BillingAnnual:    365,
-}
 
 // ─────────────────────────────────────────────────────────────────
 // POST /api/v1/billing/submit-proof  (Tenant JWT)
@@ -53,22 +42,122 @@ func SubmitPaymentProof(c *gin.Context) {
 		return
 	}
 
-	// Block duplicate pending submissions
-	var existingPending models.PaymentProof
-	if err := database.DB.Where("business_id = ? AND status = ?", businessID, models.PaymentStatusPending).First(&existingPending).Error; err == nil {
-		c.JSON(http.StatusConflict, gin.H{
-			"error":        "You already have a payment proof waiting for approval. Please wait for it to be reviewed.",
-			"submitted_at": existingPending.CreatedAt,
-		})
+	cycle := strings.ToLower(strings.TrimSpace(c.PostForm("billing_cycle")))
+	plan := strings.ToLower(strings.TrimSpace(c.PostForm("plan")))
+	addonKeys := c.PostFormArray("addon_keys")
+	if len(addonKeys) == 0 {
+		addonKeys = c.PostFormArray("addon_keys[]") // fallback
+	}
+
+	var checkoutType string
+	if plan != "" && len(addonKeys) > 0 {
+		checkoutType = "mixed"
+	} else if plan != "" {
+		checkoutType = "subscription"
+	} else if len(addonKeys) > 0 {
+		checkoutType = "addon_only"
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Must select a plan or at least one add-on"})
 		return
 	}
 
-	// Validate billing cycle
-	cycle := c.PostForm("billing_cycle")
-	amount, ok := proofBillingAmounts[cycle]
-	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid billing cycle. Use: monthly, quarterly, or annual"})
-		return
+	if checkoutType == "subscription" || checkoutType == "mixed" {
+		if plan == "" || cycle == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Plan and billing cycle are required for subscription checkout"})
+			return
+		}
+	}
+
+	// Check existing pending proofs
+	var pendingProofs []models.PaymentProof
+	database.DB.Preload("LineItems").Where("business_id = ? AND status = ?", businessID, models.PaymentStatusPending).Find(&pendingProofs)
+
+	if checkoutType == "subscription" || checkoutType == "mixed" {
+		for _, p := range pendingProofs {
+			if p.CheckoutType == "subscription" || p.CheckoutType == "mixed" {
+				c.JSON(http.StatusConflict, gin.H{
+					"error":        "You already have a subscription payment proof waiting for approval. Please wait for it to be reviewed.",
+					"submitted_at": p.CreatedAt,
+				})
+				return
+			}
+		}
+	}
+
+	var lineItems []models.PaymentProofLineItem
+	var planAmount, oneTimeTotal, monthlyAddonTotal, totalAmount float64
+
+	if checkoutType == "subscription" || checkoutType == "mixed" {
+		amt, err := platform.AmountFor(database.DB, plan, cycle)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid billing configuration: " + err.Error()})
+			return
+		}
+		planAmount = amt
+		totalAmount += amt
+
+		planObj, _ := platform.GetPlan(database.DB, plan)
+		lineItems = append(lineItems, models.PaymentProofLineItem{
+			ItemType:    models.ItemTypeSubscription,
+			Key:         plan,
+			Name:        planObj.DisplayName + " Plan",
+			Description: "Subscription plan: " + cycle,
+			BillingType: cycle,
+			Quantity:    1,
+			UnitPrice:   amt,
+			Total:       amt,
+		})
+	}
+
+	if len(addonKeys) > 0 {
+		var purchasedAddons []string
+		database.DB.Raw(`
+			SELECT l.key
+			FROM payment_proof_line_items l
+			JOIN payment_proofs p ON p.id = l.payment_proof_id
+			WHERE p.business_id = ? AND p.status IN (?, ?) AND l.item_type = ?
+		`, businessID, models.PaymentStatusPending, models.PaymentStatusApproved, models.ItemTypeAddon).Scan(&purchasedAddons)
+
+		purchasedMap := make(map[string]bool)
+		for _, k := range purchasedAddons {
+			purchasedMap[k] = true
+		}
+
+		for _, key := range addonKeys {
+			var addon models.BillingAddon
+			if err := database.DB.Where("key = ? AND is_active = ?", key, true).First(&addon).Error; err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or inactive addon: " + key})
+				return
+			}
+
+			if addon.PurchasePolicy == models.PurchasePolicyOncePerBusiness && purchasedMap[key] {
+				c.JSON(http.StatusConflict, gin.H{"error": "Addon already purchased or pending: " + addon.Name})
+				return
+			}
+
+			if addon.Key == "dfy_meta_setup" && biz.WAStatus == "connected" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Business is already connected, select Reconfiguration Support instead."})
+				return
+			}
+
+			if addon.BillingType == models.BillingTypeOneTime {
+				oneTimeTotal += addon.Amount
+			} else {
+				monthlyAddonTotal += addon.Amount
+			}
+			totalAmount += addon.Amount
+
+			lineItems = append(lineItems, models.PaymentProofLineItem{
+				ItemType:    models.ItemTypeAddon,
+				Key:         addon.Key,
+				Name:        addon.Name,
+				Description: addon.Description,
+				BillingType: addon.BillingType,
+				Quantity:    1,
+				UnitPrice:   addon.Amount,
+				Total:       addon.Amount,
+			})
+		}
 	}
 
 	// Get the uploaded screenshot
@@ -117,14 +206,21 @@ func SubmitPaymentProof(c *gin.Context) {
 
 	// Create PaymentProof record
 	proof := models.PaymentProof{
-		BusinessID:    businessID,
-		BusinessName:  biz.Name,
-		BusinessPhone: biz.Phone,
-		BusinessEmail: user.Email,
-		BillingCycle:  cycle,
-		Amount:        amount,
-		ScreenshotURL: resp.SecureURL,
-		Status:        models.PaymentStatusPending,
+		BusinessID:        businessID,
+		BusinessName:      biz.Name,
+		BusinessPhone:     biz.Phone,
+		BusinessEmail:     user.Email,
+		CheckoutType:      checkoutType,
+		BillingCycle:      cycle,
+		Plan:              plan,
+		Amount:            totalAmount,
+		PlanAmount:        planAmount,
+		OneTimeTotal:      oneTimeTotal,
+		MonthlyAddonTotal: monthlyAddonTotal,
+		TotalAmount:       totalAmount,
+		ScreenshotURL:     resp.SecureURL,
+		Status:            models.PaymentStatusPending,
+		LineItems:         lineItems,
 	}
 
 	if err := database.DB.Create(&proof).Error; err != nil {
@@ -132,17 +228,18 @@ func SubmitPaymentProof(c *gin.Context) {
 		return
 	}
 
-	log.Printf("💰 New payment proof submitted: Business %d (%s) — %s — LKR %.0f", businessID, biz.Name, cycle, amount)
+	log.Printf("💰 New payment proof submitted: Business %d (%s) — %s — LKR %.0f", businessID, biz.Name, cycle, totalAmount)
 
 	LogActivity(businessID, "user", c.GetUint("user_id"), "payment_proof_submitted", "billing", strconv.FormatUint(uint64(proof.ID), 10),
-		map[string]interface{}{"cycle": cycle, "amount": amount}, c.ClientIP(), "medium", biz.Name, biz.Plan)
+		map[string]interface{}{"cycle": cycle, "amount": totalAmount, "checkout_type": checkoutType}, c.ClientIP(), "medium", biz.Name, biz.Plan)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message":       "Payment proof submitted successfully! Our team will verify and send your activation code via email within a few hours.",
 		"proof_id":      proof.ID,
 		"status":        proof.Status,
 		"billing_cycle": cycle,
-		"amount":        amount,
+		"amount":        totalAmount,
+		"checkout_type": checkoutType,
 	})
 }
 
@@ -162,7 +259,9 @@ func GetPaymentStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"has_proof":       true,
 		"status":          proof.Status,
+		"checkout_type":   proof.CheckoutType,
 		"billing_cycle":   proof.BillingCycle,
+		"plan":            proof.Plan,
 		"amount":          proof.Amount,
 		"activation_code": proof.ActivationCode, // non-empty only if approved
 		"admin_note":      proof.AdminNote,      // non-empty only if rejected
@@ -184,7 +283,7 @@ func ListPaymentProofs(c *gin.Context) {
 	}
 
 	var proofs []models.PaymentProof
-	if err := query.Find(&proofs).Error; err != nil {
+	if err := query.Preload("LineItems").Find(&proofs).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch payment proofs"})
 		return
 	}
@@ -213,7 +312,7 @@ func ApprovePayment(c *gin.Context) {
 	}
 
 	var proof models.PaymentProof
-	if err := database.DB.First(&proof, id).Error; err != nil {
+	if err := database.DB.Preload("LineItems").First(&proof, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Payment proof not found"})
 		return
 	}
@@ -223,29 +322,63 @@ func ApprovePayment(c *gin.Context) {
 		return
 	}
 
-	// Generate activation code locked to this business's phone
-	code := generateProofActivationCode("starter")
+	var code string
+	now := time.Now()
 
-	durationDays := proofBillingDays[proof.BillingCycle]
-	if durationDays == 0 {
-		durationDays = 30
+	// Create BillingServicePurchases for addon line items
+	for _, li := range proof.LineItems {
+		if li.ItemType == models.ItemTypeAddon {
+			database.DB.Create(&models.BillingServicePurchase{
+				BusinessID:     proof.BusinessID,
+				AddonKey:       li.Key,
+				PaymentProofID: proof.ID,
+				Status:         models.ServiceStatusPaid,
+				PurchasedAt:    now,
+			})
+		}
 	}
 
-	activationCode := models.ActivationCode{
-		Code:         code,
-		Plan:         models.PlanStarter,
-		BillingCycle: proof.BillingCycle,
-		DurationDays: durationDays,
-		Note:         fmt.Sprintf("Auto-generated from payment proof #%d — %s", proof.ID, proof.BusinessName),
-		TargetPhone:  proof.BusinessPhone,
-	}
-	if err := database.DB.Create(&activationCode).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate activation code: " + err.Error()})
-		return
+	if proof.CheckoutType == "subscription" || proof.CheckoutType == "mixed" {
+		code = generateProofActivationCode(proof.Plan)
+
+		durationDays, err := platform.DaysForCycle(proof.BillingCycle)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid billing cycle on payment proof"})
+			return
+		}
+
+		activationCode := models.ActivationCode{
+			Code:         code,
+			Plan:         proof.Plan,
+			BillingCycle: proof.BillingCycle,
+			DurationDays: durationDays,
+			Note:         fmt.Sprintf("Auto-generated from payment proof #%d — %s", proof.ID, proof.BusinessName),
+			TargetPhone:  proof.BusinessPhone,
+		}
+		if err := database.DB.Create(&activationCode).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate activation code: " + err.Error()})
+			return
+		}
+
+		// Send email asynchronously
+		go func() {
+			if err := utils.SendActivationCodeEmail(
+				proof.BusinessEmail,
+				proof.BusinessName,
+				code,
+				proof.Plan,
+				proof.BillingCycle,
+				durationDays,
+			); err != nil {
+				log.Printf("⚠️ Failed to send activation code email to %s: %v", proof.BusinessEmail, err)
+			}
+		}()
+	} else {
+		// TODO: Add-on only confirmation email if needed
+		log.Printf("ℹ️ Add-on only payment approved for %s, no activation code generated.", proof.BusinessName)
 	}
 
 	// Update PaymentProof
-	now := time.Now()
 	if err := database.DB.Model(&proof).Updates(map[string]interface{}{
 		"status":          models.PaymentStatusApproved,
 		"activation_code": code,
@@ -255,31 +388,23 @@ func ApprovePayment(c *gin.Context) {
 		return
 	}
 
-	// Send email asynchronously
-	go func() {
-		if err := utils.SendActivationCodeEmail(
-			proof.BusinessEmail,
-			proof.BusinessName,
-			code,
-			models.PlanStarter,
-			proof.BillingCycle,
-			durationDays,
-		); err != nil {
-			log.Printf("⚠️ Failed to send activation code email to %s: %v", proof.BusinessEmail, err)
-		}
-	}()
+	LogActivity(proof.BusinessID, "super_admin", 0, "payment_approved", "billing", strconv.FormatUint(uint64(proof.ID), 10),
+		map[string]interface{}{"proof_id": proof.ID, "cycle": proof.BillingCycle, "amount": proof.Amount, "checkout_type": proof.CheckoutType},
+		c.ClientIP(), "high", proof.BusinessName, proof.Plan)
 
-	LogActivity(proof.BusinessID, "super_admin", 0, "payment_approved", "billing", code,
-		map[string]interface{}{"proof_id": proof.ID, "cycle": proof.BillingCycle, "amount": proof.Amount},
-		c.ClientIP(), "high", proof.BusinessName, models.PlanStarter)
+	log.Printf("✅ Payment proof #%d approved for %s", proof.ID, proof.BusinessName)
 
-	log.Printf("✅ Payment proof #%d approved for %s — Code: %s", proof.ID, proof.BusinessName, code)
-
-	c.JSON(http.StatusOK, gin.H{
-		"message":         fmt.Sprintf("Payment approved! Code %s generated and emailed to %s.", code, proof.BusinessEmail),
-		"activation_code": code,
-		"emailed_to":      proof.BusinessEmail,
-	})
+	if code != "" {
+		c.JSON(http.StatusOK, gin.H{
+			"message":         fmt.Sprintf("Payment approved! Code %s generated and emailed to %s.", code, proof.BusinessEmail),
+			"activation_code": code,
+			"emailed_to":      proof.BusinessEmail,
+		})
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Service payment approved successfully! Tasks have been created for fulfillment.",
+		})
+	}
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -338,6 +463,11 @@ func RejectPayment(c *gin.Context) {
 func generateProofActivationCode(plan string) string {
 	const charset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 	planTag := "STR"
+	if plan == models.PlanPro || plan == "pro" {
+		planTag = "PRO"
+	} else if plan == "free" {
+		planTag = "FRE"
+	}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	b := make([]byte, 4)
 	for i := range b {

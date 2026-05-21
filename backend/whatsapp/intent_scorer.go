@@ -45,12 +45,12 @@ var tier1Strong = []string{
 	"i'd like to order", "i would like to order",
 	// Singlish — core buy verbs
 	"ganna", "gannakola", "ganna ona", "ganna one",
-	"meka ona", "meka one",		// "want this" — unambiguous purchase shorthand
-	"mata ona", "mata one",		// "I want" — equally unambiguous
+	"meka ona", "meka one", // "want this" — unambiguous purchase shorthand
+	"mata ona", "mata one", // "I want" — equally unambiguous
 	"order karanna", "order denna", "order ekak",
-	"ewwanna", "ewwanawa",		// "send me" / "give me"
-	"katta ganna", "kenna",		// "to buy" forms
-	"danna ona", "danna one",	// "want to give/take"
+	"ewwanna", "ewwanawa", // "send me" / "give me"
+	"katta ganna", "kenna", // "to buy" forms
+	"danna ona", "danna one", // "want to give/take"
 	"buy karanna", "buy karanawa",
 	// Sinhala Unicode — direct script matches
 	"ගන්න", "ගන්නකොල", "ගන්නවා",
@@ -61,7 +61,7 @@ var tier1Strong = []string{
 // Combined with Tier 3 context signals, these reach "high".
 var tier2Medium = []string{
 	// Singlish desire expressions
-	"ona", "one",       // "want/need" suffix
+	"ona", "one", // "want/need" suffix
 	"eka onna", "eka one",
 	"ekak onna", "ekak one",
 	"mata eka", "mata meka",

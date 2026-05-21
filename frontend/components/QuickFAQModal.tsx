@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const API = 'http://localhost:8080';
+import { API_URL } from '@/hooks/_shared';
+const API = API_URL;
 
 interface QuickFAQModalProps {
   unmatchedMessage: string;
@@ -100,20 +101,20 @@ export default function QuickFAQModal({ unmatchedMessage, onClose, onSuccess }: 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-2xl rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200 bg-zinc-900 border border-zinc-800 flex flex-col max-h-[92vh] overflow-y-auto">
+      <div className="w-full max-w-2xl rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200 bg-muted border border-border flex flex-col max-h-[92vh] overflow-y-auto">
 
         {/* ── Header ── */}
-        <div className="px-6 pt-6 pb-4 border-b border-zinc-800/60 bg-zinc-900 sticky top-0 z-10 flex items-start justify-between">
+        <div className="px-6 pt-6 pb-4 border-b border-border/60 bg-muted sticky top-0 z-10 flex items-start justify-between">
           <div>
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
               <ShieldAlert className="text-amber-400" size={20} />
               Convert to FAQ Rule
             </h2>
-            <p className="text-xs text-zinc-400 mt-1">Turn this unanswered query into a 24/7 automated response.</p>
+            <p className="text-xs text-muted-foreground mt-1">Turn this unanswered query into a 24/7 automated response.</p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors ml-4 shrink-0"
+            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors ml-4 shrink-0"
           >
             <X size={16} />
           </button>
@@ -150,8 +151,8 @@ export default function QuickFAQModal({ unmatchedMessage, onClose, onSuccess }: 
 
           {/* ── Keywords ── */}
           <div>
-            <label className="block text-sm mb-1.5 text-zinc-300 font-medium">
-              Trigger Keywords <span className="text-xs text-zinc-500 font-normal italic ml-2">(Comma separated)</span>
+            <label className="block text-sm mb-1.5 text-muted-foreground font-medium">
+              Trigger Keywords <span className="text-xs text-muted-foreground font-normal italic ml-2">(Comma separated)</span>
             </label>
             <input
               required
@@ -159,14 +160,14 @@ export default function QuickFAQModal({ unmatchedMessage, onClose, onSuccess }: 
               value={form.keywords}
               onChange={e => setForm({ ...form, keywords: e.target.value })}
               placeholder="Type or click 'Generalize & Draft'..."
-              className="w-full px-4 py-2.5 bg-zinc-950 border rounded-xl text-sm outline-none focus:border-zinc-500 border-zinc-800 transition-colors text-white placeholder:text-zinc-600"
+              className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm outline-none focus:border-zinc-500 border-border transition-colors text-foreground placeholder:text-zinc-600"
             />
           </div>
 
           {/* ── Sinhala response ── */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-sm text-zinc-300 font-medium flex items-center gap-1.5">
+              <label className="text-sm text-muted-foreground font-medium flex items-center gap-1.5">
                 Bot Response{' '}
                 <span className="text-[11px] px-1.5 py-0.5 bg-green-500/10 text-green-400 border border-green-500/20 rounded font-bold">සිංහල</span>
                 {missingSinhala && (
@@ -181,15 +182,15 @@ export default function QuickFAQModal({ unmatchedMessage, onClose, onSuccess }: 
               value={form.sinhala_response}
               onChange={e => setForm({ ...form, sinhala_response: e.target.value })}
               placeholder="අපගේ බෙදාහැරීමේ ක්‍රියාවලිය..."
-              className={`w-full px-4 py-3 bg-zinc-950 border rounded-xl text-sm outline-none focus:border-zinc-500 transition-colors resize-y text-zinc-200 leading-relaxed ${
-                missingSinhala ? 'border-amber-500/30' : 'border-zinc-800'
+              className={`w-full px-4 py-3 bg-background border rounded-xl text-sm outline-none focus:border-zinc-500 transition-colors resize-y text-foreground leading-relaxed ${
+                missingSinhala ? 'border-amber-500/30' : 'border-border'
               }`}
             />
           </div>
 
           {/* ── English response ── */}
           <div>
-            <label className="text-sm mb-1.5 text-zinc-300 font-medium flex items-center gap-1.5">
+            <label className="text-sm mb-1.5 text-muted-foreground font-medium flex items-center gap-1.5">
               Bot Response{' '}
               <span className="text-[11px] px-1.5 py-0.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded font-bold">English</span>
             </label>
@@ -199,32 +200,32 @@ export default function QuickFAQModal({ unmatchedMessage, onClose, onSuccess }: 
               value={form.response}
               onChange={e => setForm({ ...form, response: e.target.value })}
               placeholder="We deliver island-wide within 3 business days..."
-              className="w-full px-4 py-3 bg-zinc-950 border rounded-xl text-sm outline-none focus:border-zinc-500 border-zinc-800 transition-colors resize-y leading-relaxed text-zinc-200"
+              className="w-full px-4 py-3 bg-background border rounded-xl text-sm outline-none focus:border-zinc-500 border-border transition-colors resize-y leading-relaxed text-foreground"
             />
           </div>
 
           {/* ── Active toggle + actions ── */}
-          <div className="flex items-center justify-between border-t pt-5 mt-1 border-zinc-800">
+          <div className="flex items-center justify-between border-t pt-5 mt-1 border-border">
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
                 id="qfaq-active"
                 checked={form.is_active}
                 onChange={e => setForm({ ...form, is_active: e.target.checked })}
-                className="w-4 h-4 rounded border-zinc-700 bg-zinc-950 accent-emerald-500 cursor-pointer"
+                className="w-4 h-4 rounded border-border bg-background accent-emerald-500 cursor-pointer"
               />
               <div className="flex flex-col">
-                <label htmlFor="qfaq-active" className="text-sm font-medium cursor-pointer select-none text-zinc-200">
+                <label htmlFor="qfaq-active" className="text-sm font-medium cursor-pointer select-none text-foreground">
                   Rule Active
                 </label>
-                <span className="text-[10px] text-zinc-500">Turn off to save as draft without activating.</span>
+                <span className="text-[10px] text-muted-foreground">Turn off to save as draft without activating.</span>
               </div>
             </div>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl text-sm font-medium text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                className="px-4 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
               >
                 Cancel
               </button>

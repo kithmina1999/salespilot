@@ -32,8 +32,8 @@ import (
 // Ambiguous = true means multiple unpaid orders exist and the customer
 // must be asked which one the proof belongs to.
 type PaymentOrderResult struct {
-	Order     *models.Order   // the single resolved order (nil when Ambiguous or no match)
-	Orders    []models.Order  // all candidates when Ambiguous = true
+	Order     *models.Order  // the single resolved order (nil when Ambiguous or no match)
+	Orders    []models.Order // all candidates when Ambiguous = true
 	Ambiguous bool
 }
 

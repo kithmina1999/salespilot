@@ -39,7 +39,7 @@ func sendOTPViaWhatsApp(phone string, otp string) error {
 	if err != nil {
 		return fmt.Errorf("your bot is disconnected and the system bot is offline")
 	}
-	
+
 	if biz.WAPhoneNumberID == "" || biz.WAAccessToken == "" {
 		return fmt.Errorf("Meta API credentials missing for OTP sender")
 	}
@@ -270,7 +270,7 @@ func ResetPassword(c *gin.Context) {
 	if err := database.DB.Model(&models.User{}).
 		Where("phone = ?", record.Phone).
 		Updates(map[string]interface{}{
-			"password_hash": string(hashed),
+			"password_hash":       string(hashed),
 			"password_changed_at": now,
 		}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})

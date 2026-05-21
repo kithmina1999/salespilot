@@ -38,8 +38,12 @@
     "settings": "அமைப்புகள்",
     "billing": "பில்லிங்",
     "connect": "WhatsApp இணைப்பு",
-    "inbox": "இன்பாக்ஸ்",
+    "inbox": "உள்வரும் பெட்டி",
     "reports": "அறிக்கைகள்",
+    "usage": "பயன்பாடு (Usage)",
+    "plans": "திட்டங்கள் (Plans)",
+    "payment_history": "கட்டண வரலாறு (Payment History)",
+    "activate_code": "குறியீட்டை செயல்படுத்துக (Activate Code)",
     "logout": "வெளியேறு"
   },
   "auth": {

@@ -33,7 +33,7 @@ func RunAbandonedCartReminders() {
 			false,
 			time.Now(),
 		).
-		Preload("").      // no associations, just the struct
+		Preload(""). // no associations, just the struct
 		Find(&carts)
 
 	if len(carts) == 0 {

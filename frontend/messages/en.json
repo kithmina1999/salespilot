@@ -40,6 +40,10 @@
     "connect":"WhatsApp ",
     "inbox": "Inbox",
     "reports": "Reports",
+    "usage": "Usage",
+    "plans": "Plans",
+    "payment_history": "Payment History",
+    "activate_code": "Activate Code",
     "logout": "Logout"
   },
   "auth": {

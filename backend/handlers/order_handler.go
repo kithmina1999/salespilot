@@ -108,8 +108,8 @@ func GetOrdersByCustomer(c *gin.Context) {
 // ToggleLateAlert enables or disables the automatic late-delivery cron alert for an order.
 // PATCH /api/v1/orders/:id/late-alert  {"enabled": true/false}
 //
-//   enabled=true  → reset late_alert_sent to false  (cron will send alert if overdue)
-//   enabled=false → set  late_alert_sent to true   (suppress future alerts for this order)
+//	enabled=true  → reset late_alert_sent to false  (cron will send alert if overdue)
+//	enabled=false → set  late_alert_sent to true   (suppress future alerts for this order)
 func ToggleLateAlert(c *gin.Context) {
 	db := c.MustGet("db").(*gorm.DB)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)

@@ -13,25 +13,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
+	"github.com/kithmina1999/salespilot/platform"
 )
-
-// billingDays maps a billing cycle to the number of days the plan is active.
-var billingDays = map[string]int{
-	models.BillingMonthly: 30,
-	models.BillingAnnual:  365,
-}
-
-// billingAmounts maps cycle → amount in LKR (must match PayHere checkout amount exactly)
-var billingAmounts = map[string]map[string]float64{
-	models.PlanStarter: {
-		models.BillingMonthly: 1490,
-		models.BillingAnnual:  14900, // save Rs. 3,000 (2 months free)
-	},
-	models.PlanPro: {
-		models.BillingMonthly: 3490,
-		models.BillingAnnual:  34900, // save Rs. 7,000 (2 months free)
-	},
-}
 
 type billingTimeRemaining struct {
 	Status        string
@@ -141,6 +124,26 @@ func BillingStatus(c *gin.Context) {
 		}
 	}
 
+	// Fetch active platform notice
+	var notice *models.PlatformNotice
+	var n models.PlatformNotice
+	// Check for active notice that hasn't expired
+	err := database.DB.Where("is_active = ? AND (expires_at IS NULL OR expires_at > ?)", true, now).Order("created_at desc").First(&n).Error
+	if err == nil {
+		notice = &n
+	}
+
+	pricing, err := platform.PublicPricing(database.DB)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load pricing"})
+		return
+	}
+	plans, err := platform.GetPlans(database.DB)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load plan catalog"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"plan":                  biz.Plan,
 		"effective_plan":        remaining.EffectivePlan,
@@ -161,20 +164,13 @@ func BillingStatus(c *gin.Context) {
 		"faq_reply_count":       biz.FaqReplyCount,
 		"system_message_count":  biz.SystemMessageCount,
 		"rule_generation_count": biz.RuleGenerationCount,
-		"pricing": gin.H{
-			"starter": gin.H{
-				"monthly": billingAmounts[models.PlanStarter][models.BillingMonthly],
-				"annual":  billingAmounts[models.PlanStarter][models.BillingAnnual],
-			},
-			"pro": gin.H{
-				"monthly": billingAmounts[models.PlanPro][models.BillingMonthly],
-				"annual":  billingAmounts[models.PlanPro][models.BillingAnnual],
-			},
-		},
+		"pricing":               pricing,
+		"plan_limits":           platform.PlanLimitsResponse(plans),
 		// Launch promotion fields
 		"promo_active":        promoIsActive(),
 		"promo_ends_at":       promoEndDate.Format(time.RFC3339),
 		"is_first_activation": biz.BillingCycle == "" && biz.PlanExpiresAt == nil,
+		"platform_notice":     notice,
 	})
 }
 
@@ -195,14 +191,11 @@ func BillingInitiate(c *gin.Context) {
 		return
 	}
 
-	planAmounts, planOk := billingAmounts[req.Plan]
-	if !planOk {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid plan. Use: starter or pro"})
-		return
-	}
-	amount, cycleOk := planAmounts[req.Cycle]
-	if !cycleOk {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cycle. Use: monthly or annual"})
+	req.Plan = strings.ToLower(strings.TrimSpace(req.Plan))
+	req.Cycle = strings.ToLower(strings.TrimSpace(req.Cycle))
+	amount, err := platform.AmountFor(database.DB, req.Plan, req.Cycle)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -232,6 +225,18 @@ func BillingInitiate(c *gin.Context) {
 
 	orderID := generateOrderID(businessID)
 	hash := payhereHash(merchantID, orderID, amount, "LKR", merchantSecret)
+	if err := database.DB.Create(&models.BillingPaymentAttempt{
+		OrderID:      orderID,
+		BusinessID:   businessID,
+		Plan:         req.Plan,
+		BillingCycle: req.Cycle,
+		Amount:       amount,
+		Currency:     "LKR",
+		Status:       "pending",
+	}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create payment attempt"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"checkout_url": checkoutURL,
@@ -286,29 +291,36 @@ func BillingNotify(c *gin.Context) {
 	// Parse business ID and cycle from order_id format: OC-{bizID}-{timestamp}-{rand}
 	// Cycle is stored in a pending payment record (we encode it into order_id)
 	// Extract from order prefix: OC-{businessID}-...
-	var businessID uint
-	fmt.Sscanf(orderID, "OC-%d-", &businessID)
+	var attempt models.BillingPaymentAttempt
+	if err := database.DB.Where("order_id = ?", orderID).First(&attempt).Error; err != nil {
+		log.Printf("PayHere notify: payment attempt not found for order %s", orderID)
+		c.String(http.StatusOK, "OK")
+		return
+	}
+	if attempt.Status == "paid" {
+		c.String(http.StatusOK, "OK")
+		return
+	}
+	if fmt.Sprintf("%.2f", attempt.Amount) != fmt.Sprintf("%.2f", amount) || attempt.Currency != currency {
+		log.Printf("PayHere notify: amount/currency mismatch for order %s", orderID)
+		c.String(http.StatusForbidden, "Invalid amount")
+		return
+	}
+	businessID := attempt.BusinessID
 	if businessID == 0 {
 		log.Printf("❌ PayHere notify: cannot parse businessID from order_id %s", orderID)
 		c.String(http.StatusOK, "OK")
 		return
 	}
 
-	// Determine billing cycle from the payment amount
-	detectedPlan := models.PlanStarter // fallback
-	detectedCycle := models.BillingMonthly
-outer:
-	for plan, cycles := range billingAmounts {
-		for cycle, amt := range cycles {
-			if fmt.Sprintf("%.2f", amt) == fmt.Sprintf("%.2f", amount) {
-				detectedPlan = plan
-				detectedCycle = cycle
-				break outer
-			}
-		}
+	detectedPlan := attempt.Plan
+	detectedCycle := attempt.BillingCycle
+	days, err := platform.DaysForCycle(detectedCycle)
+	if err != nil {
+		log.Printf("PayHere notify: invalid cycle for order %s: %v", orderID, err)
+		c.String(http.StatusOK, "OK")
+		return
 	}
-
-	days := billingDays[detectedCycle]
 	now := time.Now()
 	expiresAt := now.AddDate(0, 0, days)
 
@@ -334,6 +346,10 @@ outer:
 		"billing_cycle":    detectedCycle,
 		"plan_expires_at":  expiresAt,
 		"payhere_order_id": paymentID,
+	})
+	database.DB.Model(&attempt).Updates(map[string]interface{}{
+		"status":     "paid",
+		"payment_id": paymentID,
 	})
 
 	LogActivity(businessID, "system", 0, "plan_upgraded", "billing", orderID, map[string]interface{}{

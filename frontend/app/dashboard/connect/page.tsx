@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { toast } from 'sonner';
+import { API_URL } from '@/hooks/_shared';
 import { useAppStore } from '@/lib/store';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -38,12 +39,12 @@ function CopyField({ label, value }: { label: string; value: string }) {
   }
   return (
     <div className="space-y-1">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">{label}</p>
-      <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5">
-        <code className="flex-1 text-xs font-mono text-zinc-300 truncate">{value || '—'}</code>
+      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{label}</p>
+      <div className="flex items-center gap-2 bg-background border border-border rounded-xl px-3 py-2.5">
+        <code className="flex-1 text-xs font-mono text-muted-foreground truncate">{value || '—'}</code>
         <button
           onClick={copy}
-          className="shrink-0 p-1 rounded-lg text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-all"
+          className="shrink-0 p-1 rounded-lg text-zinc-600 hover:text-muted-foreground hover:bg-secondary transition-all"
           title="Copy"
         >
           {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
@@ -56,16 +57,16 @@ function CopyField({ label, value }: { label: string; value: string }) {
 function GuidePanel() {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-xl border border-zinc-800 overflow-hidden">
+    <div className="rounded-xl border border-border overflow-hidden">
       <button
         onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 text-sm font-bold text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40 transition-all"
+        className="w-full flex items-center justify-between px-4 py-3 text-sm font-bold text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-all"
       >
         <span>📘 How to get these credentials?</span>
         {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
       </button>
       {open && (
-        <div className="px-4 pb-4 pt-1 space-y-3 text-xs text-zinc-400 border-t border-zinc-800 bg-zinc-900/40">
+        <div className="px-4 pb-4 pt-1 space-y-3 text-xs text-muted-foreground border-t border-border bg-muted/40">
           {[
             {
               step: '1',
@@ -99,12 +100,12 @@ function GuidePanel() {
             },
           ].map(g => (
             <div key={g.step} className="flex gap-3">
-              <span className="shrink-0 w-5 h-5 rounded-full bg-zinc-800 text-zinc-400 flex items-center justify-center text-[10px] font-black mt-0.5">
+              <span className="shrink-0 w-5 h-5 rounded-full bg-secondary text-muted-foreground flex items-center justify-center text-[10px] font-black mt-0.5">
                 {g.step}
               </span>
               <div>
-                <p className="font-bold text-zinc-300">{g.title}</p>
-                <p className="text-zinc-500 mt-0.5 leading-relaxed">{g.desc}</p>
+                <p className="font-bold text-muted-foreground">{g.title}</p>
+                <p className="text-muted-foreground mt-0.5 leading-relaxed">{g.desc}</p>
               </div>
             </div>
           ))}
@@ -121,7 +122,7 @@ function GuidePanel() {
               href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-zinc-500 font-bold hover:underline"
+              className="inline-flex items-center gap-1.5 text-muted-foreground font-bold hover:underline"
             >
               <ExternalLink size={11} /> Official API Docs
             </a>
@@ -156,7 +157,7 @@ export default function ConnectPage() {
   const [disconnecting, setDisconnecting] = useState(false);
 
   // Webhook URL (read from env or derive)
-  const webhookUrl = `${process.env.NEXT_PUBLIC_API_URL ?? 'https://your-api.com'}/api/whatsapp/webhook`;
+  const webhookUrl = `${API_URL}/api/whatsapp/webhook`;
 
   // ── Load status on mount ──
   useEffect(() => {
@@ -249,25 +250,25 @@ export default function ConnectPage() {
       <div className="max-w-2xl mx-auto space-y-6">
 
         {/* ── Header ── */}
-        <div className="pb-6 mb-2 border-b border-zinc-800">
-          <h1 className="text-3xl font-black tracking-tight text-zinc-100 flex items-center gap-3">
+        <div className="pb-6 mb-2 border-b border-border">
+          <h1 className="text-3xl font-black tracking-tight text-foreground flex items-center gap-3">
             <Wifi className="w-7 h-7 text-emerald-400" />
             WhatsApp Connection
           </h1>
-          <p className="text-sm text-zinc-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Connect your official Meta WhatsApp Business number to power the AI bot.
           </p>
         </div>
 
         {/* ── Not Connected ── */}
         {view === 'not_connected' && (
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-8 flex flex-col items-center gap-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="w-20 h-20 rounded-2xl bg-zinc-950 border border-zinc-800 flex items-center justify-center shadow-inner">
+          <div className="rounded-2xl border border-border bg-card p-8 flex flex-col items-center gap-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="w-20 h-20 rounded-2xl bg-background border border-border flex items-center justify-center shadow-inner">
               <WifiOff size={34} className="text-zinc-600" />
             </div>
             <div>
-              <h2 className="text-xl font-black text-white">Not Connected</h2>
-              <p className="text-sm text-zinc-500 mt-1 max-w-sm">
+              <h2 className="text-xl font-black text-foreground">Not Connected</h2>
+              <p className="text-sm text-muted-foreground mt-1 max-w-sm">
                 Link your Meta WhatsApp number to start responding to customers automatically.
               </p>
             </div>
@@ -283,16 +284,16 @@ export default function ConnectPage() {
         {/* ── Setup Form ── */}
         {view === 'setup' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
-              <h2 className="text-lg font-black text-white mb-1">Enter Meta Credentials</h2>
-              <p className="text-xs text-zinc-500 mb-5">
+            <div className="rounded-2xl border border-border bg-card p-6">
+              <h2 className="text-lg font-black text-foreground mb-1">Enter Meta Credentials</h2>
+              <p className="text-xs text-muted-foreground mb-5">
                 These are verified live with Meta before saving. We never store temporary tokens.
               </p>
 
               <form onSubmit={handleConnect} className="space-y-4">
                 {/* Phone Number ID */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+                  <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                     Phone Number ID
                   </label>
                   <input
@@ -301,14 +302,14 @@ export default function ConnectPage() {
                     onChange={e => setPhoneNumberId(e.target.value)}
                     placeholder="e.g. 123456789012345"
                     required
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-mono"
+                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-mono"
                   />
                   <p className="text-[10px] text-zinc-600">WhatsApp Manager → Phone Numbers → click your number → copy the ID. This is NOT your actual phone number.</p>
                 </div>
 
                 {/* WABA ID */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+                  <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                     WhatsApp Business Account ID (WABA ID)
                   </label>
                   <input
@@ -317,14 +318,14 @@ export default function ConnectPage() {
                     onChange={e => setWabaId(e.target.value)}
                     placeholder="e.g. 987654321012345"
                     required
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-mono"
+                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-mono"
                   />
                   <p className="text-[10px] text-zinc-600">Meta Business Manager → WhatsApp Accounts → the WABA ID is shown at the top of the page.</p>
                 </div>
 
                 {/* Access Token */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+                  <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                     System User Access Token
                   </label>
                   <div className="relative">
@@ -334,17 +335,17 @@ export default function ConnectPage() {
                       onChange={e => setAccessToken(e.target.value)}
                       placeholder="EAAxxxxx..."
                       required
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 pr-12 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-mono"
+                      className="w-full bg-background border border-border rounded-xl px-4 py-3 pr-12 text-sm text-foreground placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-mono"
                     />
                     <button
                       type="button"
                       onClick={() => setShowToken(v => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-zinc-500 hover:text-zinc-300 transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-muted-foreground transition-colors"
                     >
                       {showToken ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
                   </div>
-                  <p className="text-[10px] text-zinc-600">Business Manager → Settings → System Users → Generate Token. Use a <strong className="text-zinc-500">System User token</strong>, NOT the temporary test token.</p>
+                  <p className="text-[10px] text-zinc-600">Business Manager → Settings → System Users → Generate Token. Use a <strong className="text-muted-foreground">System User token</strong>, NOT the temporary test token.</p>
                 </div>
 
 
@@ -354,7 +355,7 @@ export default function ConnectPage() {
                   <button
                     type="button"
                     onClick={() => setView('not_connected')}
-                    className="flex-1 py-3 rounded-xl border border-zinc-800 text-sm font-bold text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 transition-all"
+                    className="flex-1 py-3 rounded-xl border border-border text-sm font-bold text-muted-foreground hover:text-muted-foreground hover:border-border transition-all"
                   >
                     Cancel
                   </button>
@@ -389,17 +390,17 @@ export default function ConnectPage() {
                     <div className="w-14 h-14 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center">
                       <Wifi size={26} className="text-emerald-400" />
                     </div>
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-zinc-900 rounded-full flex items-center justify-center">
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-muted rounded-full flex items-center justify-center">
                       <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
                     </div>
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-0.5">Status</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Status</p>
                     <div className="flex items-center gap-2">
-                      <h2 className="text-xl font-black text-white">Connected</h2>
+                      <h2 className="text-xl font-black text-foreground">Connected</h2>
                       <CheckCircle2 size={17} className="text-emerald-400 mt-0.5" />
                     </div>
-                    <p className="text-xs text-zinc-500 mt-0.5">Meta WhatsApp Cloud API · Live</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Meta WhatsApp Cloud API · Live</p>
                   </div>
                 </div>
 
@@ -418,14 +419,14 @@ export default function ConnectPage() {
             </div>
 
             {/* Credential details */}
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5 space-y-4">
-              <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Connection Details</p>
+            <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Connection Details</p>
               <CopyField label="Phone Number ID" value={waState.phone_number_id} />
               <CopyField label="WABA ID" value={waState.waba_id} />
               <div className="space-y-1">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Access Token</p>
-                <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5">
-                  <code className="flex-1 text-xs font-mono text-zinc-500 truncate">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Access Token</p>
+                <div className="flex items-center gap-2 bg-background border border-border rounded-xl px-3 py-2.5">
+                  <code className="flex-1 text-xs font-mono text-muted-foreground truncate">
                     {maskToken('stored')}
                   </code>
                   <span className="text-[10px] text-zinc-700 font-bold">Secured</span>
@@ -434,8 +435,8 @@ export default function ConnectPage() {
             </div>
 
             {/* Webhook URL
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5 space-y-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+          <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
               <ShieldCheck size={12} className="text-emerald-500" /> Webhook URL (registered in Meta)
             </p>
             <CopyField label="Callback URL" value={webhookUrl} />
@@ -460,7 +461,7 @@ export default function ConnectPage() {
               <button
                 onClick={handleTest}
                 disabled={testing}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-700 text-sm font-bold text-zinc-300 transition-all"
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-border bg-muted hover:bg-secondary hover:border-border text-sm font-bold text-muted-foreground transition-all"
               >
                 {testing
                   ? <><Loader2 size={14} className="animate-spin" /> Testing...</>
@@ -469,7 +470,7 @@ export default function ConnectPage() {
               </button>
               <button
                 onClick={() => setView('setup')}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-700 text-sm font-bold text-zinc-300 transition-all"
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-border bg-muted hover:bg-secondary hover:border-border text-sm font-bold text-muted-foreground transition-all"
               >
                 Update Credentials
               </button>

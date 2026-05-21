@@ -154,6 +154,7 @@ func SendActivationCodeEmail(toEmail, businessName, code, plan, cycle string, du
 	log.Printf("📧 Activation code email sent to %s (code: %s)", toEmail, code)
 	return nil
 }
+
 // SendLateDeliveryEmail alerts the tenant (admin email) when a shipped order
 // has not been delivered within the expected window.
 // This is email-based (not WhatsApp) because late deliveries are cold outbound

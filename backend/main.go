@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -103,37 +105,62 @@ func main() {
 	r.GET("/api/whatsapp/webhook", whatsapp.VerifyWebhook)
 	r.POST("/api/whatsapp/webhook", whatsapp.HandleWebhook)
 
-	// System API (Master Admin access only)
-	system := r.Group("/system", middleware.MasterAuth(cfg.MasterAPIKey))
+	// System API Auth (Super Admin)
+	systemAuth := r.Group("/system/auth")
+	{
+		systemAuth.POST("/login", middleware.RateLimitAdminLogin(), handlers.SuperAdminLogin)
+		systemAuth.POST("/logout", middleware.RequireSuperAdmin(), handlers.SuperAdminLogout)
+		systemAuth.GET("/me", middleware.RequireSuperAdmin(), handlers.SuperAdminMe)
+	}
+
+	// System API (Super Admin access only)
+	system := r.Group("/system")
+	system.Use(middleware.RequireSuperAdmin())
 	{
 		// Global metrics
-		system.GET("/metrics", handlers.GetSystemMetrics)
+		system.GET("/metrics", middleware.RequireSuperPermission(middleware.PermUsageView), handlers.GetSystemMetrics)
 
 		// Business management
-		system.POST("/businesses", handlers.SystemCreateBusiness)
-		system.GET("/businesses", handlers.ListSystemBusinesses)
-		system.GET("/businesses/:id", handlers.GetSystemBusiness)
-		system.PATCH("/businesses/:id/plan", handlers.OverrideBusinessPlan)
+		system.POST("/businesses", middleware.RequireSuperPermission(middleware.PermBusinessManage), handlers.SystemCreateBusiness)
+		system.GET("/businesses", middleware.RequireSuperPermission(middleware.PermBusinessView), handlers.ListSystemBusinesses)
+		system.GET("/businesses/:id", middleware.RequireSuperPermission(middleware.PermBusinessView), handlers.GetSystemBusiness)
+		system.PATCH("/businesses/:id/plan", middleware.RequireSuperPermission(middleware.PermPlanManage), middleware.HighRiskRoute("force_plan"), handlers.OverrideBusinessPlan)
+		system.PATCH("/businesses/:id/quotas", middleware.RequireSuperPermission(middleware.PermPlanManage), middleware.HighRiskRoute("override_quotas"), handlers.OverrideBusinessQuotas)
+		system.POST("/businesses/:id/reset-usage", middleware.RequireSuperPermission(middleware.PermPlanManage), middleware.HighRiskRoute("reset_usage"), handlers.ResetBusinessUsage)
+		system.POST("/businesses/:id/suspend", middleware.RequireSuperPermission(middleware.PermBusinessManage), middleware.HighRiskRoute("suspend_business"), handlers.SuspendBusiness)
+		system.POST("/businesses/:id/unsuspend", middleware.RequireSuperPermission(middleware.PermBusinessManage), middleware.HighRiskRoute("unsuspend_business"), handlers.UnsuspendBusiness)
+		system.POST("/businesses/:id/debug-mode", middleware.RequireSuperPermission(middleware.PermBusinessManage), handlers.ToggleDebugMode)
+		system.GET("/businesses/:id/pipeline-logs", middleware.RequireSuperPermission(middleware.PermBusinessView), handlers.ListPipelineLogs)
+		system.GET("/pipeline-logs/:log_id", middleware.RequireSuperPermission(middleware.PermBusinessView), handlers.GetPipelineLogDetails)
 
 		// Activation code management
-		system.POST("/activation-codes", handlers.CreateActivationCode)
-		system.GET("/activation-codes", handlers.ListActivationCodes)
-		system.DELETE("/activation-codes/:code", handlers.RevokeActivationCode)
+		system.POST("/activation-codes", middleware.RequireSuperPermission(middleware.PermActivationCreate), middleware.HighRiskRoute("generate_code"), handlers.CreateActivationCode)
+		system.GET("/activation-codes", middleware.RequireSuperPermission(middleware.PermActivationView), handlers.ListActivationCodes)
+		system.DELETE("/activation-codes/:code", middleware.RequireSuperPermission(middleware.PermActivationDelete), middleware.HighRiskRoute("revoke_code"), handlers.RevokeActivationCode)
 
 		// Payment proof verification queue
-		system.GET("/payments", handlers.ListPaymentProofs)
-		system.POST("/payments/:id/approve", handlers.ApprovePayment)
-		system.POST("/payments/:id/reject", handlers.RejectPayment)
+		system.GET("/payments", middleware.RequireSuperPermission(middleware.PermBillingView), handlers.ListPaymentProofs)
+		system.POST("/payments/:id/approve", middleware.RequireSuperPermission(middleware.PermBillingManage), middleware.HighRiskRoute("approve_payment"), handlers.ApprovePayment)
+		system.POST("/payments/:id/reject", middleware.RequireSuperPermission(middleware.PermBillingManage), middleware.HighRiskRoute("reject_payment"), handlers.RejectPayment)
+
+		// Billing settings and plan catalog
+		system.GET("/settings/billing", middleware.RequireSuperPermission(middleware.PermBillingView), handlers.GetSystemBillingSettings)
+		system.PUT("/settings/billing", middleware.RequireSuperPermission(middleware.PermBillingManage), middleware.HighRiskRoute("update_billing_settings"), handlers.UpdateSystemBillingSettings)
+
+		// Platform Notices
+		system.GET("/notices", middleware.RequireSuperPermission(middleware.PermBusinessView), handlers.ListPlatformNotices)
+		system.POST("/notices", middleware.RequireSuperPermission(middleware.PermBusinessManage), handlers.CreatePlatformNotice)
+		system.DELETE("/notices/:id", middleware.RequireSuperPermission(middleware.PermBusinessManage), handlers.DeactivatePlatformNotice)
 
 		// Global Rule management (DROP + Context Bridge + FAQ defaults)
-		system.GET("/global-rules", handlers.ListGlobalRules)
-		system.POST("/global-rules", handlers.CreateGlobalRule)
-		system.PUT("/global-rules/:id", handlers.UpdateGlobalRule)
-		system.DELETE("/global-rules/:id", handlers.DeleteGlobalRule)
+		system.GET("/global-rules", middleware.RequireSuperPermission(middleware.PermBusinessView), handlers.ListGlobalRules)
+		system.POST("/global-rules", middleware.RequireSuperPermission(middleware.PermBusinessManage), handlers.CreateGlobalRule)
+		system.PUT("/global-rules/:id", middleware.RequireSuperPermission(middleware.PermBusinessManage), handlers.UpdateGlobalRule)
+		system.DELETE("/global-rules/:id", middleware.RequireSuperPermission(middleware.PermBusinessManage), middleware.HighRiskRoute("delete_global_rule"), handlers.DeleteGlobalRule)
 
 		// Platform-wide audit log (Super Admin only)
-		system.GET("/audit-logs", handlers.GetSystemAuditLogs)
-		system.GET("/audit-logs/download", handlers.DownloadSystemAuditLogs)
+		system.GET("/audit-logs", middleware.RequireSuperPermission(middleware.PermAuditView), handlers.GetSystemAuditLogs)
+		system.GET("/audit-logs/download", middleware.RequireSuperPermission(middleware.PermAuditView), handlers.DownloadSystemAuditLogs)
 	}
 
 	// Dashboard Authentication
@@ -154,6 +181,8 @@ func main() {
 	{
 		// Billing
 		dash.GET("/billing/status", handlers.BillingStatus)
+		dash.GET("/billing/bank-details", handlers.GetBillingBankDetails)
+		dash.GET("/billing/options", handlers.GetBillingOptions)
 		dash.POST("/billing/activate", handlers.RedeemActivationCode)   // Activation code redemption
 		dash.POST("/billing/submit-proof", handlers.SubmitPaymentProof) // Bank transfer proof upload
 		dash.GET("/billing/payment-status", handlers.GetPaymentStatus)  // Check latest proof status
@@ -172,35 +201,37 @@ func main() {
 
 		// Dashboard Product Management
 		dash.GET("/products", handlers.AdminListProducts)
-		dash.POST("/products", handlers.AdminCreateProduct)
-		dash.PUT("/products/:id", handlers.AdminUpdateProduct)
-		dash.DELETE("/products/:id", handlers.AdminDeleteProduct)
-		dash.POST("/products/:id/image", handlers.AdminUploadImage(cfg.ServerURL))
+		dash.POST("/products", middleware.RequireBusinessActive(), handlers.AdminCreateProduct)
+		dash.PUT("/products/:id", middleware.RequireBusinessActive(), handlers.AdminUpdateProduct)
+		dash.DELETE("/products/:id", middleware.RequireBusinessActive(), handlers.AdminDeleteProduct)
+		dash.POST("/products/:id/image", middleware.RequireBusinessActive(), handlers.AdminUploadImage(cfg.ServerURL))
 
 		// Dashboard Rule (FAQ) Management
 		dash.GET("/rules", handlers.ListRules)
-		dash.POST("/rules", handlers.CreateRule)
-		dash.PUT("/rules/:id", handlers.UpdateRule)
-		dash.DELETE("/rules/:id", handlers.DeleteRule)
-		dash.POST("/faqs/draft", handlers.DraftFAQ)
-		dash.POST("/rules/generate", handlers.GenerateRule) // Pro: AI-generates keywords + EN + SIN from intent
+		dash.POST("/rules", middleware.RequireBusinessActive(), handlers.CreateRule)
+		dash.POST("/rules/clone-template", middleware.RequireBusinessActive(), handlers.CloneTemplate)
+		dash.PUT("/rules/:id", middleware.RequireBusinessActive(), handlers.UpdateRule)
+		dash.DELETE("/rules/:id", middleware.RequireBusinessActive(), handlers.DeleteRule)
+		dash.POST("/faqs/draft", middleware.RequireBusinessActive(), handlers.DraftFAQ)
+		dash.POST("/rules/generate", middleware.RequireBusinessActive(), handlers.GenerateRule)   // Pro: AI-generates keywords + EN + SIN from intent
+		dash.POST("/rules/translate", middleware.RequireBusinessActive(), handlers.TranslateRule) // Single field auto-translate
 
 		// Dashboard Chats (CRM) Management
 		dash.GET("/chats", handlers.ListChats)
 		dash.GET("/chats/:phone", handlers.GetChatProfile)
-		dash.POST("/chats/:phone/send", handlers.SendManualReply)
-		dash.PUT("/customers/:phone", handlers.UpsertCustomer) // Allow updating notes/tags from dashboard
-		dash.PATCH("/customers/:phone/bot-status", handlers.ToggleBotPause)
+		dash.POST("/chats/:phone/send", middleware.RequireBusinessActive(), handlers.SendManualReply)
+		dash.PUT("/customers/:phone", middleware.RequireBusinessActive(), handlers.UpsertCustomer) // Allow updating notes/tags from dashboard
+		dash.PATCH("/customers/:phone/bot-status", middleware.RequireBusinessActive(), handlers.ToggleBotPause)
 
 		// Dashboard Orders Management
 		dash.GET("/orders", handlers.ListOrders)
-		dash.PATCH("/orders/:id/status", handlers.UpdateOrderStatus)
-		dash.PATCH("/orders/:id/late-alert", handlers.ToggleLateAlert)
+		dash.PATCH("/orders/:id/status", middleware.RequireBusinessActive(), handlers.UpdateOrderStatus)
+		dash.PATCH("/orders/:id/late-alert", middleware.RequireBusinessActive(), handlers.ToggleLateAlert)
 		// Slice 4: Payment proof review
 		dash.GET("/orders/proofs", handlers.ListOrderProofs)
 		dash.GET("/orders/:id/proofs", handlers.GetOrderProofs)
-		dash.POST("/orders/proofs/:id/approve", handlers.ApproveOrderProof)
-		dash.POST("/orders/proofs/:id/reject", handlers.RejectOrderProof)
+		dash.POST("/orders/proofs/:id/approve", middleware.RequireBusinessActive(), handlers.ApproveOrderProof)
+		dash.POST("/orders/proofs/:id/reject", middleware.RequireBusinessActive(), handlers.RejectOrderProof)
 
 		// Dashboard Finance Analytics
 		dash.GET("/finance/stats", handlers.FinanceStats)
@@ -214,20 +245,22 @@ func main() {
 
 		// Dashboard Settings & Audit
 		dash.GET("/settings/business", handlers.GetBusinessSettings)
-		dash.PUT("/settings/business", handlers.UpdateBusinessSettings)
-		dash.PUT("/settings/language", handlers.UpdateLanguageSettings) // ← independent dashboard + bot language
+		dash.PUT("/settings/business", middleware.RequireBusinessActive(), handlers.UpdateBusinessSettings)
+		dash.POST("/business/simulate", middleware.RequireBusinessActive(), handlers.SimulateMessage)       // Sandbox simulator
+		dash.DELETE("/business/simulate", middleware.RequireBusinessActive(), handlers.ClearSimulation)     // Clear Sandbox
+		dash.PUT("/settings/language", middleware.RequireBusinessActive(), handlers.UpdateLanguageSettings) // ← independent dashboard + bot language
 		dash.GET("/settings/usage", handlers.GetUsageStats)
 
 		// Monthly Intelligence Report Settings
 		dash.GET("/settings/report", handlers.GetReportSettings)
-		dash.PUT("/settings/report", handlers.UpdateReportSettings)
-		dash.POST("/settings/report/test", handlers.SendTestReport)
+		dash.PUT("/settings/report", middleware.RequireBusinessActive(), handlers.UpdateReportSettings)
+		dash.POST("/settings/report/test", middleware.RequireBusinessActive(), handlers.SendTestReport)
 		dash.GET("/settings/report/history", handlers.GetReportHistory)
 		dash.GET("/settings/logs", handlers.GetAuditLogs)
 		dash.GET("/settings/logs/download", handlers.DownloadAuditLogs)
 		dash.GET("/settings/blacklist", handlers.GetBlacklist)
-		dash.POST("/settings/blacklist", handlers.AddToBlacklist)
-		dash.DELETE("/settings/blacklist/:id", handlers.RemoveFromBlacklist)
+		dash.POST("/settings/blacklist", middleware.RequireBusinessActive(), handlers.AddToBlacklist)
+		dash.DELETE("/settings/blacklist/:id", middleware.RequireBusinessActive(), handlers.RemoveFromBlacklist)
 
 		// Authenticated email-OTP password change (3-step flow)
 		dash.POST("/settings/change-password/request", handlers.RequestPasswordChangeOTP)
@@ -280,16 +313,30 @@ func main() {
 
 	log.Printf("📁 Uploads served at %s/uploads/", cfg.ServerURL)
 
+	srv := &http.Server{
+		Addr:    ":" + cfg.Port,
+		Handler: r,
+	}
+
 	go func() {
 		log.Printf("🚀 SalesPilot API starting on port %s", cfg.Port)
-		if err := r.Run(":" + cfg.Port); err != nil {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("❌ Server failed: %v", err)
 		}
 	}()
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("🛑 Shutdown signal received — draining worker pool...")
+
+	log.Println("🛑 Shutdown signal received — shutting down HTTP server...")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("❌ Server forced to shutdown: %v", err)
+	}
+
+	log.Println("🛑 HTTP server stopped — draining worker pool...")
 	utils.DrainAndWait()
 	appStore.Stop() // stop cache GC goroutine cleanly
 	log.Println("✅ All workers finished — exiting cleanly")

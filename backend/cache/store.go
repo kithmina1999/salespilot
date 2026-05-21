@@ -70,10 +70,10 @@ type entry struct {
 // It satisfies the StateStore interface and is the default implementation
 // for single-instance deployments.
 type InMemoryStore struct {
-	mu      sync.RWMutex
-	data    map[string]entry
-	config  StoreConfig
-	stopGC  chan struct{}
+	mu     sync.RWMutex
+	data   map[string]entry
+	config StoreConfig
+	stopGC chan struct{}
 }
 
 // NewInMemoryStore creates a ready-to-use cache with background cleanup.

@@ -1,12 +1,12 @@
 package whatsapp
 
 import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "io"
-    "log"
-    "net/http"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
 )
 
 const metaGraphAPIVersion = "v20.0"
@@ -17,45 +17,50 @@ const metaGraphAPIVersion = "v20.0"
 // to:            recipient phone in E.164 (e.g. "94771234567").
 // text:          the message body.
 func SendText(phoneNumberID, accessToken, to, text string) error {
-    url := fmt.Sprintf("https://graph.facebook.com/%s/%s/messages", metaGraphAPIVersion, phoneNumberID)
+	if to == "99900000000" {
+		log.Printf("🏖️ [SANDBOX] SendText to %s: %s", to, text)
+		return nil
+	}
 
-    payload := map[string]interface{}{
-        "messaging_product": "whatsapp",
-        "recipient_type":    "individual",
-        "to":                to,
-        "type":              "text",
-        "text": map[string]string{
-            "preview_url": "false",
-            "body":        text,
-        },
-    }
+	url := fmt.Sprintf("https://graph.facebook.com/%s/%s/messages", metaGraphAPIVersion, phoneNumberID)
 
-    bodyBytes, err := json.Marshal(payload)
-    if err != nil {
-        return fmt.Errorf("SendText: marshal error: %w", err)
-    }
+	payload := map[string]interface{}{
+		"messaging_product": "whatsapp",
+		"recipient_type":    "individual",
+		"to":                to,
+		"type":              "text",
+		"text": map[string]string{
+			"preview_url": "false",
+			"body":        text,
+		},
+	}
 
-    req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(bodyBytes))
-    if err != nil {
-        return fmt.Errorf("SendText: create request error: %w", err)
-    }
-    req.Header.Set("Authorization", "Bearer "+accessToken)
-    req.Header.Set("Content-Type", "application/json")
+	bodyBytes, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("SendText: marshal error: %w", err)
+	}
 
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil {
-        return fmt.Errorf("SendText: HTTP error: %w", err)
-    }
-    defer resp.Body.Close()
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return fmt.Errorf("SendText: create request error: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
 
-    respBody, _ := io.ReadAll(resp.Body)
-    if resp.StatusCode != http.StatusOK {
-        log.Printf("❌ SendText: Meta API returned %d: %s", resp.StatusCode, string(respBody))
-        return fmt.Errorf("SendText: Meta API error %d: %s", resp.StatusCode, string(respBody))
-    }
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("SendText: HTTP error: %w", err)
+	}
+	defer resp.Body.Close()
 
-    log.Printf("📤 SendText: Message sent to %s via phoneNumberID %s", to, phoneNumberID)
-    return nil
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("❌ SendText: Meta API returned %d: %s", resp.StatusCode, string(respBody))
+		return fmt.Errorf("SendText: Meta API error %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	log.Printf("📤 SendText: Message sent to %s via phoneNumberID %s", to, phoneNumberID)
+	return nil
 }
 
 // SendAuthTemplate sends a WhatsApp authentication template via the Meta Cloud API.
@@ -84,9 +89,9 @@ func SendAuthTemplate(phoneNumberID, accessToken, to, templateName, otp string) 
 					},
 				},
 				{
-					"type": "button",
+					"type":     "button",
 					"sub_type": "url",
-					"index": "0",
+					"index":    "0",
 					"parameters": []map[string]interface{}{
 						{
 							"type": "text",
@@ -134,64 +139,64 @@ func SendAuthTemplate(phoneNumberID, accessToken, to, templateName, otp string) 
 // even for tokens without send permission — causing silent 401s when the bot
 // tries to reply to customers.
 func TestCredentials(phoneNumberID, accessToken string) error {
-    // Step 1: verify the phone number ID resolves correctly
-    phoneURL := fmt.Sprintf("https://graph.facebook.com/%s/%s?fields=display_phone_number,verified_name", metaGraphAPIVersion, phoneNumberID)
-    req, err := http.NewRequest(http.MethodGet, phoneURL, nil)
-    if err != nil {
-        return fmt.Errorf("TestCredentials: create request: %w", err)
-    }
-    req.Header.Set("Authorization", "Bearer "+accessToken)
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil {
-        return fmt.Errorf("TestCredentials: HTTP error: %w", err)
-    }
-    respBody, _ := io.ReadAll(resp.Body)
-    resp.Body.Close()
-    if resp.StatusCode != http.StatusOK {
-        return fmt.Errorf("Meta API rejected credentials (HTTP %d): %s", resp.StatusCode, string(respBody))
-    }
+	// Step 1: verify the phone number ID resolves correctly
+	phoneURL := fmt.Sprintf("https://graph.facebook.com/%s/%s?fields=display_phone_number,verified_name", metaGraphAPIVersion, phoneNumberID)
+	req, err := http.NewRequest(http.MethodGet, phoneURL, nil)
+	if err != nil {
+		return fmt.Errorf("TestCredentials: create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("TestCredentials: HTTP error: %w", err)
+	}
+	respBody, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Meta API rejected credentials (HTTP %d): %s", resp.StatusCode, string(respBody))
+	}
 
-    // Step 2: check token scopes — ensure whatsapp_business_messaging is granted.
-    // Without this scope the bot can READ but cannot SEND messages (401 on POST /messages).
-    debugURL := fmt.Sprintf("https://graph.facebook.com/%s/debug_token?input_token=%s&access_token=%s",
-        metaGraphAPIVersion, accessToken, accessToken)
-    req2, err := http.NewRequest(http.MethodGet, debugURL, nil)
-    if err == nil {
-        resp2, err2 := http.DefaultClient.Do(req2)
-        if err2 == nil {
-            var debugBody struct {
-                Data struct {
-                    Scopes []string `json:"scopes"`
-                } `json:"data"`
-            }
-            body2, _ := io.ReadAll(resp2.Body)
-            resp2.Body.Close()
-            if err := json.Unmarshal(body2, &debugBody); err == nil && len(debugBody.Data.Scopes) > 0 {
-                hasMessaging := false
-                for _, s := range debugBody.Data.Scopes {
-                    if s == "whatsapp_business_messaging" {
-                        hasMessaging = true
-                        break
-                    }
-                }
-                if !hasMessaging {
-                    return fmt.Errorf(
-                        "token is missing 'whatsapp_business_messaging' permission — " +
-                        "the bot can read but CANNOT send messages. " +
-                        "Re-generate your token with this scope enabled in Meta Graph Explorer")
-                }
-            }
-        }
-    }
+	// Step 2: check token scopes — ensure whatsapp_business_messaging is granted.
+	// Without this scope the bot can READ but cannot SEND messages (401 on POST /messages).
+	debugURL := fmt.Sprintf("https://graph.facebook.com/%s/debug_token?input_token=%s&access_token=%s",
+		metaGraphAPIVersion, accessToken, accessToken)
+	req2, err := http.NewRequest(http.MethodGet, debugURL, nil)
+	if err == nil {
+		resp2, err2 := http.DefaultClient.Do(req2)
+		if err2 == nil {
+			var debugBody struct {
+				Data struct {
+					Scopes []string `json:"scopes"`
+				} `json:"data"`
+			}
+			body2, _ := io.ReadAll(resp2.Body)
+			resp2.Body.Close()
+			if err := json.Unmarshal(body2, &debugBody); err == nil && len(debugBody.Data.Scopes) > 0 {
+				hasMessaging := false
+				for _, s := range debugBody.Data.Scopes {
+					if s == "whatsapp_business_messaging" {
+						hasMessaging = true
+						break
+					}
+				}
+				if !hasMessaging {
+					return fmt.Errorf(
+						"token is missing 'whatsapp_business_messaging' permission — " +
+							"the bot can read but CANNOT send messages. " +
+							"Re-generate your token with this scope enabled in Meta Graph Explorer")
+				}
+			}
+		}
+	}
 
-    log.Printf("✅ TestCredentials: phoneNumberID %s verified with messaging scope", phoneNumberID)
-    return nil
+	log.Printf("✅ TestCredentials: phoneNumberID %s verified with messaging scope", phoneNumberID)
+	return nil
 }
 
 // PhoneInfo holds the human-readable details returned from Meta for a phone number ID.
 type PhoneInfo struct {
-    DisplayPhone string
-    VerifiedName string
+	DisplayPhone string
+	VerifiedName string
 }
 
 // TestCredentialsWithInfo verifies credentials AND returns display info from Meta.
@@ -265,27 +270,27 @@ func TestCredentialsWithInfo(phoneNumberID, accessToken string) (*PhoneInfo, err
 // wabaID:      the business's WhatsApp Business Account ID
 // accessToken: the business's permanent access token (must have whatsapp_business_management scope)
 func SubscribeWABAWebhook(wabaID, accessToken string) error {
-    url := fmt.Sprintf("https://graph.facebook.com/%s/%s/subscribed_apps", metaGraphAPIVersion, wabaID)
+	url := fmt.Sprintf("https://graph.facebook.com/%s/%s/subscribed_apps", metaGraphAPIVersion, wabaID)
 
-    req, err := http.NewRequest(http.MethodPost, url, nil)
-    if err != nil {
-        return fmt.Errorf("SubscribeWABAWebhook: create request error: %w", err)
-    }
-    req.Header.Set("Authorization", "Bearer "+accessToken)
-    req.Header.Set("Content-Type", "application/json")
+	req, err := http.NewRequest(http.MethodPost, url, nil)
+	if err != nil {
+		return fmt.Errorf("SubscribeWABAWebhook: create request error: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
 
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil {
-        return fmt.Errorf("SubscribeWABAWebhook: HTTP error: %w", err)
-    }
-    defer resp.Body.Close()
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("SubscribeWABAWebhook: HTTP error: %w", err)
+	}
+	defer resp.Body.Close()
 
-    respBody, _ := io.ReadAll(resp.Body)
-    if resp.StatusCode != http.StatusOK {
-        log.Printf("⚠️  SubscribeWABAWebhook: Meta returned %d: %s", resp.StatusCode, string(respBody))
-        return fmt.Errorf("SubscribeWABAWebhook: Meta API error %d: %s", resp.StatusCode, string(respBody))
-    }
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("⚠️  SubscribeWABAWebhook: Meta returned %d: %s", resp.StatusCode, string(respBody))
+		return fmt.Errorf("SubscribeWABAWebhook: Meta API error %d: %s", resp.StatusCode, string(respBody))
+	}
 
-    log.Printf("🔔 SubscribeWABAWebhook: WABA %s subscribed to webhook", wabaID)
-    return nil
+	log.Printf("🔔 SubscribeWABAWebhook: WABA %s subscribed to webhook", wabaID)
+	return nil
 }

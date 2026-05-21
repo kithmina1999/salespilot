@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { ShieldCheck } from 'lucide-react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+import { API_URL } from '@/hooks/_shared';
 
 interface BlacklistedNumber {
   id: number;
@@ -54,13 +54,13 @@ export default function BlockedNumbersTab() {
     else toast.error('Failed to unblock.');
   }
 
-  const inputCls = 'px-4 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm outline-none focus:border-zinc-600 transition-colors text-zinc-200 placeholder:text-zinc-600';
+  const inputCls = 'px-4 py-2.5 bg-background border border-border rounded-xl text-sm outline-none focus:border-zinc-600 transition-colors text-foreground placeholder:text-zinc-600';
 
   return (
-    <div className="rounded-2xl bg-zinc-900/50 border border-zinc-800 overflow-hidden">
-      <div className="px-6 py-4 border-b border-zinc-800 flex items-center gap-2">
+    <div className="rounded-2xl bg-card border border-border overflow-hidden">
+      <div className="px-6 py-4 border-b border-border flex items-center gap-2">
         <ShieldCheck size={16} className="text-red-400" />
-        <h2 className="text-sm font-bold text-zinc-200">Blocked Numbers</h2>
+        <h2 className="text-sm font-bold text-foreground">Blocked Numbers</h2>
       </div>
       <div className="p-6 space-y-6">
         <form onSubmit={handleBlock} className="flex flex-col sm:flex-row gap-3">
@@ -77,21 +77,21 @@ export default function BlockedNumbersTab() {
         </form>
 
         {blacklist.length === 0 ? (
-          <p className="text-sm text-center py-10 text-zinc-600 border border-dashed border-zinc-800 rounded-xl">
+          <p className="text-sm text-center py-10 text-zinc-600 border border-dashed border-border rounded-xl">
             No numbers currently blocked.
           </p>
         ) : (
           <div className="space-y-2">
             {blacklist.map(b => (
-              <div key={b.id} className="flex items-center justify-between p-4 rounded-xl bg-zinc-950 border border-zinc-800">
+              <div key={b.id} className="flex items-center justify-between p-4 rounded-xl bg-background border border-border">
                 <div>
-                  <span className="font-mono text-sm font-bold text-zinc-200 block">{b.phone}</span>
+                  <span className="font-mono text-sm font-bold text-foreground block">{b.phone}</span>
                   <span className="text-xs text-zinc-600 mt-0.5 block">
                     {b.reason || 'No reason provided'} · Blocked {fmt(b.blocked_at)}
                   </span>
                 </div>
                 <button onClick={() => handleUnblock(b.id)}
-                  className="text-xs font-bold px-4 py-2 rounded-lg bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors">
+                  className="text-xs font-bold px-4 py-2 rounded-lg bg-secondary text-muted-foreground hover:bg-border hover:text-foreground transition-colors">
                   Unblock
                 </button>
               </div>

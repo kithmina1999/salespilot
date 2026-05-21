@@ -257,7 +257,6 @@ func handleProductImageInquiry(business *models.Business, fromNormalized, fromRa
 	database.DB.Create(&models.Message{BusinessID: business.ID, Phone: fromNormalized, Role: "model", Content: reply})
 }
 
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 // localizedWaitMessage returns a short "please wait" in the business's bot language.
@@ -325,4 +324,3 @@ func downloadMetaMedia(mediaURL, accessToken string) ([]byte, string, error) {
 	}
 	return data, mimeType, nil
 }
-	

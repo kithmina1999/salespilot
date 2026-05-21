@@ -1,14 +1,28 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { fetchApi } from "@/lib/api";
+import { useState, useEffect } from "react";
+import useSWR from "swr";
+import { api } from "@/lib/api";
 import {
   Banknote, Clock, CheckCircle, XCircle, Search,
   RefreshCw, ZoomIn, X, AlertTriangle, ChevronDown,
   ImageIcon, Loader2,
 } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
 
 type ProofStatus = "pending" | "approved" | "rejected";
+
+type PaymentProofLineItem = {
+  id: number;
+  item_type: "subscription" | "addon";
+  key: string;
+  name: string;
+  billing_type: string;
+  amount: number;
+  quantity: number;
+  unit_price: number;
+  total: number;
+};
 
 type PaymentProof = {
   id: number;
@@ -16,12 +30,15 @@ type PaymentProof = {
   business_name: string;
   business_phone: string;
   business_email: string;
+  checkout_type: "subscription" | "addon_only" | "mixed";
   billing_cycle: string;
+  plan: string;
   amount: number;
   screenshot_url: string;
   status: ProofStatus;
   activation_code: string;
   admin_note: string;
+  line_items?: PaymentProofLineItem[];
   submitted_at: string;
   reviewed_at: string | null;
   created_at: string;
@@ -43,13 +60,17 @@ function fmtDate(s: string) {
 }
 
 export default function PaymentsPage() {
-  const [proofs, setProofs] = useState<PaymentProof[]>([]);
+  const { data, isLoading: loading, mutate } = useSWR(
+    "/system/payments",
+    (url: string) => api.get(url).then((res) => res.data)
+  );
+  const proofs: PaymentProof[] = data?.proofs || [];
+  const pendingCount = data?.pending_count || 0;
+  const approvedCount = data?.approved_count || 0;
+
   const [filtered, setFiltered] = useState<PaymentProof[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProofStatus | "all">("all");
-  const [pendingCount, setPendingCount] = useState(0);
-  const [approvedCount, setApprovedCount] = useState(0);
 
   // Lightbox state
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
@@ -63,21 +84,8 @@ export default function PaymentsPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [rejectLoading, setRejectLoading] = useState(false);
 
-  const loadProofs = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await fetchApi<any>("/system/payments");
-      setProofs(data.proofs || []);
-      setPendingCount(data.pending_count ?? 0);
-      setApprovedCount(data.approved_count ?? 0);
-    } catch (err) {
-      console.error("Failed to load payments:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { loadProofs(); }, [loadProofs]);
+  const { admin } = useAuth();
+  const isOwner = admin?.role === "owner";
 
   // Filter logic
   useEffect(() => {
@@ -98,11 +106,11 @@ export default function PaymentsPage() {
   async function handleApprove(proof: PaymentProof) {
     setApproveLoading(true);
     try {
-      await fetchApi(`/system/payments/${proof.id}/approve`, { method: "POST" });
+      await api.post(`/system/payments/${proof.id}/approve`);
       setApproving(null);
-      await loadProofs();
+      mutate();
     } catch (err: any) {
-      alert("Failed to approve: " + err.message);
+      alert("Failed to approve: " + (err.response?.data?.error || err.message));
     } finally {
       setApproveLoading(false);
     }
@@ -112,15 +120,12 @@ export default function PaymentsPage() {
     if (!rejecting || !rejectReason.trim()) return;
     setRejectLoading(true);
     try {
-      await fetchApi(`/system/payments/${rejecting.id}/reject`, {
-        method: "POST",
-        body: JSON.stringify({ reason: rejectReason.trim() }),
-      });
+      await api.post(`/system/payments/${rejecting.id}/reject`, { reason: rejectReason.trim() });
       setRejecting(null);
       setRejectReason("");
-      await loadProofs();
+      mutate();
     } catch (err: any) {
-      alert("Failed to reject: " + err.message);
+      alert("Failed to reject: " + (err.response?.data?.error || err.message));
     } finally {
       setRejectLoading(false);
     }
@@ -147,11 +152,11 @@ export default function PaymentsPage() {
             <h1 style={{ fontSize: "1.75rem", fontWeight: 900, color: "var(--text)", letterSpacing: "-0.03em" }}>
               Payment Verification
             </h1>
-            <p style={{ fontSize: "0.875rem", color: "var(--muted)", marginTop: "0.25rem" }}>
+            <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", marginTop: "0.25rem" }}>
               Review bank transfer screenshots and issue activation codes
             </p>
           </div>
-          <button onClick={loadProofs} style={{ padding: "0.5rem", background: "var(--surface)", border: "1px solid var(--border-2)", borderRadius: "0.625rem", color: "var(--muted)", cursor: "pointer", display: "flex", alignItems: "center" }}>
+          <button onClick={() => mutate()} style={{ padding: "0.5rem", background: "var(--surface)", border: "1px solid var(--border-2)", borderRadius: "0.625rem", color: "var(--muted-foreground)", cursor: "pointer", display: "flex", alignItems: "center" }}>
             <RefreshCw size={15} />
           </button>
         </div>
@@ -167,7 +172,7 @@ export default function PaymentsPage() {
               <div style={{ width: 38, height: 38, borderRadius: 10, background: `${s.accent}18`, display: "flex", alignItems: "center", justifyContent: "center", color: s.accent, flexShrink: 0 }}>{s.icon}</div>
               <div>
                 <p style={{ fontSize: "1.75rem", fontWeight: 900, color: "var(--text)", letterSpacing: "-0.03em", lineHeight: 1 }}>{s.value}</p>
-                <p style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: "0.2rem" }}>{s.label}</p>
+                <p style={{ fontSize: "0.8rem", color: "var(--muted-foreground)", marginTop: "0.2rem" }}>{s.label}</p>
               </div>
             </div>
           ))}
@@ -202,7 +207,7 @@ export default function PaymentsPage() {
 
           {/* Search */}
           <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
-            <Search size={14} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "var(--muted)", pointerEvents: "none" }} />
+            <Search size={14} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "var(--muted-foreground)", pointerEvents: "none" }} />
             <input
               type="text" placeholder="Search by name, phone, email..." value={search}
               onChange={e => setSearch(e.target.value)}
@@ -216,18 +221,18 @@ export default function PaymentsPage() {
           {/* Headers */}
           <div style={{ display: "grid", gridTemplateColumns: "2.5fr 1.5fr 1.2fr 100px 1fr 180px", padding: "0.75rem 1.25rem", background: "rgba(255,255,255,0.02)", borderBottom: "1px solid var(--border)" }}>
             {["Business", "Cycle / Amount", "Submitted", "Screenshot", "Status", "Actions"].map(h => (
-              <span key={h} style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--muted)", letterSpacing: "0.05em", textTransform: "uppercase", textAlign: h === "Actions" ? "right" : "left" }}>{h}</span>
+              <span key={h} style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--muted-foreground)", letterSpacing: "0.05em", textTransform: "uppercase", textAlign: h === "Actions" ? "right" : "left" }}>{h}</span>
             ))}
           </div>
 
           {loading ? (
             <div style={{ padding: "3rem", textAlign: "center" }}>
-              <Loader2 size={24} style={{ color: "var(--muted)", animation: "spin 1s linear infinite", margin: "0 auto" }} />
+              <Loader2 size={24} style={{ color: "var(--muted-foreground)", animation: "spin 1s linear infinite", margin: "0 auto" }} />
             </div>
           ) : filtered.length === 0 ? (
             <div style={{ padding: "3.5rem", textAlign: "center" }}>
-              <Banknote size={28} style={{ color: "var(--muted)", margin: "0 auto 0.75rem" }} />
-              <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>No payment submissions {statusFilter !== "all" ? `with status "${statusFilter}"` : "yet"}.</p>
+              <Banknote size={28} style={{ color: "var(--muted-foreground)", margin: "0 auto 0.75rem" }} />
+              <p style={{ color: "var(--muted-foreground)", fontSize: "0.9rem" }}>No payment submissions {statusFilter !== "all" ? `with status "${statusFilter}"` : "yet"}.</p>
             </div>
           ) : (
             filtered.map((proof, idx) => {
@@ -242,18 +247,31 @@ export default function PaymentsPage() {
                   {/* Business */}
                   <div>
                     <p style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--text)" }}>{proof.business_name}</p>
-                    <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.15rem", fontFamily: "monospace" }}>{proof.business_phone}</p>
+                    <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginTop: "0.15rem", fontFamily: "monospace" }}>{proof.business_phone}</p>
                     <p style={{ fontSize: "0.7rem", color: "var(--muted-2)", marginTop: "0.1rem" }}>{proof.business_email}</p>
                   </div>
 
-                  {/* Cycle */}
+                  {/* Cycle / Items */}
                   <div>
                     <p style={{ fontSize: "0.8375rem", fontWeight: 700, color: "var(--text)" }}>{formatLKR(proof.amount)}</p>
-                    <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.1rem" }}>{CYCLE_LABEL[proof.billing_cycle] ?? proof.billing_cycle}</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", marginTop: "0.1rem" }}>
+                      <span style={{ fontSize: "0.65rem", fontWeight: 600, padding: "0.1rem 0.3rem", borderRadius: "0.25rem", background: "var(--surface-2)", color: "var(--muted-foreground)" }}>
+                        {proof.checkout_type === 'subscription' ? 'Sub' : proof.checkout_type === 'addon_only' ? 'Add-on' : 'Mixed'}
+                      </span>
+                    </div>
+                    {proof.line_items && proof.line_items.length > 0 && (
+                      <div style={{ marginTop: "0.2rem", display: "flex", flexDirection: "column", gap: "0.1rem" }}>
+                        {proof.line_items.map(li => (
+                          <div key={li.id} style={{ fontSize: "0.65rem", color: "var(--muted-2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 160 }} title={li.name}>
+                            • {li.name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Submitted */}
-                  <p style={{ fontSize: "0.75rem", color: "var(--muted)" }}>{fmtDate(proof.created_at)}</p>
+                  <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>{fmtDate(proof.created_at)}</p>
 
                   {/* Screenshot thumbnail */}
                   <div>
@@ -273,7 +291,7 @@ export default function PaymentsPage() {
                       </button>
                     ) : (
                       <div style={{ width: 60, height: 44, background: "var(--surface-2)", borderRadius: "0.5rem", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <ImageIcon size={14} style={{ color: "var(--muted)" }} />
+                        <ImageIcon size={14} style={{ color: "var(--muted-foreground)" }} />
                       </div>
                     )}
                   </div>
@@ -282,7 +300,7 @@ export default function PaymentsPage() {
                   <div>
                     <span style={{ padding: "0.2rem 0.6rem", background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: "999px", fontSize: "0.7rem", fontWeight: 700 }}>{s.label}</span>
                     {proof.status === "approved" && proof.activation_code && (
-                      <p style={{ fontSize: "0.7rem", color: "var(--muted)", marginTop: "0.2rem", fontFamily: "monospace" }}>{proof.activation_code}</p>
+                      <p style={{ fontSize: "0.7rem", color: "var(--muted-foreground)", marginTop: "0.2rem", fontFamily: "monospace" }}>{proof.activation_code}</p>
                     )}
                     {proof.status === "rejected" && proof.admin_note && (
                       <p style={{ fontSize: "0.7rem", color: "#f87171", marginTop: "0.2rem", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={proof.admin_note}>{proof.admin_note}</p>
@@ -294,14 +312,18 @@ export default function PaymentsPage() {
                     {proof.status === "pending" && (
                       <>
                         <button
+                          disabled={!isOwner}
                           onClick={() => setApproving(proof)}
-                          style={{ display: "flex", alignItems: "center", gap: "0.3rem", padding: "0.35rem 0.75rem", background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: "0.5rem", color: "#4ade80", fontSize: "0.75rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}
+                          style={{ display: "flex", alignItems: "center", gap: "0.3rem", padding: "0.35rem 0.75rem", background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: "0.5rem", color: "#4ade80", fontSize: "0.75rem", fontWeight: 600, cursor: isOwner ? "pointer" : "not-allowed", fontFamily: "inherit", whiteSpace: "nowrap", opacity: isOwner ? 1 : 0.5 }}
+                          title={!isOwner ? "Owner permissions required" : "Approve Payment"}
                         >
                           <CheckCircle size={12} /> Approve
                         </button>
                         <button
+                          disabled={!isOwner}
                           onClick={() => setRejecting(proof)}
-                          style={{ display: "flex", alignItems: "center", gap: "0.3rem", padding: "0.35rem 0.625rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "0.5rem", color: "#f87171", fontSize: "0.75rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                          style={{ display: "flex", alignItems: "center", gap: "0.3rem", padding: "0.35rem 0.625rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "0.5rem", color: "#f87171", fontSize: "0.75rem", fontWeight: 600, cursor: isOwner ? "pointer" : "not-allowed", fontFamily: "inherit", opacity: isOwner ? 1 : 0.5 }}
+                          title={!isOwner ? "Owner permissions required" : "Reject Payment"}
                         >
                           <XCircle size={12} /> Reject
                         </button>
@@ -347,12 +369,15 @@ export default function PaymentsPage() {
               </div>
               <h3 style={{ fontSize: "1.0625rem", fontWeight: 700, color: "var(--text)" }}>Approve Payment</h3>
             </div>
-            <p style={{ fontSize: "0.875rem", color: "var(--muted)", marginBottom: "0.5rem", lineHeight: 1.6 }}>
+            <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", marginBottom: "0.5rem", lineHeight: 1.6 }}>
               Approve payment from <strong style={{ color: "var(--text)" }}>{approving.business_name}</strong>?
             </p>
-            <p style={{ fontSize: "0.875rem", color: "var(--muted)", marginBottom: "1.5rem", lineHeight: 1.6 }}>
-              The system will generate a <strong style={{ color: "#4ade80" }}>BSS-STR-XXXX</strong> code and email it to{" "}
-              <strong style={{ color: "var(--text)" }}>{approving.business_email}</strong>.
+            <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", marginBottom: "1.5rem", lineHeight: 1.6 }}>
+              {approving.checkout_type === 'addon_only' ? (
+                <>The system will update the payment status to <strong style={{ color: "#4ade80" }}>Approved</strong> and create tasks for the selected services.</>
+              ) : (
+                <>The system will generate a <strong style={{ color: "#4ade80" }}>BSS-STR-XXXX</strong> code and email it to <strong style={{ color: "var(--text)" }}>{approving.business_email}</strong>.</>
+              )}
             </p>
             <div style={{ display: "flex", gap: "0.625rem", justifyContent: "flex-end" }}>
               <button
@@ -381,11 +406,11 @@ export default function PaymentsPage() {
               </div>
               <h3 style={{ fontSize: "1.0625rem", fontWeight: 700, color: "var(--text)" }}>Reject Payment</h3>
             </div>
-            <p style={{ fontSize: "0.875rem", color: "var(--muted)", marginBottom: "1rem", lineHeight: 1.6 }}>
+            <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", marginBottom: "1rem", lineHeight: 1.6 }}>
               Reject payment from <strong style={{ color: "var(--text)" }}>{rejecting.business_name}</strong>. This reason will be shown to the tenant so they can resubmit.
             </p>
             <div style={{ marginBottom: "1.5rem" }}>
-              <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)", marginBottom: "0.375rem" }}>
+              <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted-foreground)", marginBottom: "0.375rem" }}>
                 Rejection Reason <span style={{ color: "#ef4444" }}>*</span>
               </label>
               <textarea

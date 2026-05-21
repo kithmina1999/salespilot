@@ -4,6 +4,7 @@ import { Menu, PanelLeft } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import ConnectionBanner from '@/components/ConnectionBanner';
 import TrialBanner from '@/components/TrialBanner';
+import PlatformNoticeBanner from '@/components/PlatformNoticeBanner';
 import TrialUpsellController from '@/components/TrialUpsellModal';
 import DashboardGuard from '@/components/DashboardGuard';
 import NotificationListener from '@/components/NotificationListener';
@@ -36,6 +37,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
           <span className="text-sm font-bold text-foreground tracking-tight">SalesPilot</span>
         </header>
 
+        <PlatformNoticeBanner />
         <TrialBanner />
         <ConnectionBanner />
 

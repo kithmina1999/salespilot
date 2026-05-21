@@ -22,48 +22,35 @@ const FEATURES_AT_RISK = [
 export default function TrialBanner() {
   const usage = useAppStore((s) => s.usage);
   const pricing = useAppStore((s) => s.pricing);
-  const [expiresAt, setExpiresAt] = useState<Date | null>(null);
-  const [isExpired, setIsExpired] = useState(false);
-  const [timeLeft, setTimeLeft] = useState<{ d: number; h: number; m: number; s: number } | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const [dismissed, setDismissed] = useState(false);
 
   // Read trial data from store (no fetch needed — DashboardGuard already called fetchAll)
   useEffect(() => {
-    if (!usage) return;
-    const hasPaidPlan = usage.plan_expires_at && new Date(usage.plan_expires_at) > new Date();
-    if (hasPaidPlan) return;
-    if (usage.trial_expires_at) {
-      const exp = new Date(usage.trial_expires_at);
-      setExpiresAt(exp);
-      if (exp <= new Date()) setIsExpired(true);
-    }
-  }, [usage]);
-
-
-  useEffect(() => {
-    if (!expiresAt) return;
-    function tick() {
-      const diff = expiresAt!.getTime() - Date.now();
-      if (diff <= 0) { setTimeLeft({ d: 0, h: 0, m: 0, s: 0 }); setIsExpired(true); return; }
-      setTimeLeft({
-        d: Math.floor(diff / (1000 * 60 * 60 * 24)),
-        h: Math.floor((diff / (1000 * 60 * 60)) % 24),
-        m: Math.floor((diff / 1000 / 60) % 60),
-        s: Math.floor((diff / 1000) % 60),
-      });
-    }
-    tick();
-    const id = setInterval(tick, 1000);
+    const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [expiresAt]);
+  }, []);
 
-  if (!expiresAt) return null;
+  const paidPlanExpiresAt = usage?.plan_expires_at ? Date.parse(usage.plan_expires_at) : null;
+  const hasPaidPlan = Boolean(paidPlanExpiresAt && paidPlanExpiresAt > now);
+  const trialExpiresAt = !hasPaidPlan && usage?.trial_expires_at ? Date.parse(usage.trial_expires_at) : null;
+  const expiresAt = trialExpiresAt !== null && Number.isFinite(trialExpiresAt) ? trialExpiresAt : null;
+  const diff = expiresAt !== null ? Math.max(expiresAt - now, 0) : null;
+  const timeLeft = diff === null ? null : {
+    d: Math.floor(diff / (1000 * 60 * 60 * 24)),
+    h: Math.floor((diff / (1000 * 60 * 60)) % 24),
+    m: Math.floor((diff / 1000 / 60) % 60),
+    s: Math.floor((diff / 1000) % 60),
+  };
+  const isExpired = Boolean(expiresAt !== null && expiresAt <= now);
+
+  if (expiresAt === null) return null;
   if (dismissed && !isExpired) return null;
 
   const daysLeft = timeLeft?.d ?? 0;
   const phase = isExpired ? 'expiring' : getPhase(daysLeft);
   
-  const monthlyPrice = pricing?.starter?.monthly?.toLocaleString() || '1,490';
+  const monthlyPrice = pricing?.starter?.monthly?.toLocaleString();
 
   // ── Per-phase style tokens ────────────────────────────────────
   const style = {
@@ -110,7 +97,7 @@ export default function TrialBanner() {
         {style.dismissible && (
           <button
             onClick={() => setDismissed(true)}
-            className="p-1.5 rounded-lg text-zinc-600 hover:text-zinc-400 hover:bg-white/5 transition-all shrink-0"
+            className="p-1.5 rounded-lg text-zinc-600 hover:text-muted-foreground hover:bg-white/5 transition-all shrink-0"
             aria-label="Dismiss"
           >
             <X size={14} />
@@ -123,13 +110,13 @@ export default function TrialBanner() {
         {/* Message */}
         <div className="flex-1 min-w-0">
           {phase === 'comfortable' && (
-            <p className="text-sm font-semibold text-zinc-300">
+            <p className="text-sm font-semibold text-muted-foreground">
               <span style={{ color: style.accent }}>{daysLeft} days</span> of full access remaining.
-              <span className="text-zinc-600 text-xs font-normal ml-1">· LKR {monthlyPrice}/mo</span>
+              {monthlyPrice && <span className="text-zinc-600 text-xs font-normal ml-1">· LKR {monthlyPrice}/mo</span>}
             </p>
           )}
           {phase === 'urgent' && (
-            <p className="text-sm font-bold text-zinc-200">
+            <p className="text-sm font-bold text-foreground">
               Only <span style={{ color: style.accent }}>{daysLeft} day{daysLeft !== 1 ? 's' : ''} left</span> — AI features stop working soon.
             </p>
           )}
@@ -192,15 +179,15 @@ export default function TrialBanner() {
         {/* Main message */}
         <div className="flex-1 min-w-0">
           {phase === 'comfortable' && (
-            <p className="text-sm font-semibold text-zinc-300">
+            <p className="text-sm font-semibold text-muted-foreground">
               Your AI assistant is running.{' '}
               <span style={{ color: style.accent }}>{daysLeft} days of full access remaining.</span>
-              <span className="text-zinc-600 text-xs font-normal ml-2">· LKR {monthlyPrice}/mo to continue</span>
+              {monthlyPrice && <span className="text-zinc-600 text-xs font-normal ml-2">· LKR {monthlyPrice}/mo to continue</span>}
             </p>
           )}
           {phase === 'urgent' && (
             <div>
-              <p className="text-sm font-bold text-zinc-200">
+              <p className="text-sm font-bold text-foreground">
                 Only <span style={{ color: style.accent }}>{daysLeft} day{daysLeft !== 1 ? 's' : ''} left</span> —
                 {' '}these features will stop working:
               </p>
@@ -254,7 +241,9 @@ export default function TrialBanner() {
           onMouseLeave={(e) => { e.currentTarget.style.background = style.ctaBg; }}
         >
           <Zap size={12} />
-          {phase === 'expiring' ? `Reactivate · LKR ${monthlyPrice}/mo` : `Subscribe · LKR ${monthlyPrice}/mo`}
+          {phase === 'expiring'
+            ? monthlyPrice ? `Reactivate · LKR ${monthlyPrice}/mo` : 'Reactivate'
+            : monthlyPrice ? `Subscribe · LKR ${monthlyPrice}/mo` : 'Subscribe'}
           <ArrowRight size={12} />
         </Link>
 
@@ -262,7 +251,7 @@ export default function TrialBanner() {
         {style.dismissible && (
           <button
             onClick={() => setDismissed(true)}
-            className="p-1.5 rounded-lg text-zinc-700 hover:text-zinc-400 hover:bg-white/5 transition-all shrink-0"
+            className="p-1.5 rounded-lg text-zinc-700 hover:text-muted-foreground hover:bg-white/5 transition-all shrink-0"
             aria-label="Dismiss"
           >
             <X size={14} />
