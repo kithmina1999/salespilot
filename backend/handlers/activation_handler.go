@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
+	"github.com/kithmina1999/salespilot/platform"
 )
 
 // ── Launch Promotion ─────────────────────────────────────────────────────────
@@ -279,19 +280,23 @@ func RedeemActivationCode(c *gin.Context) {
 	// First activation bonus — only applies during launch promotion period
 	isFirstActivation := biz.BillingCycle == "" && biz.PlanExpiresAt == nil
 	bonusApplied := isFirstActivation && promoIsActive()
-	newAILimit := 3000     // Standard: 3,000 AI replies/month
-	newRuleGenLimit := 100 // Standard: 100 AI rule generations/month
+	ent, err := platform.GetPlanEntitlements(database.DB, code.Plan)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load plan entitlements"})
+		return
+	}
+	newAILimit := ent.MaxAIMessages
+	newRuleGenLimit := ent.MaxRuleGens
 	if bonusApplied {
-		newAILimit = 4000     // First-activation bonus: +1,000 extra AI replies
-		newRuleGenLimit = 150 // First-activation bonus: +50 extra rule generations
+		if newAILimit > 0 {
+			newAILimit += 1000
+		}
+		if newRuleGenLimit > 0 {
+			newRuleGenLimit += 50
+		}
 	}
 
-	newSimulationLimit := models.StarterSimulationLimit
-	if code.Plan == models.PlanPro {
-		newSimulationLimit = models.ProSimulationLimit
-	} else if code.Plan == models.PlanFree {
-		newSimulationLimit = models.FreeSimulationLimit
-	}
+	newSimulationLimit := ent.MaxSimulations
 
 	// Upgrade the business plan and clear the trial (trial ends when paid plan begins)
 	updates := map[string]interface{}{

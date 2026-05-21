@@ -70,16 +70,17 @@ export interface AppUsage {
   };
 
   // Full plan comparison data — driven from backend constants, never hardcode in frontend
-  plan_limits: {
+  plan_limits?: {
     free:    PlanLimits;
     starter: PlanLimits;
     pro:     PlanLimits;
+    trial?:  PlanLimits;
   };
 }
 
 export interface AppPricing {
-  starter: { monthly: number; annual: number };
-  pro: { monthly: number; annual: number };
+  starter?: { monthly: number; annual: number };
+  pro?: { monthly: number; annual: number };
   status: 'free' | 'trial_active' | 'trial_expired_to_free' | 'paid_active' | 'expired_to_free' | 'paid_grace';
   active_trial: boolean;
   expires_at: string | null;
@@ -248,11 +249,7 @@ export const useAppStore = create<AppState>()(
                   gemini_vision: false,
                 },
                 // Plan limits from backend — single source of truth
-                plan_limits: u.plan_limits ?? {
-                  free:    { products: 10,  rules: 10, ai_messages: 0,    system_messages: 300, rule_gens: 3,   storage_bytes: 0 },
-                  starter: { products: 100, rules: -1, ai_messages: 1500, system_messages: -1,  rule_gens: 30,  storage_bytes: 104857600 },
-                  pro:     { products: -1,  rules: -1, ai_messages: 5000, system_messages: -1,  rule_gens: 100, storage_bytes: 524288000 },
-                },
+                plan_limits: u.plan_limits,
               },
               usageLoaded: true,
             });
@@ -262,8 +259,8 @@ export const useAppStore = create<AppState>()(
             const b = await billingRes.json();
             set({
               pricing: {
-                starter: b.pricing?.starter ?? { monthly: 1490, annual: 14900 },
-                pro: b.pricing?.pro ?? { monthly: 3490, annual: 34900 },
+                starter: b.pricing?.starter,
+                pro: b.pricing?.pro,
                 status: b.status ?? 'free',
                 active_trial: b.active_trial ?? false,
                 expires_at: b.expires_at ?? null,

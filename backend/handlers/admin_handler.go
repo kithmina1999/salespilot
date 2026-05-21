@@ -62,12 +62,13 @@ func AdminCreateProduct(c *gin.Context) {
 	var productCount int64
 	database.DB.Model(&models.Product{}).Where("business_id = ?", businessID).Count(&productCount)
 
-	if biz.Plan == models.PlanFree && productCount >= 10 {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Free Plan limit reached (Max 10 Products). Please upgrade to Starter or Pro."})
+	ent, err := GetUsageEntitlements(biz, time.Now())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load product limits"})
 		return
 	}
-	if biz.Plan == models.PlanStarter && productCount >= 100 {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Starter Plan limit reached (Max 100 Products). Please upgrade to Pro."})
+	if ent.MaxProducts >= 0 && productCount >= int64(ent.MaxProducts) {
+		c.JSON(http.StatusForbidden, gin.H{"error": fmt.Sprintf("Product limit reached (Max %d). Please upgrade your plan.", ent.MaxProducts)})
 		return
 	}
 
@@ -207,7 +208,11 @@ func AdminUploadImage(serverURL string) gin.HandlerFunc {
 			return
 		}
 
-		ent := GetUsageEntitlements(biz, time.Now())
+		ent, err := GetUsageEntitlements(biz, time.Now())
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load upload limits"})
+			return
+		}
 
 		if !ent.CanUploadCloudinary {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Image hosting is not allowed on your current plan. Please upgrade."})

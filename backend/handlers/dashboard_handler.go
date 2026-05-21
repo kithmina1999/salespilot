@@ -232,15 +232,11 @@ func GetDashboardStats(c *gin.Context) {
 		Where("business_id = ? AND created_at < ?", businessID, thisMonthStart).
 		Distinct("phone").Count(&totalCustomersLastMonth)
 
-	// Calculate Rule Generation Limit based on plan & trial
 	activeTrial := biz.IsInActiveTrial()
-	maxRuleGens := models.FreeRuleGenLimit
-	if activeTrial {
-		maxRuleGens = models.StarterRuleGenLimit
-	} else if biz.Plan == models.PlanStarter {
-		maxRuleGens = models.StarterRuleGenLimit
-	} else if biz.Plan == models.PlanPro {
-		maxRuleGens = models.ProRuleGenLimit
+	ent, err := GetUsageEntitlements(biz, now)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load plan entitlements"})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -254,7 +250,7 @@ func GetDashboardStats(c *gin.Context) {
 		"plan":                  biz.Plan,
 		"active_trial":          activeTrial,
 		"rule_generation_count": biz.RuleGenerationCount,
-		"rule_generation_limit": maxRuleGens,
+		"rule_generation_limit": ent.MaxRuleGens,
 		"top_unmatched":         unmatched,
 		"daily_stats":           dailyStats,
 

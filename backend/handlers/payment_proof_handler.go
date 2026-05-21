@@ -14,42 +14,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
+	"github.com/kithmina1999/salespilot/platform"
 	"github.com/kithmina1999/salespilot/utils"
 
 	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 )
-
-func getProofBillingAmount(plan string, cycle string) float64 {
-	var monthly float64
-	var annual float64
-
-	switch plan {
-	case models.PlanPro:
-		monthly = 3490
-		annual = 34900
-	case models.PlanStarter:
-		fallthrough
-	default:
-		monthly = 1490
-		annual = 14900
-	}
-
-	switch cycle {
-	case models.BillingAnnual:
-		return annual
-	case models.BillingMonthly:
-		fallthrough
-	default:
-		return monthly
-	}
-}
-
-var proofBillingDays = map[string]int{
-	models.BillingMonthly:   30,
-	models.BillingQuarterly: 90,
-	models.BillingAnnual:    365,
-}
 
 // ─────────────────────────────────────────────────────────────────
 // POST /api/v1/billing/submit-proof  (Tenant JWT)
@@ -83,18 +53,15 @@ func SubmitPaymentProof(c *gin.Context) {
 	}
 
 	// Validate billing cycle
-	cycle := c.PostForm("billing_cycle")
-	plan := c.PostForm("plan")
-	if plan == "" {
-		plan = models.PlanStarter
+	cycle := strings.ToLower(strings.TrimSpace(c.PostForm("billing_cycle")))
+	plan := strings.ToLower(strings.TrimSpace(c.PostForm("plan")))
+	if plan == "" || cycle == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Plan and billing cycle are required"})
+		return
 	}
-	if cycle == "" {
-		cycle = models.BillingMonthly
-	}
-
-	amount := getProofBillingAmount(plan, cycle)
-	if amount == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid billing configuration"})
+	amount, err := platform.AmountFor(database.DB, plan, cycle)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid billing configuration: " + err.Error()})
 		return
 	}
 
@@ -255,9 +222,10 @@ func ApprovePayment(c *gin.Context) {
 	// Generate activation code locked to this business's phone
 	code := generateProofActivationCode(proof.Plan)
 
-	durationDays := proofBillingDays[proof.BillingCycle]
-	if durationDays == 0 {
-		durationDays = 30
+	durationDays, err := platform.DaysForCycle(proof.BillingCycle)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid billing cycle on payment proof"})
+		return
 	}
 
 	activationCode := models.ActivationCode{

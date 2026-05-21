@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
+	"github.com/kithmina1999/salespilot/platform"
 )
 
 // POST /api/v1/billing/trial/start
@@ -44,29 +45,39 @@ func StartTrial(c *gin.Context) {
 		return
 	}
 
+	settings, err := platform.GetBillingSettings(database.DB)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load trial settings"})
+		return
+	}
+	ent, err := platform.GetPlanEntitlements(database.DB, settings.TrialPlanKey)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load trial entitlements"})
+		return
+	}
 	now := time.Now()
-	expiresAt := now.AddDate(0, 0, models.TrialDurationDays)
+	expiresAt := now.AddDate(0, 0, settings.TrialDays)
 
 	database.DB.Model(&biz).Updates(map[string]interface{}{
 		"trial_expires_at": expiresAt,
-		"ai_message_limit": models.TrialAILimit, // 150 AI replies during trial
-		"simulation_limit": models.TrialSimulationLimit,
+		"ai_message_limit": ent.MaxAIMessages,
+		"simulation_limit": ent.MaxSimulations,
 	})
 
 	LogActivity(biz.ID, "system", 0, "trial_started", "billing", "14_day_ai_trial",
 		map[string]interface{}{
 			"expires_at": expiresAt,
-			"ai_limit":   models.TrialAILimit,
+			"ai_limit":   ent.MaxAIMessages,
 		}, c.ClientIP(), "low", biz.Name, models.PlanFree)
 
 	log.Printf("✨ 14-Day AI Trial started for Business %d — Expires %s (AI limit: %d)",
-		biz.ID, expiresAt.Format("2006-01-02"), models.TrialAILimit)
+		biz.ID, expiresAt.Format("2006-01-02"), ent.MaxAIMessages)
 
 	c.JSON(http.StatusOK, gin.H{
 		"trial_started": true,
-		"message":       "Your 14-day AI trial has started! Enjoy up to 150 AI replies.",
+		"message":       "Your AI trial has started.",
 		"expires_at":    expiresAt,
-		"ai_limit":      models.TrialAILimit,
-		"trial_days":    models.TrialDurationDays,
+		"ai_limit":      ent.MaxAIMessages,
+		"trial_days":    settings.TrialDays,
 	})
 }

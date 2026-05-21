@@ -68,6 +68,14 @@ func TestMain(m *testing.M) {
 	}
 	// Upsert: if a previous test run left this row, reuse it
 	database.DB.Where("api_key = ?", biz.APIKey).FirstOrCreate(&biz)
+	database.DB.Model(&biz).Updates(map[string]interface{}{
+		"name":           "__test_payment_settings__",
+		"phone":          "00000000001",
+		"plan":           models.PlanFree,
+		"allow_cod":      true,
+		"allow_transfer": false,
+		"bank_details":   "",
+	})
 	testPaymentBizID = biz.ID
 
 	code := m.Run()

@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -141,6 +143,10 @@ func main() {
 		system.POST("/payments/:id/approve", middleware.RequireSuperPermission(middleware.PermBillingManage), middleware.HighRiskRoute("approve_payment"), handlers.ApprovePayment)
 		system.POST("/payments/:id/reject", middleware.RequireSuperPermission(middleware.PermBillingManage), middleware.HighRiskRoute("reject_payment"), handlers.RejectPayment)
 
+		// Billing settings and plan catalog
+		system.GET("/settings/billing", middleware.RequireSuperPermission(middleware.PermBillingView), handlers.GetSystemBillingSettings)
+		system.PUT("/settings/billing", middleware.RequireSuperPermission(middleware.PermBillingManage), middleware.HighRiskRoute("update_billing_settings"), handlers.UpdateSystemBillingSettings)
+
 		// Platform Notices
 		system.GET("/notices", middleware.RequireSuperPermission(middleware.PermBusinessView), handlers.ListPlatformNotices)
 		system.POST("/notices", middleware.RequireSuperPermission(middleware.PermBusinessManage), handlers.CreatePlatformNotice)
@@ -175,6 +181,8 @@ func main() {
 	{
 		// Billing
 		dash.GET("/billing/status", handlers.BillingStatus)
+		dash.GET("/billing/bank-details", handlers.GetBillingBankDetails)
+		dash.GET("/billing/options", handlers.GetBillingOptions)
 		dash.POST("/billing/activate", handlers.RedeemActivationCode)   // Activation code redemption
 		dash.POST("/billing/submit-proof", handlers.SubmitPaymentProof) // Bank transfer proof upload
 		dash.GET("/billing/payment-status", handlers.GetPaymentStatus)  // Check latest proof status
@@ -305,16 +313,30 @@ func main() {
 
 	log.Printf("📁 Uploads served at %s/uploads/", cfg.ServerURL)
 
+	srv := &http.Server{
+		Addr:    ":" + cfg.Port,
+		Handler: r,
+	}
+
 	go func() {
 		log.Printf("🚀 SalesPilot API starting on port %s", cfg.Port)
-		if err := r.Run(":" + cfg.Port); err != nil {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("❌ Server failed: %v", err)
 		}
 	}()
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("🛑 Shutdown signal received — draining worker pool...")
+
+	log.Println("🛑 Shutdown signal received — shutting down HTTP server...")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("❌ Server forced to shutdown: %v", err)
+	}
+
+	log.Println("🛑 HTTP server stopped — draining worker pool...")
 	utils.DrainAndWait()
 	appStore.Stop() // stop cache GC goroutine cleanly
 	log.Println("✅ All workers finished — exiting cleanly")

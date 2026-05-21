@@ -193,6 +193,7 @@ export function UsageTable({
                 <RefreshCw className="size-3.5 mr-1" /> Reset
               </Button>
               <Button
+                nativeButton={false}
                 render={<Link href={`/businesses/${business.id}`} />}
                 variant="outline"
                 size="sm"

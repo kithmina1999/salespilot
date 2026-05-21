@@ -188,12 +188,17 @@ func CreateRule(c *gin.Context) {
 	db := c.MustGet("db").(*gorm.DB)
 	db.Model(&models.Rule{}).Count(&ruleCount)
 
-	if biz.Plan == models.PlanFree && !biz.IsInActiveTrial() && ruleCount >= 5 {
+	ent, err := GetUsageEntitlements(biz, time.Now())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load rule limits"})
+		return
+	}
+	if ent.MaxRules >= 0 && ruleCount >= int64(ent.MaxRules) {
 		c.JSON(http.StatusForbidden, gin.H{
-			"error":            "Free plan allows a maximum of 5 FAQ rules. Start a trial or subscribe to add more.",
+			"error":            fmt.Sprintf("Your current plan allows a maximum of %d FAQ rules. Upgrade to add more.", ent.MaxRules),
 			"upgrade_required": true,
 			"rule_count":       ruleCount,
-			"rule_limit":       5,
+			"rule_limit":       ent.MaxRules,
 		})
 		return
 	}
@@ -381,18 +386,23 @@ func DraftFAQ(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify business context"})
 		return
 	}
+	ent, err := GetUsageEntitlements(biz, time.Now())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load AI generation limits"})
+		return
+	}
 
 	// Plan-based quota check (trial users get Starter-level access)
 	switch {
-	case biz.Plan == models.PlanFree && !biz.IsInActiveTrial():
+	case ent.MaxRuleGens == 0:
 		c.JSON(http.StatusForbidden, gin.H{
 			"error":            "AI Draft requires Starter or Pro plan. Start your free trial to unlock this feature.",
 			"upgrade_required": true,
 		})
 		return
-	case (biz.Plan == models.PlanStarter || biz.IsInActiveTrial()) && biz.RuleGenerationCount >= 30:
+	case ent.MaxRuleGens > 0 && biz.RuleGenerationCount >= ent.MaxRuleGens:
 		c.JSON(http.StatusTooManyRequests, gin.H{
-			"error":         "Monthly AI generation limit reached (30). Upgrade to Pro for unlimited drafts.",
+			"error":         fmt.Sprintf("Monthly AI generation limit reached (%d). Upgrade for more drafts.", ent.MaxRuleGens),
 			"limit_reached": true,
 		})
 		return
@@ -605,14 +615,19 @@ func GenerateRule(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Business not found"})
 		return
 	}
+	ent, err := GetUsageEntitlements(biz, time.Now())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load AI generation limits"})
+		return
+	}
 
 	// Plan-based quota check (trial users get Starter-level access)
 	switch {
-	case biz.Plan == models.PlanFree && !biz.IsInActiveTrial():
+	case ent.MaxRuleGens == 0:
 		c.JSON(http.StatusForbidden, gin.H{"error": "AI Rule Generation requires Starter or Pro plan. Start your free trial to unlock this feature.", "upgrade_required": true})
 		return
-	case (biz.Plan == models.PlanStarter || biz.IsInActiveTrial()) && biz.RuleGenerationCount >= 30:
-		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Monthly AI generation limit reached (30). Upgrade to Pro for unlimited.", "limit_reached": true})
+	case ent.MaxRuleGens > 0 && biz.RuleGenerationCount >= ent.MaxRuleGens:
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": fmt.Sprintf("Monthly AI generation limit reached (%d). Upgrade for more.", ent.MaxRuleGens), "limit_reached": true})
 		return
 	case biz.Plan == models.PlanPro:
 		// Unlimited — no quota check

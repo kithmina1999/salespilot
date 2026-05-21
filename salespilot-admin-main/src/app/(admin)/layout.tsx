@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   LogOut,
   ScrollText,
+  Settings2,
   Shield,
   BarChart3,
 } from "lucide-react"
@@ -48,6 +49,7 @@ const navItems = [
   { href: "/usage", label: "Usage & Quotas", icon: BarChart3, section: "main" },
   { href: "/activation-codes", label: "Activation Codes", icon: KeyRound, section: "main" },
   { href: "/audit-logs", label: "Audit Logs", icon: ScrollText, section: "main" },
+  { href: "/platform-settings", label: "Platform Settings", icon: Settings2, section: "system" },
   { href: "/global-rules", label: "Global Rules", icon: BookOpen, section: "system" },
 ]
 

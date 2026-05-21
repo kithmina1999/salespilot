@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/kithmina1999/salespilot/models"
+	"github.com/kithmina1999/salespilot/platform"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -51,6 +52,8 @@ func Init(dsn string) {
 			&models.Cart{}, &models.SavedAddress{},
 			&models.SuperAdminUser{}, &models.SuperAdminSession{},
 			&models.PipelineLog{}, &models.PipelineSignalLog{},
+			&models.PlatformBillingSettings{}, &models.SubscriptionPlan{},
+			&models.BillingPaymentAttempt{},
 		)
 	}
 
@@ -75,12 +78,19 @@ func Init(dsn string) {
 		&models.PipelineLog{},
 		&models.PipelineSignalLog{},
 		&models.PlatformNotice{},
+		&models.PlatformBillingSettings{},
+		&models.SubscriptionPlan{},
+		&models.BillingPaymentAttempt{},
 	)
 	if err != nil {
 		log.Fatalf("❌ Failed to migrate database: %v", err)
 	}
 
 	log.Println("✅ PostgreSQL connected and migrated successfully")
+
+	if err := platform.EnsureBillingDefaults(DB); err != nil {
+		log.Fatalf("Failed to seed billing catalog defaults: %v", err)
+	}
 
 	if os.Getenv("SEED_DB") == "true" {
 		seedDemoData()

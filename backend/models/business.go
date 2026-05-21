@@ -16,6 +16,7 @@ const (
 	PlanFree    = "free"
 	PlanStarter = "starter" // Rs. 1,490/month
 	PlanPro     = "pro"     // Rs. 3,490/month
+	PlanTrial   = "trial"   // internal entitlement profile for active trials
 )
 
 // Plan Limits

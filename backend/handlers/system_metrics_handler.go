@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
+	"github.com/kithmina1999/salespilot/platform"
 )
 
 // GetSystemMetrics returns platform-wide Tier 1 usage and business statistics
@@ -47,8 +48,18 @@ func GetSystemMetrics(c *gin.Context) {
 	database.DB.Model(&models.PaymentProof{}).Where("status = ?", models.PaymentStatusPending).Count(&pendingPayments)
 	database.DB.Model(&models.Business{}).Where("suspended_at IS NOT NULL").Count(&suspendedTenants)
 
-	// MRR Estimate (Very simple: 1490 for starter, 3490 for pro)
-	mrr := (starterPlanCount * 1490) + (proPlanCount * 3490)
+	pricing, err := platform.PublicPricing(database.DB)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load pricing"})
+		return
+	}
+	mrr := int64(0)
+	if planPricing, ok := pricing[models.PlanStarter]; ok {
+		mrr += int64(planPricing[models.BillingMonthly]) * starterPlanCount
+	}
+	if planPricing, ok := pricing[models.PlanPro]; ok {
+		mrr += int64(planPricing[models.BillingMonthly]) * proPlanCount
+	}
 	arr := mrr * 12
 
 	c.JSON(http.StatusOK, gin.H{

@@ -245,6 +245,7 @@ export default function BusinessesPage() {
                       <X className="size-4" />
                     </Button>
                     <Button
+                      nativeButton={false}
                       render={<Link href={`/businesses/${business.id}/pipeline`} />}
                       title="View pipeline logs"
                       variant="outline"
@@ -270,6 +271,7 @@ export default function BusinessesPage() {
                 )}
 
                       <Button
+                        nativeButton={false}
                         render={<Link href={`/businesses/${business.id}`} />}
                         variant="outline"
                         size="sm"
