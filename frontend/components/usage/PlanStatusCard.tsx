@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import { ArrowRight, CheckCircle2, Clock } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 
@@ -10,23 +10,26 @@ interface Props {
 
 const TRIAL_TOTAL_MS = 14 * 24 * 60 * 60 * 1000;
 
+function subscribeToClock(callback: () => void) {
+  const id = window.setInterval(callback, 1000);
+  return () => window.clearInterval(id);
+}
+
+function getClockSnapshot() {
+  return Date.now();
+}
+
+function getServerClockSnapshot() {
+  return 0;
+}
+
+function useClockNow() {
+  return useSyncExternalStore(subscribeToClock, getClockSnapshot, getServerClockSnapshot);
+}
+
 function useCountdownMs(expiresAt: string | null): number {
-  const [msLeft, setMsLeft] = useState(0);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    if (!expiresAt) {
-      setMsLeft(0);
-      return;
-    }
-    const tick = () => setMsLeft(Math.max(0, new Date(expiresAt).getTime() - Date.now()));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [expiresAt]);
-
-  return mounted ? msLeft : 0;
+  const now = useClockNow();
+  return expiresAt ? Math.max(0, new Date(expiresAt).getTime() - now) : 0;
 }
 
 function formatTimeLeft(ms: number): { top: string; bottom: string } {
@@ -109,9 +112,7 @@ function formatRemaining(seconds: number | undefined): string | null {
 }
 
 export default function PlanStatusCard({ onUpgrade }: Props) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
+  const now = useClockNow();
   const business = useAppStore((s) => s.business);
   const usage = useAppStore((s) => s.usage);
   const pricing = useAppStore((s) => s.pricing);
@@ -122,7 +123,7 @@ export default function PlanStatusCard({ onUpgrade }: Props) {
   const returnedToFree = billingStatus === 'expired_to_free' || billingStatus === 'trial_expired_to_free';
   const isOnTrial = billingStatus === 'trial_active' || usage?.active_trial === true;
   const expiresAt = pricing?.expires_at ?? usage?.trial_expires_at ?? null;
-  const secondsRemaining = pricing?.seconds_remaining ?? (expiresAt ? Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000)) : 0);
+  const secondsRemaining = pricing?.seconds_remaining ?? (expiresAt ? Math.max(0, Math.floor((new Date(expiresAt).getTime() - now) / 1000)) : 0);
   const timeLabel = formatRemaining(secondsRemaining);
   const planExpiry = usage?.plan_expires_at ?? null;
   const expiryLabel = planExpiry
@@ -193,7 +194,7 @@ export default function PlanStatusCard({ onUpgrade }: Props) {
               </p>
             )}
 
-            {isOnTrial && mounted && !returnedToFree && (
+            {isOnTrial && !returnedToFree && (
               <p className={`text-sm mt-1.5 leading-snug ${isUrgent ? 'text-red-400 font-semibold' : 'text-muted-foreground'}`}>
                 {isUrgent
                   ? `Trial ends ${timeLabel ? `in ${timeLabel}` : 'soon'}. Free-tier limits apply after.`

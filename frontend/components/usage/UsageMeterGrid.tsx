@@ -2,7 +2,6 @@
 
 import { Bot, BookOpen, Sparkles, Package, HardDrive, MessageCircle, Lock, Infinity, HelpCircle } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
-import { AppUsage } from '@/lib/store';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

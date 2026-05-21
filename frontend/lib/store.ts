@@ -12,6 +12,9 @@
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { API_URL } from '@/hooks/_shared';
+
+const apiUrl = (path: string) => `${API_URL}${path}`;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -182,7 +185,7 @@ export const useAppStore = create<AppState>()(
         const { token } = get();
         if (!token) return;
         try {
-          const res = await fetch('/api/v1/settings/business', {
+          const res = await fetch(apiUrl('/api/v1/settings/business'), {
             headers: { Authorization: `Bearer ${token}` },
           });
           if (res.status === 401) { get().clearSession(); return; }
@@ -215,10 +218,10 @@ export const useAppStore = create<AppState>()(
         try {
           // Fetch usage + billing in parallel
           const [usageRes, billingRes] = await Promise.all([
-            fetch('/api/v1/settings/usage', {
+            fetch(apiUrl('/api/v1/settings/usage'), {
               headers: { Authorization: `Bearer ${token}` },
             }),
-            fetch('/api/v1/billing/status', {
+            fetch(apiUrl('/api/v1/billing/status'), {
               headers: { Authorization: `Bearer ${token}` },
             }),
           ]);

@@ -40,6 +40,10 @@
     "connect": "WhatsApp සම්බන්ක",
     "inbox": "එන ලිපි",
     "reports": "වාර්තා",
+    "usage": "භාවිතය (Usage)",
+    "plans": "සැලසුම් (Plans)",
+    "payment_history": "ගෙවීම් ඉතිහාසය (Payment History)",
+    "activate_code": "කේතය සක්‍රීය කරන්න (Activate Code)",
     "logout": "පිටවීම"
   },
   "auth": {
