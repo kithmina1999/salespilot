@@ -10,7 +10,8 @@ import { useBillingOptions } from '@/hooks/useBillingOptions';
 import { useAppStore } from '@/lib/store';
 import { API_URL } from '@/hooks/_shared';
 
-import CheckoutSummary from '@/components/billing/CheckoutSummary';
+import CheckoutTotals from '@/components/billing/CheckoutTotals';
+import CheckoutAddons from '@/components/billing/CheckoutAddons';
 import BankTransferDetails from '@/components/billing/BankTransferDetails';
 import BillingCycleSelector from '@/components/billing/BillingCycleSelector';
 import PaymentProofUploader from '@/components/billing/PaymentProofUploader';
@@ -20,7 +21,7 @@ function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const queryPlan = searchParams.get('plan') as 'starter' | 'pro' | null;
+  const queryPlan = searchParams.get('plan') as 'starter' | 'pro' | 'addons' | null;
   const queryCycle = searchParams.get('cycle') as 'monthly' | 'annual' | null;
 
   const { paymentStatus, refreshStatus } = useBillingStatus();
@@ -29,14 +30,15 @@ function CheckoutContent() {
   
   const [cycle, setCycle] = useState<'monthly' | 'annual'>(queryCycle ?? 'monthly');
   const [uploading, setUploading] = useState(false);
+  const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!queryPlan || (queryPlan !== 'starter' && queryPlan !== 'pro')) {
+    if (!queryPlan || (queryPlan !== 'starter' && queryPlan !== 'pro' && queryPlan !== 'addons')) {
       router.replace('/dashboard/plans');
     }
   }, [queryPlan, router]);
 
-  if (!queryPlan || (queryPlan !== 'starter' && queryPlan !== 'pro')) {
+  if (!queryPlan || (queryPlan !== 'starter' && queryPlan !== 'pro' && queryPlan !== 'addons')) {
     return null; // Will redirect
   }
 
@@ -44,10 +46,19 @@ function CheckoutContent() {
   const hasRejected = paymentStatus?.status === 'rejected';
   const hasApproved = paymentStatus?.status === 'approved';
 
-  const monthlyPrice = billingOptions?.pricing?.[queryPlan]?.monthly ?? pricing?.[queryPlan]?.monthly ?? 0;
-  const annualPrice = billingOptions?.pricing?.[queryPlan]?.annual ?? pricing?.[queryPlan]?.annual ?? 0;
+  const isSubscription = queryPlan === 'starter' || queryPlan === 'pro';
+  const latestCheckoutType = paymentStatus?.checkout_type ?? (paymentStatus?.plan ? 'subscription' : 'addon_only');
+  const latestIsSubscriptionCheckout = latestCheckoutType === 'subscription' || latestCheckoutType === 'mixed';
+  const blocksCurrentCheckout = hasPending && isSubscription && latestIsSubscriptionCheckout;
+
+  const monthlyPrice = isSubscription ? (billingOptions?.pricing?.[queryPlan]?.monthly ?? pricing?.[queryPlan]?.monthly ?? 0) : 0;
+  const annualPrice = isSubscription ? (billingOptions?.pricing?.[queryPlan]?.annual ?? pricing?.[queryPlan]?.annual ?? 0) : 0;
   const currentPrice = cycle === 'monthly' ? monthlyPrice : annualPrice;
   const bankConfigured = Boolean(billingOptions?.bank_details?.configured);
+
+  const selectedAddonObjects = (billingOptions?.addons ?? []).filter(a => selectedAddons.includes(a.key));
+  const addonsTotal = selectedAddonObjects.reduce((sum, a) => sum + a.amount, 0);
+  const totalAmount = currentPrice + addonsTotal;
 
   async function handleProofSubmit(file: File) {
     if (!bankConfigured) { toast.error('Bank transfer details are not configured yet'); return; }
@@ -57,8 +68,13 @@ function CheckoutContent() {
     try {
       const form = new FormData();
       form.append('image', file);
-      form.append('billing_cycle', cycle);
-      form.append('plan', queryPlan as string);
+      if (isSubscription) {
+        form.append('billing_cycle', cycle);
+        form.append('plan', queryPlan as string);
+      }
+      selectedAddons.forEach(addon => {
+        form.append('addon_keys', addon);
+      });
       
       const res = await fetch(`${API_URL}/api/v1/billing/submit-proof`, {
         method: 'POST',
@@ -97,14 +113,20 @@ function CheckoutContent() {
             <CheckCircle2 size={20} className="shrink-0" />
             <div className="flex-1">
               <p className="font-bold">Payment Approved! ✅</p>
-              <p className="text-sm opacity-80">Your activation code has been sent to your email.</p>
+              <p className="text-sm opacity-80">
+                {latestIsSubscriptionCheckout
+                  ? 'Your activation code has been sent to your email.'
+                  : 'Your service payment has been approved.'}
+              </p>
             </div>
-            <button
-              onClick={() => router.push('/dashboard/activate-code')}
-              className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 text-black font-black text-sm"
-            >
-              Activate <ChevronRight size={14} />
-            </button>
+            {latestIsSubscriptionCheckout && (
+              <button
+                onClick={() => router.push('/dashboard/activate-code')}
+                className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 text-black font-black text-sm"
+              >
+                Activate <ChevronRight size={14} />
+              </button>
+            )}
           </div>
         )}
 
@@ -136,34 +158,52 @@ function CheckoutContent() {
           </div>
         )}
 
-        {!hasPending && !hasApproved && (
+        {!blocksCurrentCheckout && (
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
             <div className="space-y-6">
-              <BillingCycleSelector 
-                cycle={cycle} 
-                setCycle={setCycle} 
-                monthlyPrice={monthlyPrice} 
-                annualPrice={annualPrice} 
+              {isSubscription && (
+                <BillingCycleSelector
+                  cycle={cycle}
+                  setCycle={setCycle}
+                  monthlyPrice={monthlyPrice}
+                  annualPrice={annualPrice}
+                />
+              )}
+
+              <CheckoutAddons
+                addons={billingOptions?.addons ?? []}
+                purchasedAddonKeys={billingOptions?.purchased_addons ?? []}
+                selectedAddonKeys={selectedAddons}
+                waStatus={billingOptions?.business_connection_status?.wa_status}
+                onToggleAddon={(addon) => {
+                  setSelectedAddons(prev =>
+                    prev.includes(addon.key)
+                      ? prev.filter(k => k !== addon.key)
+                      : [...prev, addon.key]
+                  );
+                }}
               />
-              <BankTransferDetails 
-                bankDetails={billingOptions?.bank_details} 
-                loading={loadingOptions} 
-                price={currentPrice} 
+
+              <BankTransferDetails
+                bankDetails={billingOptions?.bank_details}
+                loading={loadingOptions}
+                price={totalAmount}
               />
-              <PaymentProofUploader 
-                uploading={uploading} 
-                onSubmit={handleProofSubmit} 
-                disabled={!bankConfigured} 
-                supportPhone={billingOptions?.bank_details?.support_phone} 
+              <PaymentProofUploader
+                uploading={uploading}
+                onSubmit={handleProofSubmit}
+                disabled={!bankConfigured || totalAmount <= 0}
+                supportPhone={billingOptions?.bank_details?.support_phone}
               />
             </div>
             <div>
               <div className="sticky top-24">
-                <CheckoutSummary 
-                  plan={queryPlan} 
-                  cycle={cycle} 
-                  monthlyPrice={monthlyPrice} 
-                  annualPrice={annualPrice} 
+                <CheckoutTotals
+                  plan={queryPlan}
+                  cycle={cycle}
+                  monthlyPrice={monthlyPrice}
+                  annualPrice={annualPrice}
+                  selectedAddons={selectedAddonObjects}
                 />
               </div>
             </div>

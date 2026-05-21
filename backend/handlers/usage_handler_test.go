@@ -19,7 +19,11 @@ func setupUsageCatalog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&models.PlatformBillingSettings{}, &models.SubscriptionPlan{}); err != nil {
+	if err := db.AutoMigrate(
+		&models.PlatformBillingSettings{},
+		&models.SubscriptionPlan{},
+		&models.BillingAddon{},
+	); err != nil {
 		t.Fatalf("migrate billing catalog: %v", err)
 	}
 	if err := platform.EnsureBillingDefaults(db); err != nil {

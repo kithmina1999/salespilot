@@ -4,7 +4,9 @@ import { apiFetch } from '@/lib/api';
 export interface PaymentStatus {
   has_proof: boolean;
   status: string;
+  checkout_type?: 'subscription' | 'addon_only' | 'mixed';
   billing_cycle: string;
+  plan?: string;
   amount: number;
   activation_code: string;
   admin_note: string;

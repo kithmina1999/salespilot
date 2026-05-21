@@ -53,7 +53,8 @@ func Init(dsn string) {
 			&models.SuperAdminUser{}, &models.SuperAdminSession{},
 			&models.PipelineLog{}, &models.PipelineSignalLog{},
 			&models.PlatformBillingSettings{}, &models.SubscriptionPlan{},
-			&models.BillingPaymentAttempt{},
+			&models.BillingPaymentAttempt{}, &models.BillingAddon{},
+			&models.PaymentProofLineItem{}, &models.BillingServicePurchase{},
 		)
 	}
 
@@ -81,6 +82,9 @@ func Init(dsn string) {
 		&models.PlatformBillingSettings{},
 		&models.SubscriptionPlan{},
 		&models.BillingPaymentAttempt{},
+		&models.BillingAddon{},
+		&models.PaymentProofLineItem{},
+		&models.BillingServicePurchase{},
 	)
 	if err != nil {
 		log.Fatalf("❌ Failed to migrate database: %v", err)

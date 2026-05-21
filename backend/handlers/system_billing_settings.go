@@ -421,6 +421,14 @@ func GetBillingBankDetails(c *gin.Context) {
 }
 
 func GetBillingOptions(c *gin.Context) {
+	businessID := c.GetUint("business_id")
+
+	var biz models.Business
+	if err := database.DB.Select("wa_status", "connected_at").First(&biz, businessID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load business details"})
+		return
+	}
+
 	bank, err := platform.GetBankDetails(database.DB)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load bank details"})
@@ -436,10 +444,34 @@ func GetBillingOptions(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load pricing"})
 		return
 	}
+
+	var addons []models.BillingAddon
+	if err := database.DB.Where("is_active = ?", true).Order("sort_order ASC").Find(&addons).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load addons"})
+		return
+	}
+
+	var purchasedAddons []string
+	database.DB.Raw(`
+		SELECT l.key
+		FROM payment_proof_line_items l
+		JOIN payment_proofs p ON p.id = l.payment_proof_id
+		WHERE p.business_id = ? AND p.status IN (?, ?) AND l.item_type = ?
+	`, businessID, models.PaymentStatusPending, models.PaymentStatusApproved, models.ItemTypeAddon).Scan(&purchasedAddons)
+	if purchasedAddons == nil {
+		purchasedAddons = []string{}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"bank_details": bank,
-		"pricing":      pricing,
-		"plans":        platform.PublicPlans(plans),
-		"plan_limits":  platform.PlanLimitsResponse(plans),
+		"bank_details":     bank,
+		"pricing":          pricing,
+		"plans":            platform.PublicPlans(plans),
+		"plan_limits":      platform.PlanLimitsResponse(plans),
+		"addons":           addons,
+		"purchased_addons": purchasedAddons,
+		"business_connection_status": gin.H{
+			"wa_status":    biz.WAStatus,
+			"connected_at": biz.ConnectedAt,
+		},
 	})
 }

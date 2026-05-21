@@ -152,7 +152,8 @@ func EnsureBillingDefaults(db *gorm.DB) error {
 			return err
 		}
 	}
-	return nil
+
+	return EnsureBillingAddonDefaults(db)
 }
 
 func GetBillingSettings(db *gorm.DB) (models.PlatformBillingSettings, error) {
@@ -373,4 +374,67 @@ func PublicPlans(plans []models.SubscriptionPlan) []models.SubscriptionPlan {
 		return publicPlans[i].SortOrder < publicPlans[j].SortOrder
 	})
 	return publicPlans
+}
+
+func EnsureBillingAddonDefaults(db *gorm.DB) error {
+	addons := []models.BillingAddon{
+		{
+			Key:            "dfy_meta_setup",
+			Name:           "Done-For-You Meta Setup Support",
+			Description:    "Optional hands-on help for customers who want guided Meta WhatsApp setup.",
+			Amount:         7500,
+			BillingType:    models.BillingTypeOneTime,
+			PurchasePolicy: models.PurchasePolicyOncePerBusiness,
+			IsActive:       true,
+			SortOrder:      10,
+		},
+		{
+			Key:            "meta_reconfig",
+			Name:           "Meta Reconfiguration Support",
+			Description:    "For changing WhatsApp number, replacing token, reconnecting WABA, or fixing broken setup.",
+			Amount:         3500,
+			BillingType:    models.BillingTypeOneTime,
+			PurchasePolicy: models.PurchasePolicyOncePerBusiness,
+			IsActive:       true,
+			SortOrder:      20,
+		},
+		{
+			Key:            "product_catalog_setup",
+			Name:           "Product Catalog Setup",
+			Description:    "We help prepare and upload the first product list.",
+			Amount:         5000,
+			BillingType:    models.BillingTypeOneTime,
+			PurchasePolicy: models.PurchasePolicyOncePerBusiness,
+			IsActive:       true,
+			SortOrder:      30,
+		},
+		{
+			Key:            "faq_ai_setup",
+			Name:           "FAQ & AI Reply Setup",
+			Description:    "We create the first common replies and assistant tone.",
+			Amount:         3000,
+			BillingType:    models.BillingTypeOneTime,
+			PurchasePolicy: models.PurchasePolicyOncePerBusiness,
+			IsActive:       true,
+			SortOrder:      40,
+		},
+		{
+			Key:            "training_session",
+			Name:           "Owner/Staff Training Session",
+			Description:    "A guided session to teach staff how to use SalesPilot.",
+			Amount:         2500,
+			BillingType:    models.BillingTypeOneTime,
+			PurchasePolicy: models.PurchasePolicyRepeatable,
+			IsActive:       true,
+			SortOrder:      50,
+		},
+	}
+
+	for _, addon := range addons {
+		var existing models.BillingAddon
+		if err := db.Where("key = ?", addon.Key).Attrs(addon).FirstOrCreate(&existing).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }

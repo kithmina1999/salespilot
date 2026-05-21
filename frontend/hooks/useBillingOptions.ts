@@ -10,11 +10,29 @@ export interface BankDetails {
   support_phone: string;
 }
 
+export interface BillingAddon {
+  id: number;
+  key: string;
+  name: string;
+  description: string;
+  amount: number;
+  billing_type: 'one_time' | 'monthly';
+  purchase_policy: 'once_per_business' | 'once_per_connection' | 'repeatable';
+  is_active: boolean;
+  sort_order: number;
+}
+
 export interface BillingOptions {
   bank_details: BankDetails;
   pricing?: {
     starter?: { monthly: number; annual: number };
     pro?: { monthly: number; annual: number };
+  };
+  addons?: BillingAddon[];
+  purchased_addons?: string[];
+  business_connection_status?: {
+    wa_status: string;
+    connected_at?: string;
   };
 }
 

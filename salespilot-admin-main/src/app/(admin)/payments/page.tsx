@@ -12,18 +12,33 @@ import { useAuth } from "@/lib/auth-context";
 
 type ProofStatus = "pending" | "approved" | "rejected";
 
+type PaymentProofLineItem = {
+  id: number;
+  item_type: "subscription" | "addon";
+  key: string;
+  name: string;
+  billing_type: string;
+  amount: number;
+  quantity: number;
+  unit_price: number;
+  total: number;
+};
+
 type PaymentProof = {
   id: number;
   business_id: number;
   business_name: string;
   business_phone: string;
   business_email: string;
+  checkout_type: "subscription" | "addon_only" | "mixed";
   billing_cycle: string;
+  plan: string;
   amount: number;
   screenshot_url: string;
   status: ProofStatus;
   activation_code: string;
   admin_note: string;
+  line_items?: PaymentProofLineItem[];
   submitted_at: string;
   reviewed_at: string | null;
   created_at: string;
@@ -236,10 +251,23 @@ export default function PaymentsPage() {
                     <p style={{ fontSize: "0.7rem", color: "var(--muted-2)", marginTop: "0.1rem" }}>{proof.business_email}</p>
                   </div>
 
-                  {/* Cycle */}
+                  {/* Cycle / Items */}
                   <div>
                     <p style={{ fontSize: "0.8375rem", fontWeight: 700, color: "var(--text)" }}>{formatLKR(proof.amount)}</p>
-                    <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginTop: "0.1rem" }}>{CYCLE_LABEL[proof.billing_cycle] ?? proof.billing_cycle}</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", marginTop: "0.1rem" }}>
+                      <span style={{ fontSize: "0.65rem", fontWeight: 600, padding: "0.1rem 0.3rem", borderRadius: "0.25rem", background: "var(--surface-2)", color: "var(--muted-foreground)" }}>
+                        {proof.checkout_type === 'subscription' ? 'Sub' : proof.checkout_type === 'addon_only' ? 'Add-on' : 'Mixed'}
+                      </span>
+                    </div>
+                    {proof.line_items && proof.line_items.length > 0 && (
+                      <div style={{ marginTop: "0.2rem", display: "flex", flexDirection: "column", gap: "0.1rem" }}>
+                        {proof.line_items.map(li => (
+                          <div key={li.id} style={{ fontSize: "0.65rem", color: "var(--muted-2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 160 }} title={li.name}>
+                            • {li.name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Submitted */}
@@ -345,8 +373,11 @@ export default function PaymentsPage() {
               Approve payment from <strong style={{ color: "var(--text)" }}>{approving.business_name}</strong>?
             </p>
             <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", marginBottom: "1.5rem", lineHeight: 1.6 }}>
-              The system will generate a <strong style={{ color: "#4ade80" }}>BSS-STR-XXXX</strong> code and email it to{" "}
-              <strong style={{ color: "var(--text)" }}>{approving.business_email}</strong>.
+              {approving.checkout_type === 'addon_only' ? (
+                <>The system will update the payment status to <strong style={{ color: "#4ade80" }}>Approved</strong> and create tasks for the selected services.</>
+              ) : (
+                <>The system will generate a <strong style={{ color: "#4ade80" }}>BSS-STR-XXXX</strong> code and email it to <strong style={{ color: "var(--text)" }}>{approving.business_email}</strong>.</>
+              )}
             </p>
             <div style={{ display: "flex", gap: "0.625rem", justifyContent: "flex-end" }}>
               <button
