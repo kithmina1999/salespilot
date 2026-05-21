@@ -7,7 +7,7 @@ export const STATUS_STYLE: Record<string, string> = {
   cancelled: 'text-red-400   border-red-400/30   bg-red-400/10',
 };
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+export { API_URL } from '@/hooks/_shared';
 
 export const isLID = (p = '') => { 
   const d = p.split('@')[0].split(':')[0].replace(/\D/g, ''); 

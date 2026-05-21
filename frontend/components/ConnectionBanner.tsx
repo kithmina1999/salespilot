@@ -60,7 +60,7 @@ export default function ConnectionBanner() {
         </div>
         <button
           onClick={() => router.push('/dashboard/connect')}
-          className="shrink-0 flex items-center gap-2 bg-red-500 hover:bg-red-400 text-white px-4 py-1.5 rounded-lg text-xs font-black shadow-lg shadow-red-500/20 active:scale-95 transition-all w-full sm:w-auto justify-center"
+          className="shrink-0 flex items-center gap-2 bg-red-500 hover:bg-red-400 text-foreground px-4 py-1.5 rounded-lg text-xs font-black shadow-lg shadow-red-500/20 active:scale-95 transition-all w-full sm:w-auto justify-center"
         >
           {t('connection.fix')} →
         </button>

@@ -136,7 +136,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               <div className="relative shrink-0">
                 <Icon size={16} />
                 {isChats && unreadCount > 0 && (
-                  <span className="absolute -top-1.5 -right-2 bg-red-500 text-white text-[8px] font-black min-w-[14px] h-[14px] rounded-full flex items-center justify-center px-0.5 leading-none">
+                  <span className="absolute -top-1.5 -right-2 bg-red-500 text-foreground text-[8px] font-black min-w-[14px] h-[14px] rounded-full flex items-center justify-center px-0.5 leading-none">
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 )}
@@ -245,7 +245,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               </button>
               <button
                 onClick={logout}
-                className="px-5 py-2 rounded-xl text-sm font-bold bg-red-500 text-white hover:bg-red-600 shadow-md transition-colors"
+                className="px-5 py-2 rounded-xl text-sm font-bold bg-red-500 text-foreground hover:bg-red-600 shadow-md transition-colors"
               >
                 {t('auth.logout')}
               </button>

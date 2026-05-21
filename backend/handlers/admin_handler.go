@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -61,12 +62,13 @@ func AdminCreateProduct(c *gin.Context) {
 	var productCount int64
 	database.DB.Model(&models.Product{}).Where("business_id = ?", businessID).Count(&productCount)
 
-	if biz.Plan == models.PlanFree && productCount >= 10 {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Free Plan limit reached (Max 10 Products). Please upgrade to Starter or Pro."})
+	ent, err := GetUsageEntitlements(biz, time.Now())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load product limits"})
 		return
 	}
-	if biz.Plan == models.PlanStarter && productCount >= 100 {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Starter Plan limit reached (Max 100 Products). Please upgrade to Pro."})
+	if ent.MaxProducts >= 0 && productCount >= int64(ent.MaxProducts) {
+		c.JSON(http.StatusForbidden, gin.H{"error": fmt.Sprintf("Product limit reached (Max %d). Please upgrade your plan.", ent.MaxProducts)})
 		return
 	}
 
@@ -206,8 +208,14 @@ func AdminUploadImage(serverURL string) gin.HandlerFunc {
 			return
 		}
 
-		if biz.Plan == models.PlanFree {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Cloudinary image hosting is blocked on the Free Plan. Please upgrade."})
+		ent, err := GetUsageEntitlements(biz, time.Now())
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load upload limits"})
+			return
+		}
+
+		if !ent.CanUploadCloudinary {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Image hosting is not allowed on your current plan. Please upgrade."})
 			return
 		}
 
@@ -217,9 +225,22 @@ func AdminUploadImage(serverURL string) gin.HandlerFunc {
 			return
 		}
 
-		// Enforce Cloudinary Storage Limits
-		if biz.Plan == models.PlanStarter && biz.TotalStorageUsed+file.Size > 500*1024*1024 {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Starter Plan storage limit reached (Max 500MB). Please upgrade to Pro."})
+		// Enforce file size limit
+		if file.Size > ent.MaxFileSizeBytes {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Image must be under %dMB", ent.MaxFileSizeBytes/(1024*1024))})
+			return
+		}
+
+		// Validate file type (images only)
+		contentType := file.Header.Get("Content-Type")
+		if !strings.HasPrefix(contentType, "image/") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Only image files are accepted (JPG, PNG, WebP)"})
+			return
+		}
+
+		// Enforce Total Storage Limits
+		if biz.TotalStorageUsed+file.Size > ent.MaxStorageBytes {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Storage limit reached. Please upgrade your plan or delete existing products."})
 			return
 		}
 
@@ -251,7 +272,7 @@ func AdminUploadImage(serverURL string) gin.HandlerFunc {
 
 		// Upload stream to Cloudinary
 		resp, err := cld.Upload.Upload(context.Background(), src, uploader.UploadParams{
-			Folder:   "stylehaven/products",
+			Folder:   "salespilot/products",
 			PublicID: publicID,
 		})
 

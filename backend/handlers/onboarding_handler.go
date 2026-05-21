@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
+	"github.com/kithmina1999/salespilot/platform"
 )
 
 type AISeedRequest struct {
@@ -235,10 +236,23 @@ func SeedOnboardingTemplates(c *gin.Context) {
 
 	// Auto-start 14-day Starter trial on onboarding completion
 	if business.TrialExpiresAt == nil {
+		settings, err := platform.GetBillingSettings(database.DB)
+		if err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load trial settings"})
+			return
+		}
+		ent, err := platform.GetPlanEntitlements(database.DB, settings.TrialPlanKey)
+		if err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load trial entitlements"})
+			return
+		}
 		now := time.Now()
-		trialExpiry := now.AddDate(0, 0, models.TrialDurationDays)
+		trialExpiry := now.AddDate(0, 0, settings.TrialDays)
 		business.TrialExpiresAt = &trialExpiry
-		business.AIMessageLimit = models.TrialAILimit // 150 AI replies during trial
+		business.AIMessageLimit = ent.MaxAIMessages
+		business.SimulationLimit = ent.MaxSimulations
 		log.Printf("✨ 14-Day Starter Trial started for Business %d — Expires %s (AI limit: %d)", business.ID, trialExpiry.Format("2006-01-02"), models.TrialAILimit)
 	}
 

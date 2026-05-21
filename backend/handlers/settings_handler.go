@@ -12,17 +12,17 @@ import (
 )
 
 type SettingsUpdateRequest struct {
-	Name              string `json:"name"`
-	BotName           string `json:"bot_name"`
-	BotPersonality    string `json:"bot_personality"`
-	OperatingHours    string `json:"operating_hours"`
-	DeliveryPolicy    string `json:"delivery_policy"`
-	MetaCatalogID     string `json:"meta_catalog_id"`
+	Name           string `json:"name"`
+	BotName        string `json:"bot_name"`
+	BotPersonality string `json:"bot_personality"`
+	OperatingHours string `json:"operating_hours"`
+	DeliveryPolicy string `json:"delivery_policy"`
+	MetaCatalogID  string `json:"meta_catalog_id"`
 	// Language settings (new multi-language fields)
-	BotReplyLanguage  string `json:"bot_reply_language"`   // ISO 639-1 fallback lang
-	BotSupportedLangs string `json:"bot_supported_langs"`  // comma-separated ISO codes
+	BotReplyLanguage  string `json:"bot_reply_language"`  // ISO 639-1 fallback lang
+	BotSupportedLangs string `json:"bot_supported_langs"` // comma-separated ISO codes
 	// Deprecated — kept for existing frontend compatibility
-	ResponseLanguage  string `json:"response_language"`
+	ResponseLanguage string `json:"response_language"`
 	// Payment configuration (Slice 1)
 	AllowCOD      *bool  `json:"allow_cod"`      // pointer so false is distinguishable from omitted
 	AllowTransfer *bool  `json:"allow_transfer"` // pointer so false is distinguishable from omitted
@@ -44,27 +44,27 @@ func GetBusinessSettings(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"id":                   biz.ID,
-		"name":                 biz.Name,
-		"bot_name":             biz.BotName,
-		"plan":                 biz.Plan,
-		"ai_message_count":     biz.AIMessageCount,
-		"ai_message_limit":     biz.AIMessageLimit,
-		"bot_personality":      biz.BotPersonality,
-		"operating_hours":      biz.OperatingHours,
-		"delivery_policy":      biz.DeliveryPolicy,
-		"onboarding_complete":  biz.OnboardingComplete,
-		"wa_status":            biz.WAStatus,
-		"meta_catalog_id":      biz.MetaCatalogID,
+		"id":                  biz.ID,
+		"name":                biz.Name,
+		"bot_name":            biz.BotName,
+		"plan":                biz.Plan,
+		"ai_message_count":    biz.AIMessageCount,
+		"ai_message_limit":    biz.AIMessageLimit,
+		"bot_personality":     biz.BotPersonality,
+		"operating_hours":     biz.OperatingHours,
+		"delivery_policy":     biz.DeliveryPolicy,
+		"onboarding_complete": biz.OnboardingComplete,
+		"wa_status":           biz.WAStatus,
+		"meta_catalog_id":     biz.MetaCatalogID,
 		// Language settings
-		"bot_reply_language":   biz.BotReplyLanguage,
-		"bot_supported_langs":  biz.BotSupportedLangs,
+		"bot_reply_language":  biz.BotReplyLanguage,
+		"bot_supported_langs": biz.BotSupportedLangs,
 		// Deprecated — still returned for legacy frontend
-		"response_language":    biz.ResponseLanguage,
+		"response_language": biz.ResponseLanguage,
 		// Payment configuration
-		"allow_cod":            biz.AllowCOD,
-		"allow_transfer":       biz.AllowTransfer,
-		"bank_details":         biz.BankDetails,
+		"allow_cod":      biz.AllowCOD,
+		"allow_transfer": biz.AllowTransfer,
+		"bank_details":   biz.BankDetails,
 	})
 }
 
@@ -149,8 +149,8 @@ func UpdateLanguageSettings(c *gin.Context) {
 	userID := c.GetUint("user_id")
 
 	var req struct {
-		DashboardLanguage string `json:"dashboard_language"` // ISO 639-1, saved on User
-		BotReplyLanguage  string `json:"bot_reply_language"` // ISO 639-1, saved on Business
+		DashboardLanguage string `json:"dashboard_language"`  // ISO 639-1, saved on User
+		BotReplyLanguage  string `json:"bot_reply_language"`  // ISO 639-1, saved on Business
 		BotSupportedLangs string `json:"bot_supported_langs"` // comma-separated, saved on Business
 		// Convenience alias: "language" key from legacy locale.tsx apiFetch call
 		Language string `json:"language"`
@@ -196,9 +196,9 @@ func UpdateLanguageSettings(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":            "Language settings saved ✅",
-		"dashboard_language": req.DashboardLanguage,
-		"bot_reply_language": req.BotReplyLanguage,
+		"message":             "Language settings saved ✅",
+		"dashboard_language":  req.DashboardLanguage,
+		"bot_reply_language":  req.BotReplyLanguage,
 		"bot_supported_langs": req.BotSupportedLangs,
 	})
 }

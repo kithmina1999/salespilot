@@ -7,67 +7,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
+	"github.com/kithmina1999/salespilot/platform"
 )
 
-type usageEntitlements struct {
-	ActiveTrial           bool
-	MaxProducts           int
-	MaxRules              int
-	MaxAIMessages         int
-	MaxSystemMessages     int
-	MaxRuleGens           int
-	MaxStorageBytes       int64
-	CanUploadCloudinary   bool
-	CanSendWhatsAppImages bool
-	CanUseGeminiVision    bool
-}
+type UsageEntitlements = platform.UsageEntitlements
 
-func getUsageEntitlements(biz models.Business, now time.Time) usageEntitlements {
-	ent := usageEntitlements{
-		MaxProducts:       models.FreeProductLimit,
-		MaxRules:          models.FreeRuleLimit,
-		MaxAIMessages:     models.FreeAILimit,
-		MaxSystemMessages: models.FreeMsgLimit,
-		MaxRuleGens:       models.FreeRuleGenLimit,
-		MaxStorageBytes:   0,
-	}
-
-	paidPlanActive := biz.PlanExpiresAt == nil || biz.PlanExpiresAt.After(now)
-
-	switch {
-	case biz.Plan == models.PlanStarter && paidPlanActive:
-		ent.MaxProducts = 100
-		ent.MaxRules = -1
-		ent.MaxAIMessages = models.StarterAILimit
-		ent.MaxSystemMessages = -1
-		ent.MaxRuleGens = models.StarterRuleGenLimit
-		ent.MaxStorageBytes = 500 * 1024 * 1024
-		ent.CanUploadCloudinary = true
-		ent.CanSendWhatsAppImages = true
-		return ent
-	case biz.Plan == models.PlanPro && paidPlanActive:
-		ent.MaxProducts = -1
-		ent.MaxRules = -1
-		ent.MaxAIMessages = models.ProAILimit
-		ent.MaxSystemMessages = -1
-		ent.MaxRuleGens = models.ProRuleGenLimit
-		ent.MaxStorageBytes = 1024 * 1024 * 1024
-		ent.CanUploadCloudinary = true
-		ent.CanSendWhatsAppImages = true
-		ent.CanUseGeminiVision = true
-		return ent
-	}
-
-	if biz.TrialExpiresAt != nil && biz.TrialExpiresAt.After(now) {
-		ent.ActiveTrial = true
-		ent.MaxProducts = 50
-		ent.MaxRules = models.TrialRuleLimit
-		ent.MaxAIMessages = models.TrialAILimit
-		ent.MaxSystemMessages = models.TrialMsgLimit
-		ent.MaxRuleGens = models.StarterRuleGenLimit
-	}
-
-	return ent
+func GetUsageEntitlements(biz models.Business, now time.Time) (UsageEntitlements, error) {
+	return platform.GetBusinessEntitlements(database.DB, biz, now)
 }
 
 func GetUsageStats(c *gin.Context) {
@@ -85,7 +31,16 @@ func GetUsageStats(c *gin.Context) {
 	var ruleCount int64
 	database.DB.Model(&models.Rule{}).Where("business_id = ?", businessID).Count(&ruleCount)
 
-	ent := getUsageEntitlements(biz, time.Now())
+	ent, err := GetUsageEntitlements(biz, time.Now())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load plan entitlements"})
+		return
+	}
+	plans, err := platform.GetPlans(database.DB)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load plan catalog"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"plan":                  biz.Plan,
@@ -105,36 +60,12 @@ func GetUsageStats(c *gin.Context) {
 		"system_messages_limit": ent.MaxSystemMessages,
 		"storage_used_bytes":    biz.TotalStorageUsed,
 		"storage_limit_bytes":   ent.MaxStorageBytes,
+		"max_file_size_bytes":   ent.MaxFileSizeBytes,
 		"features": gin.H{
 			"cloudinary":      ent.CanUploadCloudinary,
 			"whatsapp_images": ent.CanSendWhatsAppImages,
 			"gemini_vision":   ent.CanUseGeminiVision,
 		},
-		"plan_limits": gin.H{
-			"free": gin.H{
-				"products":        models.FreeProductLimit,
-				"rules":           models.FreeRuleLimit,
-				"ai_messages":     models.FreeAILimit,
-				"system_messages": models.FreeMsgLimit,
-				"rule_gens":       models.FreeRuleGenLimit,
-				"storage_bytes":   0,
-			},
-			"starter": gin.H{
-				"products":        100,
-				"rules":           -1,
-				"ai_messages":     models.StarterAILimit,
-				"system_messages": -1,
-				"rule_gens":       models.StarterRuleGenLimit,
-				"storage_bytes":   500 * 1024 * 1024,
-			},
-			"pro": gin.H{
-				"products":        -1,
-				"rules":           -1,
-				"ai_messages":     models.ProAILimit,
-				"system_messages": -1,
-				"rule_gens":       models.ProRuleGenLimit,
-				"storage_bytes":   1024 * 1024 * 1024,
-			},
-		},
+		"plan_limits": platform.PlanLimitsResponse(plans),
 	})
 }

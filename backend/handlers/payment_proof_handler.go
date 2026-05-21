@@ -14,23 +14,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
+	"github.com/kithmina1999/salespilot/platform"
 	"github.com/kithmina1999/salespilot/utils"
 
 	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 )
-
-var proofBillingAmounts = map[string]float64{
-	models.BillingMonthly:   4500,
-	models.BillingQuarterly: 11700,
-	models.BillingAnnual:    39600,
-}
-
-var proofBillingDays = map[string]int{
-	models.BillingMonthly:   30,
-	models.BillingQuarterly: 90,
-	models.BillingAnnual:    365,
-}
 
 // ─────────────────────────────────────────────────────────────────
 // POST /api/v1/billing/submit-proof  (Tenant JWT)
@@ -64,10 +53,15 @@ func SubmitPaymentProof(c *gin.Context) {
 	}
 
 	// Validate billing cycle
-	cycle := c.PostForm("billing_cycle")
-	amount, ok := proofBillingAmounts[cycle]
-	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid billing cycle. Use: monthly, quarterly, or annual"})
+	cycle := strings.ToLower(strings.TrimSpace(c.PostForm("billing_cycle")))
+	plan := strings.ToLower(strings.TrimSpace(c.PostForm("plan")))
+	if plan == "" || cycle == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Plan and billing cycle are required"})
+		return
+	}
+	amount, err := platform.AmountFor(database.DB, plan, cycle)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid billing configuration: " + err.Error()})
 		return
 	}
 
@@ -122,6 +116,7 @@ func SubmitPaymentProof(c *gin.Context) {
 		BusinessPhone: biz.Phone,
 		BusinessEmail: user.Email,
 		BillingCycle:  cycle,
+		Plan:          plan,
 		Amount:        amount,
 		ScreenshotURL: resp.SecureURL,
 		Status:        models.PaymentStatusPending,
@@ -163,6 +158,7 @@ func GetPaymentStatus(c *gin.Context) {
 		"has_proof":       true,
 		"status":          proof.Status,
 		"billing_cycle":   proof.BillingCycle,
+		"plan":            proof.Plan,
 		"amount":          proof.Amount,
 		"activation_code": proof.ActivationCode, // non-empty only if approved
 		"admin_note":      proof.AdminNote,      // non-empty only if rejected
@@ -224,16 +220,17 @@ func ApprovePayment(c *gin.Context) {
 	}
 
 	// Generate activation code locked to this business's phone
-	code := generateProofActivationCode("starter")
+	code := generateProofActivationCode(proof.Plan)
 
-	durationDays := proofBillingDays[proof.BillingCycle]
-	if durationDays == 0 {
-		durationDays = 30
+	durationDays, err := platform.DaysForCycle(proof.BillingCycle)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid billing cycle on payment proof"})
+		return
 	}
 
 	activationCode := models.ActivationCode{
 		Code:         code,
-		Plan:         models.PlanStarter,
+		Plan:         proof.Plan,
 		BillingCycle: proof.BillingCycle,
 		DurationDays: durationDays,
 		Note:         fmt.Sprintf("Auto-generated from payment proof #%d — %s", proof.ID, proof.BusinessName),
@@ -261,7 +258,7 @@ func ApprovePayment(c *gin.Context) {
 			proof.BusinessEmail,
 			proof.BusinessName,
 			code,
-			models.PlanStarter,
+			proof.Plan,
 			proof.BillingCycle,
 			durationDays,
 		); err != nil {
@@ -271,7 +268,7 @@ func ApprovePayment(c *gin.Context) {
 
 	LogActivity(proof.BusinessID, "super_admin", 0, "payment_approved", "billing", code,
 		map[string]interface{}{"proof_id": proof.ID, "cycle": proof.BillingCycle, "amount": proof.Amount},
-		c.ClientIP(), "high", proof.BusinessName, models.PlanStarter)
+		c.ClientIP(), "high", proof.BusinessName, proof.Plan)
 
 	log.Printf("✅ Payment proof #%d approved for %s — Code: %s", proof.ID, proof.BusinessName, code)
 
@@ -338,6 +335,11 @@ func RejectPayment(c *gin.Context) {
 func generateProofActivationCode(plan string) string {
 	const charset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 	planTag := "STR"
+	if plan == models.PlanPro || plan == "pro" {
+		planTag = "PRO"
+	} else if plan == "free" {
+		planTag = "FRE"
+	}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	b := make([]byte, 4)
 	for i := range b {

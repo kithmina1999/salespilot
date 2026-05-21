@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -17,16 +18,16 @@ import (
 	"gorm.io/gorm"
 )
 
-// ListRules fetches all Global (Common) rules and all Custom rules for the tenant
+// ListRules fetches all RuleTemplates and all Custom rules for the tenant
 func ListRules(c *gin.Context) {
 	db := c.MustGet("db").(*gorm.DB)
 
-	var commonRules []models.Rule
+	var commonRules []models.RuleTemplate
 	var customRules []models.Rule
 
-	// Fetch Common Rules (BusinessID is NULL)
-	if err := database.DB.Where("business_id IS NULL").Find(&commonRules).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch common rules"})
+	// Fetch Rule Templates
+	if err := database.DB.Find(&commonRules).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch rule templates"})
 		return
 	}
 
@@ -37,9 +38,118 @@ func ListRules(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"common_rules": commonRules,
+		"common_rules": commonRules, // Keeping key as common_rules for backwards compatibility with frontend initially
 		"custom_rules": customRules,
 	})
+}
+
+// CloneTemplate copies a RuleTemplate into the business's custom rules
+func CloneTemplate(c *gin.Context) {
+	businessID := c.GetUint("business_id")
+
+	var req struct {
+		TemplateID uint `json:"template_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Template ID is required"})
+		return
+	}
+
+	var template models.RuleTemplate
+	if err := database.DB.First(&template, req.TemplateID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Template not found"})
+		return
+	}
+
+	// Create new rule from template
+	rule := models.Rule{
+		BusinessID:      &businessID,
+		Category:        template.Category,
+		Keywords:        template.Keywords,
+		Responses:       template.Responses,
+		IsActive:        true,
+		IsDropRule:      template.IsDropRule,
+		IsContextBridge: template.IsContextBridge,
+	}
+
+	if err := database.DB.Create(&rule).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clone template"})
+		return
+	}
+
+	// Background embed
+	go whatsapp.EmbedAndStoreRule(&rule)
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Template cloned successfully", "rule": rule})
+}
+
+// TranslateRule handles single-field auto-translation
+func TranslateRule(c *gin.Context) {
+	businessID := c.GetUint("business_id")
+	if businessID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req struct {
+		Text       string `json:"text" binding:"required"`
+		TargetLang string `json:"target_lang" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	prompt := fmt.Sprintf(`Translate the following text into natural, conversational %s suitable for a WhatsApp business bot.
+Focus on translating the MEANING and INTENT naturally, rather than doing a strict word-for-word translation. Preserve the natural essence of the language.
+Preserve any formatting like *bold* or emojis. Do not add any introductory text, just return the translated string.
+
+Text:
+%s`, req.TargetLang, req.Text)
+
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey
+
+	body := map[string]interface{}{
+		"contents": []map[string]interface{}{
+			{
+				"role":  "user",
+				"parts": []map[string]interface{}{{"text": prompt}},
+			},
+		},
+	}
+
+	importBytes, _ := json.Marshal(body)
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(importBytes))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to call Gemini API"})
+		return
+	}
+	defer resp.Body.Close()
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse API response"})
+		return
+	}
+
+	var reply string
+	if candidates, ok := result["candidates"].([]interface{}); ok && len(candidates) > 0 {
+		if content, ok := candidates[0].(map[string]interface{})["content"].(map[string]interface{}); ok {
+			if parts, ok := content["parts"].([]interface{}); ok && len(parts) > 0 {
+				if text, ok := parts[0].(map[string]interface{})["text"].(string); ok {
+					reply = text
+				}
+			}
+		}
+	}
+
+	if reply == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gemini returned empty response"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"translated_text": strings.TrimSpace(reply)})
 }
 
 // CreateRule creates a new Custom rule for the tenant
@@ -47,6 +157,7 @@ func CreateRule(c *gin.Context) {
 	businessID := c.GetUint("business_id")
 
 	var req struct {
+		Category        string            `json:"category"`
 		Keywords        string            `json:"keywords" binding:"required"`
 		Response        string            `json:"response"`         // legacy English field
 		SinhalaResponse string            `json:"sinhala_response"` // legacy Sinhala field
@@ -77,18 +188,24 @@ func CreateRule(c *gin.Context) {
 	db := c.MustGet("db").(*gorm.DB)
 	db.Model(&models.Rule{}).Count(&ruleCount)
 
-	if biz.Plan == models.PlanFree && !biz.IsInActiveTrial() && ruleCount >= 5 {
+	ent, err := GetUsageEntitlements(biz, time.Now())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load rule limits"})
+		return
+	}
+	if ent.MaxRules >= 0 && ruleCount >= int64(ent.MaxRules) {
 		c.JSON(http.StatusForbidden, gin.H{
-			"error":            "Free plan allows a maximum of 5 FAQ rules. Start a trial or subscribe to add more.",
+			"error":            fmt.Sprintf("Your current plan allows a maximum of %d FAQ rules. Upgrade to add more.", ent.MaxRules),
 			"upgrade_required": true,
 			"rule_count":       ruleCount,
-			"rule_limit":       5,
+			"rule_limit":       ent.MaxRules,
 		})
 		return
 	}
 
 	rule := models.Rule{
 		BusinessID:      &businessID,
+		Category:        req.Category,
 		Keywords:        req.Keywords,
 		Response:        req.Response,
 		SinhalaResponse: req.SinhalaResponse,
@@ -151,6 +268,7 @@ func UpdateRule(c *gin.Context) {
 
 	// Use a typed struct so we can handle responses map properly
 	var req struct {
+		Category        *string           `json:"category"`
 		Keywords        *string           `json:"keywords"`
 		Response        *string           `json:"response"`
 		SinhalaResponse *string           `json:"sinhala_response"`
@@ -164,19 +282,38 @@ func UpdateRule(c *gin.Context) {
 	}
 
 	// Apply scalar fields
-	if req.Keywords != nil        { rule.Keywords = *req.Keywords }
-	if req.Response != nil        { rule.Response = *req.Response; rule.SetResponse("en", *req.Response) }
-	if req.SinhalaResponse != nil { rule.SinhalaResponse = *req.SinhalaResponse; rule.SetResponse("si", *req.SinhalaResponse) }
-	if req.IsActive != nil        { rule.IsActive = *req.IsActive }
-	if req.IsDropRule != nil      { rule.IsDropRule = *req.IsDropRule }
+	if req.Category != nil {
+		rule.Category = *req.Category
+	}
+	if req.Keywords != nil {
+		rule.Keywords = *req.Keywords
+	}
+	if req.Response != nil {
+		rule.Response = *req.Response
+		rule.SetResponse("en", *req.Response)
+	}
+	if req.SinhalaResponse != nil {
+		rule.SinhalaResponse = *req.SinhalaResponse
+		rule.SetResponse("si", *req.SinhalaResponse)
+	}
+	if req.IsActive != nil {
+		rule.IsActive = *req.IsActive
+	}
+	if req.IsDropRule != nil {
+		rule.IsDropRule = *req.IsDropRule
+	}
 
 	// Apply multi-language responses map (highest priority)
 	if len(req.Responses) > 0 {
 		for lang, text := range req.Responses {
 			rule.SetResponse(lang, text)
 			// Keep legacy scalar fields in sync for backward compat
-			if lang == "en" { rule.Response = text }
-			if lang == "si" { rule.SinhalaResponse = text }
+			if lang == "en" {
+				rule.Response = text
+			}
+			if lang == "si" {
+				rule.SinhalaResponse = text
+			}
 		}
 	}
 
@@ -192,7 +329,9 @@ func UpdateRule(c *gin.Context) {
 	LogActivity(businessID, "user", c.GetUint("user_id"), "rule_updated", "rule", strconv.FormatUint(uint64(id), 10), map[string]interface{}{
 		"languages_updated": func() []string {
 			langs := []string{}
-			for l := range req.Responses { langs = append(langs, l) }
+			for l := range req.Responses {
+				langs = append(langs, l)
+			}
 			return langs
 		}(),
 	}, c.ClientIP(), "low", bizName, bizPlan)
@@ -247,18 +386,23 @@ func DraftFAQ(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify business context"})
 		return
 	}
+	ent, err := GetUsageEntitlements(biz, time.Now())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load AI generation limits"})
+		return
+	}
 
 	// Plan-based quota check (trial users get Starter-level access)
 	switch {
-	case biz.Plan == models.PlanFree && !biz.IsInActiveTrial():
+	case ent.MaxRuleGens == 0:
 		c.JSON(http.StatusForbidden, gin.H{
 			"error":            "AI Draft requires Starter or Pro plan. Start your free trial to unlock this feature.",
 			"upgrade_required": true,
 		})
 		return
-	case (biz.Plan == models.PlanStarter || biz.IsInActiveTrial()) && biz.RuleGenerationCount >= 30:
+	case ent.MaxRuleGens > 0 && biz.RuleGenerationCount >= ent.MaxRuleGens:
 		c.JSON(http.StatusTooManyRequests, gin.H{
-			"error":         "Monthly AI generation limit reached (30). Upgrade to Pro for unlimited drafts.",
+			"error":         fmt.Sprintf("Monthly AI generation limit reached (%d). Upgrade for more drafts.", ent.MaxRuleGens),
 			"limit_reached": true,
 		})
 		return
@@ -412,8 +556,12 @@ Return ONLY a raw JSON object (no markdown, no code fences):
 		}
 		// Build responses map for new multi-lang rule editor
 		responsesMap := map[string]string{}
-		if drafted.Response != "" { responsesMap["en"] = drafted.Response }
-		if drafted.SinhalaResponse != "" { responsesMap["si"] = drafted.SinhalaResponse }
+		if drafted.Response != "" {
+			responsesMap["en"] = drafted.Response
+		}
+		if drafted.SinhalaResponse != "" {
+			responsesMap["si"] = drafted.SinhalaResponse
+		}
 		c.JSON(http.StatusOK, gin.H{
 			"generalized_intent": drafted.GeneralizedIntent,
 			"keywords":           drafted.Keywords,
@@ -433,8 +581,12 @@ Return ONLY a raw JSON object (no markdown, no code fences):
 		}
 		// Build responses map for new multi-lang rule editor
 		responsesMap := map[string]string{}
-		if drafted.Response != "" { responsesMap["en"] = drafted.Response }
-		if drafted.SinhalaResponse != "" { responsesMap["si"] = drafted.SinhalaResponse }
+		if drafted.Response != "" {
+			responsesMap["en"] = drafted.Response
+		}
+		if drafted.SinhalaResponse != "" {
+			responsesMap["si"] = drafted.SinhalaResponse
+		}
 		c.JSON(http.StatusOK, gin.H{
 			"response":         drafted.Response,
 			"sinhala_response": drafted.SinhalaResponse,
@@ -463,14 +615,19 @@ func GenerateRule(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Business not found"})
 		return
 	}
+	ent, err := GetUsageEntitlements(biz, time.Now())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load AI generation limits"})
+		return
+	}
 
 	// Plan-based quota check (trial users get Starter-level access)
 	switch {
-	case biz.Plan == models.PlanFree && !biz.IsInActiveTrial():
+	case ent.MaxRuleGens == 0:
 		c.JSON(http.StatusForbidden, gin.H{"error": "AI Rule Generation requires Starter or Pro plan. Start your free trial to unlock this feature.", "upgrade_required": true})
 		return
-	case (biz.Plan == models.PlanStarter || biz.IsInActiveTrial()) && biz.RuleGenerationCount >= 30:
-		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Monthly AI generation limit reached (30). Upgrade to Pro for unlimited.", "limit_reached": true})
+	case ent.MaxRuleGens > 0 && biz.RuleGenerationCount >= ent.MaxRuleGens:
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": fmt.Sprintf("Monthly AI generation limit reached (%d). Upgrade for more.", ent.MaxRuleGens), "limit_reached": true})
 		return
 	case biz.Plan == models.PlanPro:
 		// Unlimited — no quota check

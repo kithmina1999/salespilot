@@ -44,18 +44,18 @@ export default function PaymentHistoryCard({ onTabSwitch }: Props) {
   if (loading || proofs.length === 0) return null;
 
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
-      <p className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-4">Payment History</p>
+    <div className="bg-card border border-border rounded-2xl p-6">
+      <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">Payment History</p>
       <div className="space-y-3">
         {proofs.map((p, i) => {
-          const status = STATUS_LABELS[p.status] ?? { label: p.status, classes: 'bg-zinc-800 text-zinc-400 border-zinc-700' };
+          const status = STATUS_LABELS[p.status] ?? { label: p.status, classes: 'bg-secondary text-muted-foreground border-border' };
           return (
-            <div key={i} className="flex items-center justify-between p-4 bg-zinc-950 rounded-xl border border-zinc-800/60 gap-3">
+            <div key={i} className="flex items-center justify-between p-4 bg-background rounded-xl border border-border/60 gap-3">
               <div className="space-y-0.5 min-w-0">
-                <p className="text-sm font-bold text-zinc-200 capitalize">
+                <p className="text-sm font-bold text-foreground capitalize">
                   {p.billing_cycle} Plan — {formatLKR(p.amount)}
                 </p>
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-muted-foreground">
                   Submitted{' '}
                   {new Date(p.submitted_at).toLocaleDateString('en-LK', {
                     day: 'numeric', month: 'short', year: 'numeric',

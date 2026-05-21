@@ -1,198 +1,425 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import { Settings2, Save, AlertTriangle, Bot, Zap, Server, Shield, Globe, RefreshCw } from "lucide-react";
+import { useMemo, useState } from "react"
+import useSWR from "swr"
+import {
+  AlertTriangle,
+  Banknote,
+  Loader2,
+  Lock,
+  Save,
+  ShieldAlert,
+  Sparkles,
+} from "lucide-react"
 
-type SettingGroup = {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  fields: { key: string; label: string; value: string | number | boolean; type: "text" | "number" | "toggle" | "select"; options?: string[] }[];
-};
+import {
+  AdminBadge,
+  AdminCard,
+  AdminPage,
+  AdminPageHeader,
+  AdminSectionCard,
+  AdminSkeleton,
+} from "@/components/admin/page"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
+import { api } from "@/lib/api"
+import { useAuth } from "@/lib/auth-context"
 
-const SETTING_GROUPS: SettingGroup[] = [
-  {
-    icon: <Bot size={17} />,
-    title: "AI & Gemini Limits",
-    description: "Control global AI usage caps across all tenants",
-    fields: [
-      { key: "free_ai_limit",    label: "Free Plan AI Messages/Month",    value: 50,   type: "number" },
-      { key: "starter_ai_limit", label: "Starter Plan AI Messages/Month", value: 200,  type: "number" },
-      { key: "pro_ai_limit",     label: "Pro Plan AI Messages/Month",     value: 1000, type: "number" },
-    ],
-  },
-  {
-    icon: <Zap size={17} />,
-    title: "Trial & Onboarding",
-    description: "Default trial settings for new signups",
-    fields: [
-      { key: "trial_days",         label: "Default Trial Days",         value: 14,    type: "number" },
-      { key: "trial_plan",         label: "Trial Plan",                 value: "starter", type: "select", options: ["free", "starter", "pro"] },
-      { key: "auto_downgrade",     label: "Auto-downgrade after trial", value: true,  type: "toggle" },
-    ],
-  },
-  {
-    icon: <Server size={17} />,
-    title: "Platform Maintenance",
-    description: "System-wide toggles and maintenance mode",
-    fields: [
-      { key: "maintenance_mode",   label: "Maintenance Mode",           value: false, type: "toggle" },
-      { key: "new_signups_enabled",label: "Allow New Signups",          value: true,  type: "toggle" },
-      { key: "max_plan",           label: "Maximum Available Plan",     value: "pro", type: "select", options: ["free", "starter", "pro"] },
-    ],
-  },
-  {
-    icon: <Globe size={17} />,
-    title: "Platform Identity",
-    description: "Branding and global meta settings",
-    fields: [
-      { key: "platform_name",  label: "Platform Name",        value: "SalesPilot",         type: "text" },
-      { key: "support_email",  label: "Support Email",        value: "admin@salespilot.ai", type: "text" },
-      { key: "webhook_secret", label: "Webhook Secret (Hash)",value: "wh_••••••••••••••",   type: "text" },
-    ],
-  },
-];
+type BankSettings = {
+  bank_name: string
+  bank_branch: string
+  bank_account_no: string
+  bank_account_name: string
+  support_phone: string
+  trial_days: number
+  trial_plan_key: string
+}
+
+type PlanSettings = {
+  key: string
+  display_name: string
+  badge: string
+  description: string
+  currency: string
+  monthly_price: number
+  annual_price: number
+  is_active: boolean
+  is_public: boolean
+  sort_order: number
+  max_products: number
+  max_rules: number
+  max_ai_messages: number
+  max_system_messages: number
+  max_rule_gens: number
+  max_simulations: number
+  max_storage_bytes: number
+  max_file_size_bytes: number
+  can_upload_cloudinary: boolean
+  can_send_whatsapp_images: boolean
+  can_use_gemini_vision: boolean
+}
+
+type BillingSettingsResponse = {
+  bank: BankSettings
+  plans: PlanSettings[]
+  confirmation_phrase: string
+}
+
+type NumericPlanField =
+  | "monthly_price"
+  | "annual_price"
+  | "sort_order"
+  | "max_products"
+  | "max_rules"
+  | "max_ai_messages"
+  | "max_system_messages"
+  | "max_rule_gens"
+  | "max_simulations"
+  | "max_storage_bytes"
+  | "max_file_size_bytes"
+
+const fetcher = (url: string) => api.get<BillingSettingsResponse>(url).then((r) => r.data)
+
+const numberFields: Array<{ key: NumericPlanField; label: string; hint?: string }> = [
+  { key: "monthly_price", label: "Monthly price" },
+  { key: "annual_price", label: "Annual price" },
+  { key: "max_products", label: "Products", hint: "-1 = unlimited" },
+  { key: "max_rules", label: "FAQ rules", hint: "-1 = unlimited" },
+  { key: "max_ai_messages", label: "AI replies", hint: "-1 = unlimited" },
+  { key: "max_system_messages", label: "Inbound messages", hint: "-1 = unlimited" },
+  { key: "max_rule_gens", label: "AI rule generations", hint: "-1 = unlimited" },
+  { key: "max_simulations", label: "Simulations", hint: "-1 = unlimited" },
+  { key: "max_storage_bytes", label: "Storage bytes" },
+  { key: "max_file_size_bytes", label: "Max file size bytes" },
+]
+
+function cloneSettings(data: BillingSettingsResponse): BillingSettingsResponse {
+  return {
+    bank: { ...data.bank },
+    plans: data.plans.map((plan) => ({ ...plan })),
+    confirmation_phrase: data.confirmation_phrase,
+  }
+}
+
+function normalize(value: BillingSettingsResponse | null) {
+  if (!value) return ""
+  return JSON.stringify({
+    bank: value.bank,
+    plans: [...value.plans].sort((a, b) => a.key.localeCompare(b.key)),
+  })
+}
+
+function getApiErrorMessage(err: any) {
+  const message = err?.response?.data?.error
+  return typeof message === "string" ? message : err instanceof Error ? err.message : "Request failed"
+}
 
 export default function PlatformSettingsPage() {
-  const [saved, setSaved] = useState(false);
+  const { admin } = useAuth()
+  const isOwner = admin?.role === "owner"
+  const { data, isLoading, mutate } = useSWR("/system/settings/billing", fetcher, {
+    revalidateOnFocus: false,
+  })
+  const [draft, setDraft] = useState<BillingSettingsResponse | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [reason, setReason] = useState("")
+  const [confirm, setConfirm] = useState("")
+  const [accountConfirm, setAccountConfirm] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState("")
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
-  };
+  const form = draft ?? data ?? null
+  const changed = useMemo(() => normalize(data ?? null) !== normalize(form), [data, form])
+  const accountChanged = Boolean(data && form && data.bank.bank_account_no.trim() !== form.bank.bank_account_no.trim())
+  const confirmPhrase = data?.confirmation_phrase ?? "UPDATE BILLING SETTINGS"
+  const canSubmit =
+    isOwner &&
+    changed &&
+    reason.trim().length > 0 &&
+    confirm.trim() === confirmPhrase &&
+    (!accountChanged || accountConfirm.trim() === form?.bank.bank_account_no.trim())
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    padding: "0.5625rem 0.875rem",
-    background: "var(--bg)",
-    border: "1px solid var(--border-2)",
-    borderRadius: "0.625rem",
-    color: "var(--text)",
-    fontSize: "0.875rem",
-    outline: "none",
-    fontFamily: "inherit",
-    transition: "border-color 0.15s",
-  };
+  function ensureDraft() {
+    if (draft) return draft
+    if (!data) return null
+    const next = cloneSettings(data)
+    setDraft(next)
+    return next
+  }
+
+  function updateBank<K extends keyof BankSettings>(key: K, value: BankSettings[K]) {
+    const next = ensureDraft()
+    if (!next) return
+    setDraft({ ...next, bank: { ...next.bank, [key]: value } })
+  }
+
+  function updatePlan<K extends keyof PlanSettings>(index: number, key: K, value: PlanSettings[K]) {
+    const next = ensureDraft()
+    if (!next) return
+    const plans = next.plans.map((plan, i) => (i === index ? { ...plan, [key]: value } : plan))
+    setDraft({ ...next, plans })
+  }
+
+  async function save() {
+    if (!form || !canSubmit) return
+    setSaving(true)
+    setMessage("")
+    try {
+      await api.put("/system/settings/billing", {
+        bank: form.bank,
+        plans: form.plans,
+        reason: reason.trim(),
+        confirm: confirm.trim(),
+        account_confirm: accountConfirm.trim(),
+      })
+      await mutate()
+      setDraft(null)
+      setDialogOpen(false)
+      setReason("")
+      setConfirm("")
+      setAccountConfirm("")
+      setMessage("Billing settings saved.")
+    } catch (err) {
+      setMessage(`Error: ${getApiErrorMessage(err)}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (isLoading || !form) {
+    return (
+      <AdminPage>
+        <AdminPageHeader title="Platform Settings" description="Global billing and plan configuration" />
+        <AdminSkeleton className="h-32" />
+        <AdminSkeleton className="h-96" />
+      </AdminPage>
+    )
+  }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }} className="animate-fade-up">
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem" }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", marginBottom: "0.25rem" }}>
-            <h1 style={{ fontSize: "1.75rem", fontWeight: 900, color: "var(--text)", letterSpacing: "-0.03em" }}>Platform Settings</h1>
-            <span style={{ padding: "0.2rem 0.625rem", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: "999px", fontSize: "0.7rem", fontWeight: 700, color: "#fbbf24" }}>PLACEHOLDER</span>
+    <AdminPage>
+      <AdminPageHeader
+        title="Platform Settings"
+        description="Bank details, subscription prices, and plan entitlements used by tenant billing flows."
+        badge={<AdminBadge tone="warning">High risk</AdminBadge>}
+        actions={
+          <Button disabled={!changed || !isOwner} onClick={() => setDialogOpen(true)}>
+            <Save className="size-4" />
+            Save Changes
+          </Button>
+        }
+      />
+
+      {!isOwner && (
+        <AdminCard className="border-border bg-muted/40 p-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Lock className="size-4" />
+            Owner permissions are required to edit billing settings.
           </div>
-          <p style={{ fontSize: "0.875rem", color: "var(--muted)" }}>Global platform configuration — changes affect all tenants</p>
-        </div>
+        </AdminCard>
+      )}
 
-        <button
-          onClick={handleSave}
-          style={{
-            display: "flex", alignItems: "center", gap: "0.5rem",
-            padding: "0.6rem 1.25rem",
-            background: saved ? "rgba(34,197,94,0.15)" : "linear-gradient(135deg, var(--accent), var(--accent-dim))",
-            border: saved ? "1px solid rgba(34,197,94,0.3)" : "none",
-            borderRadius: "0.625rem",
-            color: saved ? "#4ade80" : "#fff",
-            fontSize: "0.875rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-            boxShadow: saved ? "none" : "0 4px 14px var(--accent-glow2)",
-            transition: "all 0.3s",
-          }}
-        >
-          {saved ? <><RefreshCw size={15} /> Saved!</> : <><Save size={15} /> Save Changes</>}
-        </button>
-      </div>
-
-      {/* Warning */}
-      <div style={{ padding: "1rem 1.375rem", background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: "0.875rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-        <AlertTriangle size={18} color="#f87171" style={{ flexShrink: 0 }} />
-        <div>
-          <p style={{ fontSize: "0.875rem", fontWeight: 700, color: "#f87171" }}>Platform-Wide Impact</p>
-          <p style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: "0.125rem" }}>Changes to these settings apply globally to all tenant accounts. Changes are logged in the audit trail.</p>
-        </div>
-      </div>
-
-      {/* Setting Groups */}
-      {SETTING_GROUPS.map((group) => (
-        <div key={group.title} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "1rem", overflow: "hidden" }}>
-          {/* Group Header */}
-          <div style={{ padding: "1.125rem 1.5rem", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: "var(--accent-glow)", border: "1px solid rgba(99,102,241,0.2)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent)" }}>
-              {group.icon}
-            </div>
-            <div>
-              <h3 style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--text)" }}>{group.title}</h3>
-              <p style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: "0.125rem" }}>{group.description}</p>
-            </div>
+      <AdminCard className="border-destructive/20 bg-destructive/10 p-4">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-destructive" />
+          <div>
+            <p className="font-bold text-destructive">Revenue-impacting settings</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              These values are read by tenant billing screens and backend payment validation. Every save is audited.
+            </p>
           </div>
+        </div>
+      </AdminCard>
 
-          {/* Fields */}
-          <div style={{ padding: "1.375rem 1.5rem", display: "flex", flexDirection: "column", gap: "1.125rem" }}>
-            {group.fields.map((field) => (
-              <div key={field.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1.5rem", flexWrap: "wrap" }}>
-                <div style={{ flex: 1, minWidth: "180px" }}>
-                  <p style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text)" }}>{field.label}</p>
-                  <p style={{ fontSize: "0.75rem", color: "var(--muted-2)", fontFamily: "monospace", marginTop: "0.125rem" }}>{field.key}</p>
-                </div>
+      <AdminSectionCard
+        title="Bank & Trial"
+        description="Tenant bank-transfer instructions and trial duration."
+        icon={Banknote}
+        contentClassName="grid gap-4 md:grid-cols-2"
+      >
+        <Field label="Bank name" value={form.bank.bank_name} disabled={!isOwner} onChange={(v) => updateBank("bank_name", v)} />
+        <Field label="Branch" value={form.bank.bank_branch} disabled={!isOwner} onChange={(v) => updateBank("bank_branch", v)} />
+        <Field label="Account number" value={form.bank.bank_account_no} disabled={!isOwner} onChange={(v) => updateBank("bank_account_no", v)} />
+        <Field label="Account name" value={form.bank.bank_account_name} disabled={!isOwner} onChange={(v) => updateBank("bank_account_name", v)} />
+        <Field label="Support phone" value={form.bank.support_phone} disabled={!isOwner} onChange={(v) => updateBank("support_phone", v)} />
+        <Field
+          label="Trial days"
+          type="number"
+          value={String(form.bank.trial_days)}
+          disabled={!isOwner}
+          onChange={(v) => updateBank("trial_days", Number(v))}
+        />
+      </AdminSectionCard>
 
-                {field.type === "toggle" ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                    <span style={{ fontSize: "0.8125rem", color: (field.value as boolean) ? "#4ade80" : "var(--muted)" }}>
-                      {(field.value as boolean) ? "Enabled" : "Disabled"}
-                    </span>
-                    <div
-                      style={{
-                        width: "44px", height: "24px",
-                        borderRadius: "999px",
-                        background: (field.value as boolean) ? "var(--accent)" : "var(--border-2)",
-                        cursor: "pointer",
-                        position: "relative",
-                        transition: "background 0.2s",
-                      }}
-                    >
-                      <div style={{
-                        position: "absolute",
-                        top: "3px",
-                        left: (field.value as boolean) ? "23px" : "3px",
-                        width: "18px", height: "18px",
-                        borderRadius: "50%",
-                        background: "#fff",
-                        transition: "left 0.2s",
-                        boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
-                      }} />
-                    </div>
-                  </div>
-                ) : field.type === "select" ? (
-                  <select defaultValue={field.value as string}
-                    style={{ ...inputStyle, width: "200px" }}
-                    onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-                    onBlur={(e) => (e.target.style.borderColor = "var(--border-2)")}
-                  >
-                    {field.options?.map((o) => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                ) : (
-                  <input
-                    type={field.type}
-                    defaultValue={field.value as string | number}
-                    style={{ ...inputStyle, width: "200px" }}
-                    onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-                    onBlur={(e) => (e.target.style.borderColor = "var(--border-2)")}
-                  />
-                )}
+      <AdminSectionCard
+        title="Plans & Entitlements"
+        description="Prices and limits used by billing, usage cards, and plan comparison."
+        icon={Sparkles}
+        contentClassName="grid gap-4"
+      >
+        {form.plans.map((plan, index) => (
+          <AdminCard key={plan.key} className="p-4">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold uppercase tracking-wide text-foreground">{plan.key}</p>
+                <p className="text-xs text-muted-foreground">-1 means unlimited for limit fields.</p>
               </div>
-            ))}
-          </div>
-        </div>
-      ))}
+              <div className="flex flex-wrap gap-4">
+                <Toggle label="Active" checked={plan.is_active} disabled={!isOwner} onChange={(v) => updatePlan(index, "is_active", v)} />
+                <Toggle label="Public" checked={plan.is_public} disabled={!isOwner} onChange={(v) => updatePlan(index, "is_public", v)} />
+              </div>
+            </div>
 
-      {/* Placeholder banner */}
-      <div style={{ padding: "1.25rem 1.5rem", background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)", borderRadius: "0.875rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-        <Settings2 size={18} color="#fbbf24" style={{ flexShrink: 0 }} />
-        <p style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
-          Placeholder configuration. Wire to <code style={{ fontFamily: "monospace", background: "rgba(255,255,255,0.05)", padding: "0.1rem 0.3rem", borderRadius: "4px" }}>/system/settings</code> to persist values to the database.
+            <div className="grid gap-3 md:grid-cols-3">
+              <Field label="Display name" value={plan.display_name} disabled={!isOwner} onChange={(v) => updatePlan(index, "display_name", v)} />
+              <Field label="Badge" value={plan.badge ?? ""} disabled={!isOwner} onChange={(v) => updatePlan(index, "badge", v)} />
+              <Field
+                label="Sort order"
+                type="number"
+                value={String(plan.sort_order)}
+                disabled={!isOwner}
+                onChange={(v) => updatePlan(index, "sort_order", Number(v))}
+              />
+            </div>
+
+            <div className="mt-3">
+              <Label className="text-xs font-semibold text-muted-foreground">Description</Label>
+              <Textarea
+                value={plan.description ?? ""}
+                disabled={!isOwner}
+                onChange={(e) => updatePlan(index, "description", e.target.value)}
+                className="mt-1 min-h-16 bg-background"
+              />
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              {numberFields.map((field) => (
+                <div key={field.key} className="space-y-1">
+                  <Label className="text-xs font-semibold text-muted-foreground">{field.label}</Label>
+                  <Input
+                    type="number"
+                    disabled={!isOwner}
+                    value={String(plan[field.key] ?? 0)}
+                    onChange={(e) => updatePlan(index, field.key, Number(e.target.value))}
+                    className="bg-background"
+                  />
+                  {field.hint && <p className="text-[0.7rem] text-muted-foreground">{field.hint}</p>}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-5">
+              <Toggle label="Product image uploads" checked={plan.can_upload_cloudinary} disabled={!isOwner} onChange={(v) => updatePlan(index, "can_upload_cloudinary", v)} />
+              <Toggle label="WhatsApp image replies" checked={plan.can_send_whatsapp_images} disabled={!isOwner} onChange={(v) => updatePlan(index, "can_send_whatsapp_images", v)} />
+              <Toggle label="Gemini Vision" checked={plan.can_use_gemini_vision} disabled={!isOwner} onChange={(v) => updatePlan(index, "can_use_gemini_vision", v)} />
+            </div>
+          </AdminCard>
+        ))}
+      </AdminSectionCard>
+
+      {message && (
+        <p className={message.startsWith("Error") ? "text-sm font-semibold text-destructive" : "text-sm font-semibold text-emerald-500"}>
+          {message}
         </p>
-      </div>
+      )}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <ShieldAlert className="size-4" />
+              Confirm billing settings update
+            </DialogTitle>
+            <DialogDescription>
+              These changes affect what tenants pay and where they send bank transfers.
+            </DialogDescription>
+          </DialogHeader>
+
+          {accountChanged && (
+            <div className="rounded-lg border border-destructive/25 bg-destructive/10 p-3 text-sm text-destructive">
+              Bank account number is changing. Re-enter the new account number before saving.
+            </div>
+          )}
+
+          <div className="grid gap-3">
+            <div className="grid gap-1.5">
+              <Label>Reason</Label>
+              <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. New company bank account approved by finance" />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Type {confirmPhrase}</Label>
+              <Input value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+            </div>
+            {accountChanged && (
+              <div className="grid gap-1.5">
+                <Label>New account number</Label>
+                <Input value={accountConfirm} onChange={(e) => setAccountConfirm(e.target.value)} />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={save} disabled={!canSubmit || saving}>
+              {saving ? <Loader2 className="size-4 animate-spin" /> : <ShieldAlert className="size-4" />}
+              Save Billing Settings
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </AdminPage>
+  )
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  disabled,
+  type = "text",
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  disabled?: boolean
+  type?: string
+}) {
+  return (
+    <div className="grid gap-1.5">
+      <Label className="text-xs font-semibold text-muted-foreground">{label}</Label>
+      <Input type={type} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} className="bg-background" />
     </div>
-  );
+  )
+}
+
+function Toggle({
+  label,
+  checked,
+  onChange,
+  disabled,
+}: {
+  label: string
+  checked: boolean
+  onChange: (checked: boolean) => void
+  disabled?: boolean
+}) {
+  return (
+    <label className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+      <Switch checked={checked} disabled={disabled} onCheckedChange={onChange} />
+      {label}
+    </label>
+  )
 }

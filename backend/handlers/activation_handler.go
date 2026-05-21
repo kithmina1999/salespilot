@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
+	"github.com/kithmina1999/salespilot/platform"
 )
 
 // ── Launch Promotion ─────────────────────────────────────────────────────────
@@ -57,19 +58,26 @@ func CreateActivationCode(c *gin.Context) {
 		DurationDays int    `json:"duration_days" binding:"required"`
 		Note         string `json:"note"`
 		TargetPhone  string `json:"target_phone"` // optional: lock code to a specific tenant phone
+		Reason       string `json:"reason" binding:"required"`
+		Confirm      string `json:"confirm"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "plan, billing_cycle, and duration_days are required: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "plan, billing_cycle, duration_days, and reason are required: " + err.Error()})
+		return
+	}
+
+	if err := ValidateHighRiskAction(req.Reason, req.Confirm, "GENERATE CODE"); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	// Validate plan
 	planNorm := strings.ToLower(req.Plan)
 	validPlans := map[string]bool{
-    "starter": true,
-    "pro":     true,
-    "free":    true,
-}
+		"starter": true,
+		"pro":     true,
+		"free":    true,
+	}
 	if !validPlans[planNorm] {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid plan. Use: starter, pro, or free"})
 		return
@@ -151,6 +159,20 @@ func ListActivationCodes(c *gin.Context) {
 // ─────────────────────────────────────────────────────────────────
 func RevokeActivationCode(c *gin.Context) {
 	codeStr := c.Param("code")
+
+	var req struct {
+		Reason  string `json:"reason" binding:"required"`
+		Confirm string `json:"confirm"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "reason is required: " + err.Error()})
+		return
+	}
+
+	if err := ValidateHighRiskAction(req.Reason, req.Confirm, "REVOKE CODE"); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	var code models.ActivationCode
 	if err := database.DB.Where("code = ?", codeStr).First(&code).Error; err != nil {
@@ -258,12 +280,23 @@ func RedeemActivationCode(c *gin.Context) {
 	// First activation bonus — only applies during launch promotion period
 	isFirstActivation := biz.BillingCycle == "" && biz.PlanExpiresAt == nil
 	bonusApplied := isFirstActivation && promoIsActive()
-	newAILimit := 3000     // Standard: 3,000 AI replies/month
-	newRuleGenLimit := 100 // Standard: 100 AI rule generations/month
-	if bonusApplied {
-		newAILimit = 4000     // First-activation bonus: +1,000 extra AI replies
-		newRuleGenLimit = 150 // First-activation bonus: +50 extra rule generations
+	ent, err := platform.GetPlanEntitlements(database.DB, code.Plan)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load plan entitlements"})
+		return
 	}
+	newAILimit := ent.MaxAIMessages
+	newRuleGenLimit := ent.MaxRuleGens
+	if bonusApplied {
+		if newAILimit > 0 {
+			newAILimit += 1000
+		}
+		if newRuleGenLimit > 0 {
+			newRuleGenLimit += 50
+		}
+	}
+
+	newSimulationLimit := ent.MaxSimulations
 
 	// Upgrade the business plan and clear the trial (trial ends when paid plan begins)
 	updates := map[string]interface{}{
@@ -272,10 +305,11 @@ func RedeemActivationCode(c *gin.Context) {
 		"plan_expires_at":       newExpiry,
 		"ai_message_limit":      newAILimit,
 		"rule_generation_limit": newRuleGenLimit,
+		"simulation_limit":      newSimulationLimit,
 		"trial_expires_at":      nil, // Clear trial — paid plan is now active
 	}
 	// Use Session(&gorm.Session{}) with Select("*") to allow writing nil (zero) values
-	database.DB.Model(&biz).Select("plan", "billing_cycle", "plan_expires_at", "ai_message_limit", "rule_generation_limit", "trial_expires_at").Updates(updates)
+	database.DB.Model(&biz).Select("plan", "billing_cycle", "plan_expires_at", "ai_message_limit", "rule_generation_limit", "simulation_limit", "trial_expires_at").Updates(updates)
 
 	// Mark code as used
 	usedAt := time.Now()

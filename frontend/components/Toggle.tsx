@@ -38,7 +38,7 @@ export default function Toggle({ checked, defaultChecked = false, onChange, disa
       onClick={handleToggle}
       className={`group relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-all duration-300 ease-in-out shadow-inner focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 active:scale-95 ${
         disabled ? 'cursor-not-allowed opacity-50' : ''
-      } ${internalChecked ? 'bg-emerald-500 hover:bg-emerald-400' : 'bg-zinc-800 hover:bg-zinc-700'}`}
+      } ${internalChecked ? 'bg-emerald-500 hover:bg-emerald-400' : 'bg-secondary hover:bg-border'}`}
     >
       {/* <span className="sr-only">Toggle</span>  */}
       <span

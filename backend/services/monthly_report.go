@@ -20,7 +20,7 @@ import (
 // Pro   → Gemini 3.1 Pro  → "Advanced Business Intelligence Report"
 // Starter → Gemini 3.1 Flash Lite → "Business Summary Report"
 const (
-	geminiProModel     = "gemini-3.1-pro"       // Pro tier: deep strategic analysis
+	geminiProModel     = "gemini-3.1-pro"        // Pro tier: deep strategic analysis
 	geminiStarterModel = "gemini-3.1-flash-lite" // Starter tier: concise smart summary
 )
 
@@ -28,10 +28,10 @@ const (
 
 type reportStats struct {
 	BusinessName     string
-	Month            string    // "March 2026"
-	MonthKey         string    // "2026-03"
+	Month            string // "March 2026"
+	MonthKey         string // "2026-03"
 	Plan             string
-	Language         string   // "sinhala_first" | "english_first"
+	Language         string // "sinhala_first" | "english_first"
 	RevenueThisMonth float64
 	RevenuePrevMonth float64
 	OrdersTotal      int

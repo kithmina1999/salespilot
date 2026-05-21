@@ -95,8 +95,8 @@ func RevokeAllOtherSessions(c *gin.Context) {
 		Update("revoked_at", &now)
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":  "All other sessions have been revoked.",
-		"revoked":  result.RowsAffected,
+		"message": "All other sessions have been revoked.",
+		"revoked": result.RowsAffected,
 	})
 }
 

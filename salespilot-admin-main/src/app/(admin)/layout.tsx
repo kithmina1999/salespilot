@@ -1,314 +1,178 @@
-"use client";
+"use client"
 
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation"
+import { useState } from "react"
 import {
-  LayoutDashboard,
-  Building2,
-  KeyRound,
-  ScrollText,
-  DollarSign,
-  Settings2,
-  LogOut,
-  Shield,
-  ChevronRight,
   BookOpen,
-} from "lucide-react";
+  Building2,
+  ChevronRight,
+  KeyRound,
+  LayoutDashboard,
+  LogOut,
+  ScrollText,
+  Settings2,
+  Shield,
+  BarChart3,
+} from "lucide-react"
+
+import { ThemeToggle } from "@/components/theme-toggle"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarSeparator,
+} from "@/components/ui/sidebar"
+import { RequireAuth } from "@/components/auth/require-auth"
+import { api } from "@/lib/api"
+import { useAuth } from "@/lib/auth-context"
 
 const navItems = [
-  { href: "/dashboard",           label: "Dashboard",         icon: LayoutDashboard,  section: "main" },
-  { href: "/businesses",          label: "Businesses",        icon: Building2,         section: "main" },
-  { href: "/activation-codes",    label: "Activation Codes",  icon: KeyRound,          section: "main" },
-  { href: "/audit-logs",          label: "Audit Logs",        icon: ScrollText,        section: "main" },
-  { href: "/revenue",             label: "Revenue",           icon: DollarSign,        section: "main" },
-  { href: "/global-rules",        label: "Global Rules",      icon: BookOpen,          section: "system" },
-  { href: "/platform-settings",   label: "Platform Settings", icon: Settings2,         section: "system" },
-];
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, section: "main" },
+  { href: "/businesses", label: "Businesses", icon: Building2, section: "main" },
+  { href: "/usage", label: "Usage & Quotas", icon: BarChart3, section: "main" },
+  { href: "/activation-codes", label: "Activation Codes", icon: KeyRound, section: "main" },
+  { href: "/audit-logs", label: "Audit Logs", icon: ScrollText, section: "main" },
+  { href: "/platform-settings", label: "Platform Settings", icon: Settings2, section: "system" },
+  { href: "/global-rules", label: "Global Rules", icon: BookOpen, section: "system" },
+]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const router = useRouter();
-  const [showLogout, setShowLogout] = useState(false);
+  const pathname = usePathname()
+  const router = useRouter()
+  const [showLogout, setShowLogout] = useState(false)
+  const { logout, admin } = useAuth()
 
-  function handleLogout() {
-    sessionStorage.removeItem("master_key");
-    router.push("/");
+  async function handleLogout() {
+    try {
+      await api.post("/system/auth/logout")
+    } catch {
+      // Logout should still clear local auth when the network request fails.
+    }
+    logout()
+    router.push("/")
   }
 
-  const mainNav = navItems.filter((i) => i.section === "main");
-  const systemNav = navItems.filter((i) => i.section === "system");
+  const mainNav = navItems.filter((item) => item.section === "main")
+  const systemNav = navItems.filter((item) => item.section === "system")
 
   function NavLink({ href, label, icon: Icon }: (typeof navItems)[0]) {
-    const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
+    const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href))
+
     return (
-      <Link
-        href={href}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.625rem",
-          padding: "0.5rem 0.625rem",
-          borderRadius: "0.5rem",
-          fontSize: "0.8375rem",
-          fontWeight: active ? 600 : 400,
-          color: active ? "var(--text)" : "var(--muted)",
-          background: active ? "var(--accent-glow)" : "transparent",
-          border: `1px solid ${active ? "rgba(99,102,241,0.2)" : "transparent"}`,
-          transition: "all 0.15s",
-          textDecoration: "none",
-          position: "relative",
-        }}
-        onMouseEnter={(e) => {
-          if (!active) {
-            e.currentTarget.style.background = "rgba(255,255,255,0.04)";
-            e.currentTarget.style.color = "var(--text)";
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!active) {
-            e.currentTarget.style.background = "transparent";
-            e.currentTarget.style.color = "var(--muted)";
-          }
-        }}
-      >
-        <Icon
-          size={15}
-          style={{ color: active ? "var(--accent)" : "currentColor", flexShrink: 0 }}
-        />
-        <span style={{ flex: 1 }}>{label}</span>
-        {active && (
-          <ChevronRight size={13} style={{ color: "var(--accent)", opacity: 0.7 }} />
-        )}
-      </Link>
-    );
+      <SidebarMenuButton isActive={active} render={<Link href={href} />}>
+        <Icon className="size-4 shrink-0 text-current transition-colors" />
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        {active && <ChevronRight className="size-3.5 text-primary/80" />}
+      </SidebarMenuButton>
+    )
   }
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg)" }}>
-      {/* Sidebar */}
-      <aside
-        style={{
-          width: "220px",
-          flexShrink: 0,
-          display: "flex",
-          flexDirection: "column",
-          height: "100vh",
-          position: "sticky",
-          top: 0,
-          background: "var(--surface)",
-          borderRight: "1px solid var(--border)",
-          padding: "1.25rem 0.875rem",
-          gap: "0",
-        }}
-      >
-        {/* Logo */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", padding: "0 0.375rem", marginBottom: "1.75rem" }}>
-          <div
-            style={{
-              width: "30px",
-              height: "30px",
-              borderRadius: "8px",
-              background: "linear-gradient(135deg, var(--accent-dim), var(--accent))",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 4px 12px var(--accent-glow2)",
-              flexShrink: 0,
-            }}
-          >
-            <Shield size={15} color="#fff" strokeWidth={2.5} />
-          </div>
-          <div>
-            <div style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text)", lineHeight: 1.2, letterSpacing: "-0.01em" }}>
-              SalesPilot
+    <RequireAuth>
+      <SidebarProvider>
+        <Sidebar>
+          <SidebarHeader>
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
+              SA
             </div>
-            <div style={{ fontSize: "0.65rem", color: "var(--accent)", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-              Super Admin
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-foreground">
+                {admin?.name || "Super Admin"}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">
+                {admin?.email || "admin@salespilot.lk"}
+              </p>
             </div>
-          </div>
-        </div>
+            <ThemeToggle />
+          </SidebarHeader>
 
-        {/* Main Nav */}
-        <nav style={{ display: "flex", flexDirection: "column", gap: "2px", flex: 1 }}>
-          {mainNav.map((item) => (
-            <NavLink key={item.href} {...item} />
-          ))}
+          <SidebarContent>
+            <SidebarMenu>
+              {mainNav.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <NavLink {...item} />
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
 
-          {/* Divider */}
-          <div style={{ height: "1px", background: "var(--border)", margin: "0.75rem 0.25rem" }} />
+            <SidebarSeparator />
 
-          {systemNav.map((item) => (
-            <NavLink key={item.href} {...item} />
-          ))}
-        </nav>
+            <SidebarMenu>
+              {systemNav.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <NavLink {...item} />
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarContent>
 
-        {/* Bottom: admin badge + logout */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", paddingTop: "0.75rem", borderTop: "1px solid var(--border)" }}>
-          <div
-            style={{
-              padding: "0.5rem 0.625rem",
-              background: "var(--accent-glow)",
-              border: "1px solid rgba(99,102,241,0.15)",
-              borderRadius: "0.5rem",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-            }}
-          >
-            <div
-              style={{
-                width: "24px",
-                height: "24px",
-                borderRadius: "6px",
-                background: "var(--accent)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              <Shield size={13} color="#fff" strokeWidth={2.5} />
-            </div>
-            <div>
-              <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text)", lineHeight: 1.2 }}>Super Admin</div>
-              <div style={{ fontSize: "0.65rem", color: "var(--muted)", lineHeight: 1.2 }}>Full access</div>
-            </div>
-          </div>
-
-          <button
-            onClick={() => setShowLogout(true)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.625rem",
-              padding: "0.5rem 0.625rem",
-              borderRadius: "0.5rem",
-              fontSize: "0.8375rem",
-              fontWeight: 500,
-              color: "var(--muted)",
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              width: "100%",
-              textAlign: "left",
-              transition: "all 0.15s",
-              fontFamily: "inherit",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(239,68,68,0.08)";
-              e.currentTarget.style.color = "#ef4444";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.color = "var(--muted)";
-            }}
-          >
-            <LogOut size={15} />
-            Sign Out
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main style={{ flex: 1, height: "100vh", overflowY: "auto", background: "var(--bg)" }}>
-        <div style={{ padding: "2.5rem 2.75rem", maxWidth: "1300px", margin: "0 auto", minHeight: "100%" }}>
-          {children}
-        </div>
-      </main>
-
-      {/* Logout Confirmation Modal */}
-      {showLogout && (
-        <div
-          className="animate-fade-in"
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.7)",
-            backdropFilter: "blur(6px)",
-            zIndex: 50,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "1rem",
-          }}
-        >
-          <div
-            className="animate-fade-up"
-            style={{
-              background: "var(--surface-2)",
-              border: "1px solid var(--border-2)",
-              borderRadius: "1.25rem",
-              padding: "1.75rem",
-              maxWidth: "360px",
-              width: "100%",
-              boxShadow: "0 24px 60px rgba(0,0,0,0.5)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.75rem" }}>
-              <div
-                style={{
-                  width: "40px",
-                  height: "40px",
-                  borderRadius: "12px",
-                  background: "rgba(239,68,68,0.1)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <LogOut size={20} color="#ef4444" />
+          <SidebarFooter>
+            <div className="flex min-h-10 items-center gap-2 rounded-md border border-primary/15 bg-primary/10 px-2.5 py-2">
+              <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                <Shield className="size-3.5" strokeWidth={2.5} />
               </div>
-              <h3 style={{ fontSize: "1rem", fontWeight: 700, color: "var(--text)" }}>Sign Out</h3>
+              <div className="min-w-0">
+                <div className="text-xs font-bold leading-tight text-foreground">Super Admin</div>
+                <div className="text-[0.68rem] leading-tight text-muted-foreground">Full access</div>
+              </div>
             </div>
-            <p style={{ fontSize: "0.875rem", color: "var(--muted)", marginBottom: "1.5rem", lineHeight: 1.6 }}>
-              Are you sure you want to sign out of the super admin panel?
-            </p>
-            <div style={{ display: "flex", gap: "0.625rem", justifyContent: "flex-end" }}>
-              <button
-                onClick={() => setShowLogout(false)}
-                style={{
-                  padding: "0.5rem 1.125rem",
-                  borderRadius: "0.625rem",
-                  fontSize: "0.875rem",
-                  fontWeight: 600,
-                  color: "var(--text)",
-                  background: "transparent",
-                  border: "1px solid var(--border-2)",
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  transition: "background 0.15s",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleLogout}
-                style={{
-                  padding: "0.5rem 1.125rem",
-                  borderRadius: "0.625rem",
-                  fontSize: "0.875rem",
-                  fontWeight: 600,
-                  color: "#fff",
-                  background: "var(--danger)",
-                  border: "none",
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  boxShadow: "0 4px 12px rgba(239,68,68,0.3)",
-                  transition: "opacity 0.15s",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.85")}
-                onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-              >
-                Sign Out
-              </button>
-            </div>
+
+            <Button
+              onClick={() => setShowLogout(true)}
+              variant="ghost"
+              className="justify-start text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+            >
+              <LogOut className="size-4" />
+              Sign Out
+            </Button>
+          </SidebarFooter>
+        </Sidebar>
+
+        <SidebarInset>
+          <div className="mx-auto min-h-full w-full max-w-[1440px] px-6 py-7 sm:px-8 lg:px-10">
+            {children}
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </SidebarInset>
+
+        <Dialog open={showLogout} onOpenChange={setShowLogout}>
+          <DialogContent showCloseButton={false}>
+            <DialogHeader>
+              <div className="mb-1 flex items-center gap-3">
+                <span className="flex size-10 items-center justify-center rounded-xl border border-destructive/20 bg-destructive/10 text-destructive">
+                  <LogOut className="size-5" />
+                </span>
+                <DialogTitle>Sign Out</DialogTitle>
+              </div>
+              <DialogDescription>
+                Are you sure you want to sign out of the super admin panel?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+              <Button onClick={handleLogout} variant="destructive">
+                Sign Out
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </SidebarProvider>
+    </RequireAuth>
+  )
 }

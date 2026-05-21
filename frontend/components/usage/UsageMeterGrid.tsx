@@ -17,8 +17,8 @@ function formatBytes(bytes: number): string {
 function Tooltip({ text }: { text: string }) {
   return (
     <span className="group relative inline-flex items-center cursor-help ml-1">
-      <HelpCircle size={11} className="text-zinc-700 group-hover:text-zinc-500 transition-colors" />
-      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 text-[11px] leading-snug bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-normal">
+      <HelpCircle size={11} className="text-zinc-700 group-hover:text-muted-foreground transition-colors" />
+      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 text-[11px] leading-snug bg-secondary text-muted-foreground border border-border rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-normal">
         {text}
       </span>
     </span>
@@ -40,7 +40,7 @@ function UsageBar({ used, limit }: { used: number; limit: number }) {
     '';
 
   return (
-    <div className="h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden">
+    <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
       <div
         className={`h-full rounded-full transition-all duration-700 ease-out ${color} ${glow}`}
         style={{ width: `${pct}%` }}
@@ -69,17 +69,17 @@ function MetricCard({ icon, label, tooltip, used, limit, isLocked, displayUsed, 
   return (
     <div className={`rounded-xl border p-4 space-y-2.5 transition-all ${
       isLocked
-        ? 'bg-zinc-950/50 border-zinc-800/40 opacity-60'
-        : 'bg-zinc-950 border-zinc-800/60 hover:border-zinc-700/60'
+        ? 'bg-background/50 border-border/40 opacity-60'
+        : 'bg-background border-border/60 hover:border-border/60'
     }`}>
       {/* Label row */}
       <div className="flex items-center justify-between">
-        <span className={`flex items-center gap-1.5 text-xs font-bold ${isLocked ? 'text-zinc-600' : 'text-zinc-300'}`}>
+        <span className={`flex items-center gap-1.5 text-xs font-bold ${isLocked ? 'text-zinc-600' : 'text-muted-foreground'}`}>
           {icon}
           {label}
           <Tooltip text={tooltip} />
         </span>
-        <span className={`text-xs font-bold tabular-nums ${isLocked ? 'text-zinc-700' : 'text-zinc-400'}`}>
+        <span className={`text-xs font-bold tabular-nums ${isLocked ? 'text-zinc-700' : 'text-muted-foreground'}`}>
           {isLocked ? '—' : (
             <>
               {displayUsed ?? used.toLocaleString()}
@@ -132,11 +132,11 @@ export default function UsageMeterGrid() {
 
   if (!usage) {
     return (
-      <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
-        <p className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-4">Monthly Usage</p>
+      <div className="bg-card border border-border rounded-2xl p-6">
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">Monthly Usage</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-[88px] rounded-xl bg-zinc-900 border border-zinc-800/60 animate-pulse" />
+            <div key={i} className="h-[88px] rounded-xl bg-muted border border-border/60 animate-pulse" />
           ))}
         </div>
       </div>
@@ -197,11 +197,11 @@ export default function UsageMeterGrid() {
   ];
 
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
+    <div className="bg-card border border-border rounded-2xl p-6">
       <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Monthly Usage</p>
-          <p className="text-sm text-zinc-400 mt-1">{usageContext}</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Monthly Usage</p>
+          <p className="text-sm text-muted-foreground mt-1">{usageContext}</p>
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

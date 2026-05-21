@@ -13,7 +13,7 @@ import PaymentsTab from './_components/PaymentsTab';
 import { useLocale } from '@/lib/locale';
 
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+import { API_URL } from '@/hooks/_shared';
 
 export type BusinessSettings = {
   name: string;

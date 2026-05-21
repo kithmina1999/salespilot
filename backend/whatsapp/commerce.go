@@ -79,7 +79,7 @@ func SendMultiProductMessage(phoneNumberID, accessToken, to, catalogID, headerTe
 			})
 		}
 		waSections = append(waSections, map[string]interface{}{
-			"title":    s.Title,
+			"title":         s.Title,
 			"product_items": rows,
 		})
 	}
@@ -115,6 +115,12 @@ type ProductSection struct {
 
 // sendInteractive is a low-level helper that POSTs to the WA messages endpoint.
 func sendInteractive(phoneNumberID, accessToken string, payload map[string]interface{}) error {
+	// Simulator bypass
+	if to, ok := payload["to"].(string); ok && to == "99900000000" {
+		log.Printf("🏖️ [SANDBOX] sendInteractive to %s: type=%v", to, payload["type"])
+		return nil
+	}
+
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("commerce: marshal payload: %w", err)

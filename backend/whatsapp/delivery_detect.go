@@ -97,8 +97,8 @@ func getLatestShippedOrder(businessID uint, phone string) *models.Order {
 // any pending late-delivery alert.
 func markShippedOrderDelivered(order *models.Order) {
 	database.DB.Model(order).Updates(map[string]interface{}{
-		"status":            models.OrderStatusDelivered,
-		"late_alert_sent":   true, // suppress pending late alert
+		"status":              models.OrderStatusDelivered,
+		"late_alert_sent":     true, // suppress pending late alert
 		"delivery_check_sent": true,
 	})
 }

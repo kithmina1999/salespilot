@@ -71,10 +71,10 @@ func StartCronJobs() {
 func checkExpiredPlans() {
 	now := time.Now()
 	var businesses []models.Business
-	
+
 	// Find businesses where the plan has expired
 	database.DB.Where("plan_expires_at IS NOT NULL AND plan_expires_at < ? AND plan != ?", now, models.PlanFree).Find(&businesses)
-	
+
 	for _, biz := range businesses {
 		log.Printf("⚠️ Plan expired for business %d (%s) — Downgrading to Free", biz.ID, biz.Name)
 		database.DB.Model(&biz).Updates(map[string]interface{}{
@@ -87,10 +87,10 @@ func checkExpiredPlans() {
 func checkExpiredTrials() {
 	now := time.Now()
 	var businesses []models.Business
-	
+
 	// The trial sets an ai_message_limit during the trial. When it expires, AI limit goes to 0 (since they are Free plan)
 	database.DB.Where("trial_expires_at IS NOT NULL AND trial_expires_at < ? AND ai_message_limit > 0", now).Find(&businesses)
-	
+
 	for _, biz := range businesses {
 		log.Printf("⏱ Trial expired for business %d (%s) — Reverting AI limit", biz.ID, biz.Name)
 		database.DB.Model(&biz).Updates(map[string]interface{}{

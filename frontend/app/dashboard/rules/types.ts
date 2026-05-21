@@ -1,5 +1,6 @@
 export interface Rule {
   ID: number;
+  category: string;
   business_id: number | null;
   keywords: string;
   responses: string; // JSON: {"en":"...","si":"...","ta":"..."}

@@ -72,7 +72,6 @@ func discordWebhookURL(level AlertLevel) string {
 	}
 }
 
-
 // ── Convenience helpers ───────────────────────────────────────────────────────
 
 // AlertGeminiFailure fires a critical alert when the Gemini API call fails for a tenant.

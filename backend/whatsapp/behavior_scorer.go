@@ -117,10 +117,11 @@ func (s *BehaviorScorer) RecordMessageInCheckout(_ string, _ time.Time, _ string
 // This is the primary method for multi-tenant spam detection.
 //
 // All signals are computed independently and accumulated into a running score:
-//   +3  Same message repeated >= 2 consecutive times
-//   +2  Message contains a URL/link
-//   +2  Extreme burst: >15 messages in 30 seconds
-//   The running score decays by 2 per varied (non-repeated) message.
+//
+//	+3  Same message repeated >= 2 consecutive times
+//	+2  Message contains a URL/link
+//	+2  Extreme burst: >15 messages in 30 seconds
+//	The running score decays by 2 per varied (non-repeated) message.
 func (s *BehaviorScorer) RecordMessageForKey(scopeKey string, _ time.Time, text string) BehaviorScore {
 	scoreDelta := 0
 

@@ -109,3 +109,34 @@ func SuperAdminRequired() gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// RequireBusinessActive ensures the business is not softly suspended.
+// This should be chained after AuthRequired for routes that write data.
+func RequireBusinessActive() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		businessID, exists := c.Get("business_id")
+		if !exists {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Missing business context"})
+			c.Abort()
+			return
+		}
+
+		var biz models.Business
+		if err := database.DB.First(&biz, businessID).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load business context"})
+			c.Abort()
+			return
+		}
+
+		if biz.SuspendedAt != nil {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error":   "business_suspended",
+				"message": "This business is suspended. Read-only access allowed.",
+				"reason":  biz.SuspendedReason,
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
