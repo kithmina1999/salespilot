@@ -11,6 +11,8 @@ import (
 	"github.com/kithmina1999/salespilot/whatsapp"
 )
 
+const sandboxSimulatorPhone = "99900000000"
+
 // SimulateMessage allows a merchant to test their bot logic without using WhatsApp.
 func SimulateMessage(c *gin.Context) {
 	businessID := c.GetUint("business_id")
@@ -34,10 +36,8 @@ func SimulateMessage(c *gin.Context) {
 	}
 
 	// 1. Create a dummy incoming message using the sandbox phone number
-	sandboxPhone := "99900000000"
-
 	incoming := whatsapp.IncomingMessage{
-		From:      sandboxPhone,
+		From:      sandboxSimulatorPhone,
 		Text:      req.Message,
 		PushName:  "Sandbox Simulator",
 		Timestamp: fmt.Sprintf("%d", time.Now().Unix()),
@@ -47,6 +47,16 @@ func SimulateMessage(c *gin.Context) {
 	// We run it synchronously so we can return success immediately.
 	pipeline := whatsapp.NewPipeline()
 	pipeline.HandleIncomingMessage(&business, incoming)
+
+	database.DB.Model(&models.Customer{}).
+		Where("business_id = ? AND phone = ?", businessID, sandboxSimulatorPhone).
+		Updates(map[string]interface{}{
+			"name": "Sandbox Simulator",
+			"tags": "simulation,test",
+		})
+	database.DB.Model(&models.Message{}).
+		Where("business_id = ? AND phone = ? AND role = ? AND is_read = false", businessID, sandboxSimulatorPhone, "user").
+		Update("is_read", true)
 
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "Simulated successfully"})
 }
@@ -59,6 +69,6 @@ func ClearSimulation(c *gin.Context) {
 		return
 	}
 
-	database.DB.Where("business_id = ? AND phone = ?", businessID, "99900000000").Delete(&models.Message{})
+	database.DB.Where("business_id = ? AND phone = ?", businessID, sandboxSimulatorPhone).Delete(&models.Message{})
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "Simulation cleared"})
 }

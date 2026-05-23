@@ -9,12 +9,13 @@ import { AdminBadge } from "@/components/admin/page";
 import { UsageStats } from "./components/UsageStats";
 import { UsageTable } from "./components/UsageTable";
 import { ResetUsageDialog } from "./components/ResetUsageDialog";
+import type { UsageBusiness } from "./types";
 
 export default function UsageMonitorPage() {
   const [filterPlan, setFilterPlan] = useState("all");
   const [nearLimitOnly, setNearLimitOnly] = useState(false);
   
-  const [resetTarget, setResetTarget] = useState<any | null>(null);
+  const [resetTarget, setResetTarget] = useState<UsageBusiness | null>(null);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
 
   const { data: metricsData, isLoading: loadingMetrics, mutate: mutateMetrics } = useSWR(
@@ -27,7 +28,7 @@ export default function UsageMonitorPage() {
     (url: string) => api.get(url).then(res => res.data)
   );
 
-  const handleResetClick = (business: any) => {
+  const handleResetClick = (business: UsageBusiness) => {
     setResetTarget(business);
     setIsResetDialogOpen(true);
   };

@@ -85,12 +85,15 @@ func HandleWebhook(c *gin.Context) {
 		return
 	}
 
-	// Immediately ACK to Meta (must respond within 20s or Meta retries)
-	c.JSON(http.StatusOK, gin.H{"status": "ok"})
-
-	utils.EnqueueWebhook(func() {
+	if ok := utils.EnqueueWebhook(func() {
 		processWebhookPayload(payload)
-	})
+	}); !ok {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Webhook queue full"})
+		return
+	}
+
+	// ACK Meta only after the payload is safely queued for processing.
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 // MetaWebhookPayload is the top-level structure Meta sends.
@@ -198,6 +201,21 @@ func processWebhookPayload(payload MetaWebhookPayload) {
 			}
 
 			for _, msg := range change.Value.Messages {
+				const staleThreshold = 60 * time.Minute
+				if ts, err := strconv.ParseInt(msg.Timestamp, 10, 64); err == nil {
+					msgTime := time.Unix(ts, 0)
+					if time.Since(msgTime) > staleThreshold {
+						log.Printf("⏱️ [Webhook] Stale message from %s (age=%v) — dropping",
+							msg.From, time.Since(msgTime).Round(time.Second))
+						continue
+					}
+				}
+
+				if msg.Type == "image" && isAlreadyProcessed(msg.ID) {
+					log.Printf("⚡ [Webhook] Duplicate msg.ID=%s from %s — skipping", msg.ID, msg.From)
+					continue
+				}
+
 				var text string
 
 				switch msg.Type {
@@ -236,16 +254,15 @@ func processWebhookPayload(payload MetaWebhookPayload) {
 						log.Printf("🖼️ [%s] Image received from %s (media_id=%s)", business.Name, msg.From, msg.Image.ID)
 						normalizedFrom := utils.NormalizePhone(msg.From)
 						pushName := nameMap[msg.From]
-						// Capture loop variables for the goroutine
 						bizCopy := business
 						msgCopy := msg
-						go func() {
-							waitMsg := localizedWaitMessage(&bizCopy)
-							SendText(bizCopy.WAPhoneNumberID, bizCopy.WAAccessToken, normalizedFrom, waitMsg)
-							utils.EnqueueWebhook(func() {
-								HandleImageWebhook(&bizCopy, normalizedFrom, msgCopy.From, msgCopy.Image.ID, pushName)
-							})
-						}()
+						waitMsg := localizedWaitMessage(&bizCopy)
+						SendText(bizCopy.WAPhoneNumberID, bizCopy.WAAccessToken, normalizedFrom, waitMsg)
+						if ok := utils.EnqueueWebhook(func() {
+							HandleImageWebhook(&bizCopy, normalizedFrom, msgCopy.From, msgCopy.Image.ID, pushName)
+						}); !ok {
+							log.Printf("⚠️ [Webhook] Worker queue full while routing image msg.ID=%s from %s", msg.ID, msg.From)
+						}
 					}
 					continue
 				default:
@@ -259,13 +276,13 @@ func processWebhookPayload(payload MetaWebhookPayload) {
 
 				// ── Stale message filter ────────────────────────────────────
 				// Meta retries failed deliveries for up to 72 hours. Messages
-				// older than 5 minutes are almost certainly queued retries from
+				// older than 60 minutes are almost certainly queued retries from
 				// a previous connectivity issue — drop them silently so the bot
 				// doesn't replay old conversations.
-				const staleThreshold = 5 * time.Minute
+				const secondaryStaleThreshold = 60 * time.Minute
 				if ts, err := strconv.ParseInt(msg.Timestamp, 10, 64); err == nil {
 					msgTime := time.Unix(ts, 0)
-					if time.Since(msgTime) > staleThreshold {
+					if time.Since(msgTime) > secondaryStaleThreshold {
 						log.Printf("⏱️ [Webhook] Stale message from %s (age=%v) — dropping",
 							msg.From, time.Since(msgTime).Round(time.Second))
 						continue

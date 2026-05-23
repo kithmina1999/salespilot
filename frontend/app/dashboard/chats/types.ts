@@ -28,11 +28,12 @@ export interface Customer {
 }
 
 export interface Order {
-  ID: number;
+  id: number;
+  order_num?: number;
   status: string;
   total_price: number;
   items: string;
-  CreatedAt: string;
+  created_at: string;
 }
 
 export type MobileView = 'inbox' | 'chat' | 'crm';

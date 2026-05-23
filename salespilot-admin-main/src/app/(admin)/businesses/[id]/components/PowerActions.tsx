@@ -4,16 +4,17 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { ShieldAlert, Save, Lock } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import type { BusinessDetail } from "../types";
 
-function getApiErrorMessage(err: any) {
+function getApiErrorMessage(err: unknown) {
   if (typeof err === "object" && err !== null && "response" in err) {
-    const response = (err as any).response;
+    const response = (err as { response?: { data?: { error?: string } } }).response;
     if (response?.data?.error) return response.data.error;
   }
   return err instanceof Error ? err.message : "Request failed";
 }
 
-export function PowerActions({ business, id, mutate }: { business: any, id: string, mutate: () => void }) {
+export function PowerActions({ business, id, mutate }: { business: BusinessDetail, id: string, mutate: () => void }) {
   const [plan, setPlan] = useState(business.plan || "free");
   const [cycle, setCycle] = useState(business.billing_cycle || "");
   const [expiry, setExpiry] = useState(business.plan_expires_at ? new Date(business.plan_expires_at).toISOString().split("T")[0] : "");

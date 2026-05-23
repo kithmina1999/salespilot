@@ -53,8 +53,8 @@ export default function SettingsPage() {
     { id: 'language',  label: t('settings.language'),  icon: Globe,         color: 'text-blue-400'    },
     { id: 'payments',  label: 'Payments',               icon: Banknote,      color: 'text-emerald-400' },
     { id: 'security',  label: t('settings.security'),  icon: Shield,        color: 'text-blue-400'    },
-    { id: 'blacklist', label: 'Blocked Numbers',        icon: ShieldCheck,   color: 'text-red-400'     },
-    { id: 'audit',     label: t('nav.reports'),         icon: History,       color: 'text-purple-400'  },
+    { id: 'blacklist', label: t('settings.blocked_numbers'),        icon: ShieldCheck,   color: 'text-red-400'     },
+    { id: 'audit',     label: t('settings.audit_logs'),         icon: History,       color: 'text-purple-400'  },
     { id: 'reports',   label: t('nav.reports'),         icon: Bell,          color: 'text-amber-400'   },
     { id: 'danger',    label: 'Danger Zone',            icon: AlertTriangle, color: 'text-red-500'     },
   ];

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"fmt"
-	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -50,7 +49,11 @@ func RequestPasswordChangeOTP(c *gin.Context) {
 	database.DB.Where("user_id = ? AND used_at IS NULL", userID).Delete(&models.PasswordChangeToken{})
 
 	// Generate 6-digit OTP
-	otp := fmt.Sprintf("%06d", rand.Intn(1000000))
+	otp, err := generateSixDigitOTP()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate verification code"})
+		return
+	}
 
 	record := models.PasswordChangeToken{
 		UserID:    userID,

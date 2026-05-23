@@ -76,7 +76,7 @@ export default function ProductsPage() {
     e.preventDefault();
     const price = Number.parseFloat(form.price);
     const stock = Number.parseInt(form.stock, 10);
-    if (!Number.isFinite(price) || price < 0) {
+    if (!Number.isFinite(price) || price <= 0) {
       toast.error('Enter a valid product price');
       return;
     }
@@ -341,7 +341,7 @@ export default function ProductsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-semibold text-zinc-400 block mb-1.5">Price (Rs.) *</label>
-                  <input required type="number" min="0" step="0.01" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })}
+                  <input required type="number" min="0.01" step="0.01" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })}
                     className="w-full px-3 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm font-mono outline-none focus:border-zinc-600 text-white transition-colors" />
                 </div>
                 <div>

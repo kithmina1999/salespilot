@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"fmt"
-	"math/rand"
 	"net/http"
 	"time"
 
@@ -141,7 +140,11 @@ func ResendEmailOTP(c *gin.Context) {
 	// Invalidate previous OTPs
 	database.DB.Where("email = ? AND used_at IS NULL", user.Email).Delete(&models.EmailVerificationToken{})
 
-	otp := fmt.Sprintf("%06d", rand.Intn(1000000))
+	otp, err := generateSixDigitOTP()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate verification code"})
+		return
+	}
 	record := models.EmailVerificationToken{
 		Email:     user.Email,
 		OTP:       otp,

@@ -5,9 +5,9 @@ package handlers
 // Endpoints for merchants to list, approve, and reject customer payment proofs.
 //
 // Routes (registered in main.go):
-//   GET    /api/v1/orders/proofs           → ListOrderProofs
-//   POST   /api/v1/orders/proofs/:id/approve → ApproveOrderProof
-//   POST   /api/v1/orders/proofs/:id/reject  → RejectOrderProof
+//   GET    /api/v1/order-proofs             → ListOrderProofs
+//   POST   /api/v1/order-proofs/:id/approve → ApproveOrderProof
+//   POST   /api/v1/order-proofs/:id/reject  → RejectOrderProof
 
 import (
 	"fmt"
@@ -23,7 +23,7 @@ import (
 )
 
 // ListOrderProofs returns all pending/recent payment proofs for the merchant's orders.
-// GET /api/v1/orders/proofs
+// GET /api/v1/order-proofs
 func ListOrderProofs(c *gin.Context) {
 	businessID := c.GetUint("business_id")
 
@@ -74,7 +74,7 @@ func GetOrderProofs(c *gin.Context) {
 // - Sets order.Status = "confirmed"
 // - Notifies the customer via WhatsApp
 //
-// POST /api/v1/orders/proofs/:id/approve
+// POST /api/v1/order-proofs/:id/approve
 func ApproveOrderProof(c *gin.Context) {
 	businessID := c.GetUint("business_id")
 	proofID, err := strconv.ParseUint(c.Param("id"), 10, 32)
@@ -157,7 +157,7 @@ func ApproveOrderProof(c *gin.Context) {
 // - Sets order.PaymentStatus = "rejected" (order stays "new" so customer can retry)
 // - Notifies the customer via WhatsApp with the rejection reason
 //
-// POST /api/v1/orders/proofs/:id/reject
+// POST /api/v1/order-proofs/:id/reject
 func RejectOrderProof(c *gin.Context) {
 	businessID := c.GetUint("business_id")
 	proofID, err := strconv.ParseUint(c.Param("id"), 10, 32)

@@ -62,7 +62,7 @@ func TestPaymentProof_CreatesRecordAndUpdateOrder(t *testing.T) {
 
 	// Simulate HandleImageWebhook routing to handlePaymentProofImage
 	// (we pass an empty URL for the test since Cloudinary isn't mocked here)
-	handlePaymentProofImage(&biz, order.CustomerPhone, order.CustomerPhone, "Screenshot of Sampath Bank transfer for Rs 5000")
+	handlePaymentProofImage(&biz, order.CustomerPhone, order.CustomerPhone, "Screenshot of Sampath Bank transfer for Rs 5000", "")
 
 	// 1. Verify OrderPaymentProof record was created
 	var proof models.OrderPaymentProof

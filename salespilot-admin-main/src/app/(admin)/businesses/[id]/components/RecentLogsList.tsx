@@ -1,7 +1,8 @@
 import { Activity, ShieldCheck, ArrowRight, AlertTriangle, Info, AlertCircle, Bot } from "lucide-react";
 import Link from "next/link";
+import type { AuditLog, PipelineLog } from "../types";
 
-export function RecentPipelineLogs({ logs, businessId }: { logs: any[], businessId: string }) {
+export function RecentPipelineLogs({ logs, businessId }: { logs: PipelineLog[], businessId: string }) {
   return (
     <div className="bg-card border border-border rounded-2xl flex flex-col overflow-hidden">
       <div className="flex items-center justify-between p-5 border-b border-border">
@@ -55,7 +56,7 @@ export function RecentPipelineLogs({ logs, businessId }: { logs: any[], business
   );
 }
 
-export function RecentAuditLogs({ logs, businessId }: { logs: any[], businessId: string }) {
+export function RecentAuditLogs({ logs, businessId }: { logs: AuditLog[], businessId: string }) {
   const getRiskIcon = (risk: string) => {
     switch (risk) {
       case "high": return <AlertTriangle className="w-3.5 h-3.5 text-destructive" />;

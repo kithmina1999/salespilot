@@ -192,6 +192,59 @@ func TestPaymentSettings_PutSavesFields(t *testing.T) {
 
 // TestPaymentSettings_DefaultsAllowCODTrue verifies that a new business
 // has AllowCOD=true (safe default) and AllowTransfer=false (opt-in only).
+func TestPaymentSettings_PutPaymentOnlyPreservesBotProfile(t *testing.T) {
+	original := map[string]interface{}{
+		"name":                "__test_payment_settings__",
+		"bot_name":            "Support Pilot",
+		"bot_personality":     "Friendly and concise",
+		"operating_hours":     "Mon-Sat 9AM-6PM",
+		"delivery_policy":     "Island-wide delivery in 3 days",
+		"meta_catalog_id":     "catalog_123",
+		"bot_reply_language":  "si",
+		"bot_supported_langs": "en,si,ta",
+		"response_language":   "english_first",
+		"allow_cod":           true,
+		"allow_transfer":      false,
+		"bank_details":        "Old bank details",
+	}
+	if err := database.DB.Model(&models.Business{}).Where("id = ?", testPaymentBizID).Updates(original).Error; err != nil {
+		t.Fatalf("failed to seed original settings: %v", err)
+	}
+
+	payload := `{
+		"allow_cod": true,
+		"allow_transfer": true,
+		"bank_details": "Bank: HNB\nAccount: 987654321\nName: Test Shop"
+	}`
+	c, w := newPUTContext(testPaymentBizID, payload)
+
+	UpdateBusinessSettings(c)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d â€” body: %s", w.Code, w.Body.String())
+	}
+
+	var biz models.Business
+	if err := database.DB.First(&biz, testPaymentBizID).Error; err != nil {
+		t.Fatalf("failed to reload business: %v", err)
+	}
+
+	if biz.BotName != original["bot_name"] ||
+		biz.BotPersonality != original["bot_personality"] ||
+		biz.OperatingHours != original["operating_hours"] ||
+		biz.DeliveryPolicy != original["delivery_policy"] ||
+		biz.MetaCatalogID != original["meta_catalog_id"] ||
+		biz.BotReplyLanguage != original["bot_reply_language"] ||
+		biz.BotSupportedLangs != original["bot_supported_langs"] ||
+		biz.ResponseLanguage != original["response_language"] {
+		t.Fatalf("payment-only update changed non-payment settings: %+v", biz)
+	}
+
+	if !biz.AllowTransfer || !strings.Contains(biz.BankDetails, "HNB") {
+		t.Fatalf("payment fields were not updated: allow_transfer=%v bank_details=%q", biz.AllowTransfer, biz.BankDetails)
+	}
+}
+
 func TestPaymentSettings_DefaultsAllowCODTrue(t *testing.T) {
 	biz := models.Business{
 		Name:   "__test_defaults__",

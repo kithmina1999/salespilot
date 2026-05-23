@@ -12,21 +12,44 @@ import (
 )
 
 type SettingsUpdateRequest struct {
-	Name           string `json:"name"`
-	BotName        string `json:"bot_name"`
-	BotPersonality string `json:"bot_personality"`
-	OperatingHours string `json:"operating_hours"`
-	DeliveryPolicy string `json:"delivery_policy"`
-	MetaCatalogID  string `json:"meta_catalog_id"`
+	Name           *string `json:"name"`
+	BotName        *string `json:"bot_name"`
+	BotPersonality *string `json:"bot_personality"`
+	OperatingHours *string `json:"operating_hours"`
+	DeliveryPolicy *string `json:"delivery_policy"`
+	MetaCatalogID  *string `json:"meta_catalog_id"`
 	// Language settings (new multi-language fields)
-	BotReplyLanguage  string `json:"bot_reply_language"`  // ISO 639-1 fallback lang
-	BotSupportedLangs string `json:"bot_supported_langs"` // comma-separated ISO codes
+	BotReplyLanguage  *string `json:"bot_reply_language"`  // ISO 639-1 fallback lang
+	BotSupportedLangs *string `json:"bot_supported_langs"` // comma-separated ISO codes
 	// Deprecated — kept for existing frontend compatibility
-	ResponseLanguage string `json:"response_language"`
+	ResponseLanguage *string `json:"response_language"`
 	// Payment configuration (Slice 1)
-	AllowCOD      *bool  `json:"allow_cod"`      // pointer so false is distinguishable from omitted
-	AllowTransfer *bool  `json:"allow_transfer"` // pointer so false is distinguishable from omitted
-	BankDetails   string `json:"bank_details"`
+	AllowCOD      *bool   `json:"allow_cod"`      // pointer so false is distinguishable from omitted
+	AllowTransfer *bool   `json:"allow_transfer"` // pointer so false is distinguishable from omitted
+	BankDetails   *string `json:"bank_details"`
+}
+
+func businessSettingsPayload(biz models.Business) gin.H {
+	return gin.H{
+		"id":                  biz.ID,
+		"name":                biz.Name,
+		"bot_name":            biz.BotName,
+		"plan":                biz.Plan,
+		"ai_message_count":    biz.AIMessageCount,
+		"ai_message_limit":    biz.AIMessageLimit,
+		"bot_personality":     biz.BotPersonality,
+		"operating_hours":     biz.OperatingHours,
+		"delivery_policy":     biz.DeliveryPolicy,
+		"onboarding_complete": biz.OnboardingComplete,
+		"wa_status":           biz.WAStatus,
+		"meta_catalog_id":     biz.MetaCatalogID,
+		"bot_reply_language":  biz.BotReplyLanguage,
+		"bot_supported_langs": biz.BotSupportedLangs,
+		"response_language":   biz.ResponseLanguage,
+		"allow_cod":           biz.AllowCOD,
+		"allow_transfer":      biz.AllowTransfer,
+		"bank_details":        biz.BankDetails,
+	}
 }
 
 // GetBusinessSettings returns the current business branding and rules
@@ -88,26 +111,36 @@ func UpdateBusinessSettings(c *gin.Context) {
 		return
 	}
 
-	if req.Name != "" {
-		biz.Name = req.Name
+	if req.Name != nil && *req.Name != "" {
+		biz.Name = *req.Name
 	}
-	biz.BotName = req.BotName
-	biz.BotPersonality = req.BotPersonality
-	biz.OperatingHours = req.OperatingHours
-	biz.DeliveryPolicy = req.DeliveryPolicy
-	biz.MetaCatalogID = req.MetaCatalogID
+	if req.BotName != nil {
+		biz.BotName = *req.BotName
+	}
+	if req.BotPersonality != nil {
+		biz.BotPersonality = *req.BotPersonality
+	}
+	if req.OperatingHours != nil {
+		biz.OperatingHours = *req.OperatingHours
+	}
+	if req.DeliveryPolicy != nil {
+		biz.DeliveryPolicy = *req.DeliveryPolicy
+	}
+	if req.MetaCatalogID != nil {
+		biz.MetaCatalogID = *req.MetaCatalogID
+	}
 
 	// Language fields — new multi-language engine
-	if req.BotReplyLanguage != "" {
-		biz.BotReplyLanguage = req.BotReplyLanguage
+	if req.BotReplyLanguage != nil && *req.BotReplyLanguage != "" {
+		biz.BotReplyLanguage = *req.BotReplyLanguage
 	}
-	if req.BotSupportedLangs != "" {
-		biz.BotSupportedLangs = req.BotSupportedLangs
+	if req.BotSupportedLangs != nil && *req.BotSupportedLangs != "" {
+		biz.BotSupportedLangs = *req.BotSupportedLangs
 	}
 	// Legacy compat: map old english_first/sinhala_first to new fields
-	if req.ResponseLanguage != "" {
-		biz.ResponseLanguage = req.ResponseLanguage
-		if req.ResponseLanguage == "english_first" && biz.BotReplyLanguage == "" {
+	if req.ResponseLanguage != nil && *req.ResponseLanguage != "" {
+		biz.ResponseLanguage = *req.ResponseLanguage
+		if *req.ResponseLanguage == "english_first" && biz.BotReplyLanguage == "" {
 			biz.BotReplyLanguage = "en"
 		}
 	}
@@ -119,7 +152,14 @@ func UpdateBusinessSettings(c *gin.Context) {
 	if req.AllowTransfer != nil {
 		biz.AllowTransfer = *req.AllowTransfer
 	}
-	biz.BankDetails = req.BankDetails
+	if req.BankDetails != nil {
+		biz.BankDetails = *req.BankDetails
+	}
+
+	if !biz.AllowCOD && !biz.AllowTransfer {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one payment method must be enabled"})
+		return
+	}
 
 	if err := database.DB.Save(&biz).Error; err != nil {
 		log.Printf("❌ Failed to update settings for business %d: %v", biz.ID, err)
@@ -135,7 +175,7 @@ func UpdateBusinessSettings(c *gin.Context) {
 		c.ClientIP(), "medium", biz.Name, biz.Plan,
 	)
 
-	c.JSON(http.StatusOK, gin.H{"message": "Settings updated successfully", "business": biz})
+	c.JSON(http.StatusOK, gin.H{"message": "Settings updated successfully", "business": businessSettingsPayload(biz)})
 }
 
 // UpdateLanguageSettings updates ONLY the dashboard language for the authenticated user

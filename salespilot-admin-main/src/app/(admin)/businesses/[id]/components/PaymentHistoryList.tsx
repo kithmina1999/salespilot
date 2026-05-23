@@ -1,11 +1,24 @@
 import { CreditCard, ArrowRight, CheckCircle2, XCircle, Clock } from "lucide-react";
 import Link from "next/link";
+import type { ActivationHistoryItem, PaymentHistoryItem } from "../types";
 
-export function PaymentHistoryList({ payments, activationCodes, businessId }: { payments: any[], activationCodes: any[], businessId: string }) {
+type TimelineEvent =
+  | (PaymentHistoryItem & { _type: "payment"; _date: Date })
+  | (ActivationHistoryItem & { _type: "activation"; _date: Date });
+
+export function PaymentHistoryList({
+  payments,
+  activationCodes,
+  businessId,
+}: {
+  payments: PaymentHistoryItem[];
+  activationCodes: ActivationHistoryItem[];
+  businessId: string;
+}) {
   // Combine and sort events
-  const events = [
-    ...(payments || []).map(p => ({ ...p, _type: 'payment', _date: new Date(p.created_at) })),
-    ...(activationCodes || []).map(a => ({ ...a, _type: 'activation', _date: new Date(a.used_at) }))
+  const events: TimelineEvent[] = [
+    ...(payments || []).map(p => ({ ...p, _type: "payment" as const, _date: new Date(p.created_at) })),
+    ...(activationCodes || []).map(a => ({ ...a, _type: "activation" as const, _date: new Date(a.used_at || 0) }))
   ].sort((a, b) => b._date.getTime() - a._date.getTime()).slice(0, 5);
 
   const getPaymentStatusIcon = (status: string) => {

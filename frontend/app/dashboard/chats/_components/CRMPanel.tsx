@@ -157,11 +157,12 @@ export function CRMPanel() {
               <div className="space-y-2.5">
                 {orders.map(o => {
                   const items = parseItems(o.items);
+                  const orderLabel = o.order_num || o.id;
                   return (
-                    <div key={o.ID} className="p-3 rounded-xl bg-muted/60 border border-border space-y-2">
+                    <div key={o.id} className="p-3 rounded-xl bg-muted/60 border border-border space-y-2">
                       <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-bold text-muted-foreground">ORDER #{o.ID}</span>
-                        <span className="text-[10px] text-zinc-600">{fmtDate(o.CreatedAt)}</span>
+                        <span className="text-[10px] font-bold text-muted-foreground">ORDER #{orderLabel}</span>
+                        <span className="text-[10px] text-zinc-600">{fmtDate(o.created_at)}</span>
                       </div>
                       <div className="space-y-1 border-t border-border/50 pt-1.5">
                         {items.map((item: any, idx: number) => (
@@ -175,7 +176,7 @@ export function CRMPanel() {
                         <span className="text-sm font-black text-foreground">Rs.{o.total_price.toLocaleString()}</span>
                         <select
                           value={o.status}
-                          onChange={e => updateOrderStatus(o.ID, e.target.value)}
+                          onChange={e => updateOrderStatus(o.id, e.target.value)}
                           className={`text-[10px] font-bold uppercase rounded-md px-2 py-1 outline-none cursor-pointer border ${STATUS_STYLE[o.status] ?? ''}`}
                           style={{ background: 'transparent' }}
                         >

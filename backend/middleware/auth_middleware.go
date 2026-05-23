@@ -39,7 +39,7 @@ func AuthRequired() gin.HandlerFunc {
 
 		claims, err := utils.ValidateToken(tokenStr)
 		if err != nil {
-			log.Printf("[AuthRequired] 401: Invalid token - error: %v, string: %s", err, tokenStr)
+			log.Printf("[AuthRequired] 401: Invalid token - error: %v", err)
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
 			c.Abort()
 			return

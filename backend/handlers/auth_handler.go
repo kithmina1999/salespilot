@@ -1,9 +1,7 @@
 package handlers
 
 import (
-	"fmt"
 	"log"
-	"math/rand"
 	"net/http"
 	"regexp"
 	"time"
@@ -195,7 +193,11 @@ func Register(c *gin.Context) {
 	tx.Commit()
 
 	// Generate 6-digit OTP
-	otp := fmt.Sprintf("%06d", rand.Intn(1000000))
+	otp, err := generateSixDigitOTP()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate verification code"})
+		return
+	}
 
 	record := models.EmailVerificationToken{
 		Email:     user.Email,
