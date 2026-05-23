@@ -1,6 +1,6 @@
 'use client';
 
-import { useSyncExternalStore } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowRight, CheckCircle2, Clock } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 
@@ -10,21 +10,18 @@ interface Props {
 
 const TRIAL_TOTAL_MS = 14 * 24 * 60 * 60 * 1000;
 
-function subscribeToClock(callback: () => void) {
-  const id = window.setInterval(callback, 1000);
-  return () => window.clearInterval(id);
-}
-
-function getClockSnapshot() {
-  return Date.now();
-}
-
-function getServerClockSnapshot() {
-  return 0;
-}
-
 function useClockNow() {
-  return useSyncExternalStore(subscribeToClock, getClockSnapshot, getServerClockSnapshot);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(id);
+  }, []);
+
+  return now;
 }
 
 function useCountdownMs(expiresAt: string | null): number {
@@ -190,7 +187,7 @@ export default function PlanStatusCard({ onUpgrade }: Props) {
             {isPaid && !returnedToFree && expiryLabel && (
               <p className="text-sm text-muted-foreground mt-1.5 flex items-center gap-1.5">
                 <Clock size={12} className="text-emerald-500/60 shrink-0" />
-                {timeLabel ?? 'Active'} · Renews {expiryLabel}
+                {timeLabel ?? 'Active'} - Renews {expiryLabel}
               </p>
             )}
 
