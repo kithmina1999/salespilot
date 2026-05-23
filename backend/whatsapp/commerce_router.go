@@ -117,6 +117,10 @@ func RouteCommerceMessage(ctx CommerceRoutingContext, text string) CommerceDecis
 		return commerceDecision(IntentClarifyCommerce, RouteClarify, 0.72, CartPolicyClarify, UsageClassClarification, "checkout_without_active_cart")
 	}
 
+	if cartActive && isAddToCartRequest(normalized) {
+		return commerceDecision(IntentAddToCart, RouteOrderBot, 0.92, CartPolicyOwn, UsageClassCartInteraction, "active_cart_add_to_cart")
+	}
+
 	if ctx.LastBotAskedQuestion && isShortAffirmation(normalized) {
 		return commerceDecision(IntentContextBridge, RouteContextBridge, 0.85, CartPolicyNone, UsageClassContextBridge, "affirmation_after_bot_question")
 	}
@@ -260,6 +264,19 @@ func isCheckoutRequest(normalized string) bool {
 		normalized == "check out" ||
 		strings.Contains(normalized, "proceed to checkout") ||
 		strings.Contains(normalized, "place order now")
+}
+
+func isAddToCartRequest(normalized string) bool {
+	if strings.Contains(normalized, "add to cart") ||
+		strings.Contains(normalized, "add this to cart") ||
+		strings.Contains(normalized, "put in cart") ||
+		strings.Contains(normalized, "cart ekata") {
+		return true
+	}
+	if !routerContainsWord(normalized, "cart") {
+		return false
+	}
+	return containsExactToken(normalized, []string{"add", "ad", "put"})
 }
 
 func isCartEscapeRequest(text string) bool {

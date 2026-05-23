@@ -198,6 +198,8 @@ function RouteTag({ route }: { route: string }) {
     native_product: { bg: "bg-cyan-500/10", text: "text-cyan-400", border: "border-cyan-500/20", label: "Native Product" },
     clarify: { bg: "bg-amber-500/10", text: "text-amber-400", border: "border-amber-500/20", label: "Clarify" },
     context_bridge: { bg: "bg-purple-500/10", text: "text-purple-400", border: "border-purple-500/20", label: "Context Bridge" },
+    router_payment: { bg: "bg-cyan-500/10", text: "text-cyan-400", border: "border-cyan-500/20", label: "Router Payment" },
+    router_delivery: { bg: "bg-cyan-500/10", text: "text-cyan-400", border: "border-cyan-500/20", label: "Router Delivery" },
     system_limit: { bg: "bg-amber-500/10", text: "text-amber-400", border: "border-amber-500/20", label: "System Limit" },
     gibberish: { bg: "bg-red-500/10", text: "text-red-400", border: "border-red-500/20", label: "Gibberish" },
     drop: { bg: "bg-red-500/10", text: "text-red-400", border: "border-red-500/20", label: "Dropped" },
@@ -640,7 +642,7 @@ export default function PipelineLogsPage() {
       {/* ── Detail Sheet ───────────────────────────────────── */}
       <Sheet open={selectedLogId !== null} onOpenChange={(open) => !open && setSelectedLogId(null)}>
         <SheetContent
-          className="w-full overflow-y-auto border-l border-border bg-background p-0 sm:max-w-none sm:w-[min(860px,92vw)]"
+          className="w-full overflow-y-auto border-l border-border bg-background p-0 sm:max-w-none sm:min-w-[min(1860px,45vw)] sm:w-[min(860px,92vw)]"
         >
           <div className="p-8">
             <SheetHeader className="mb-6 border-b border-border pb-5 text-left">

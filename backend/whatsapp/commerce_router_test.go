@@ -100,6 +100,14 @@ func TestCommerceRouterGoldenIntents(t *testing.T) {
 			cartPolicy: CartPolicyOwn,
 		},
 		{
+			name:       "natural add to cart owns selected item",
+			text:       "can i ad thisto cart",
+			ctx:        withCartState(ctx, models.CartStateItemSelected),
+			intent:     IntentAddToCart,
+			route:      RouteOrderBot,
+			cartPolicy: CartPolicyOwn,
+		},
+		{
 			name:       "checkout without cart asks clarification",
 			text:       "checkout",
 			ctx:        ctx,

@@ -76,7 +76,7 @@ var intentAnchorPhrases = map[string][]string{
 		"items thiyanawa mokakda",
 		"mokakda sell karanawa",
 		// Sinhala script
-		"මොනවාද තියෙනවා",
+		"මොනවද තියෙන්නේ",
 		"ඔයාලා මොනවද විකුණන්නේ",
 		"මිල ලැයිස්තුව දෙන්න",
 	},
@@ -108,6 +108,7 @@ var intentAnchorPhrases = map[string][]string{
 		"ඔයාලගේ return policy මොකද්ද",
 		"delivery වලට කොච්චර දවස් යයිද",
 		"මගේ ඕඩර් එක කොහේද",
+		"ඕඩර් එක කවද්ද ඒන්නේ?",
 	},
 }
 

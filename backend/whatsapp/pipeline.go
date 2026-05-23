@@ -9,7 +9,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/kithmina1999/salespilot/database"
@@ -17,58 +16,6 @@ import (
 	"github.com/kithmina1999/salespilot/platform"
 	"github.com/kithmina1999/salespilot/utils"
 )
-
-// Two-tier rate limiter:
-//
-//	Tier 1 (burst): max 8 messages per 3 minutes   → warns + throttles
-//	Tier 2 (abuse): max 40 messages per hour        → auto-blacklists
-var (
-	burstLimits = make(map[string]map[int64]int) // 3-min window
-	hourLimits  = make(map[string]map[int64]int) // 60-min window
-	rlMutex     sync.Mutex
-)
-
-// checkBurstLimit returns true if the user exceeded 8 msgs in the last 3 minutes.
-func checkBurstLimit(phone string) bool {
-	rlMutex.Lock()
-	defer rlMutex.Unlock()
-
-	now := time.Now()
-	// Bucket key = floor to nearest 3-minute window
-	windowKey := now.Unix() / 180 // 180 seconds = 3 minutes
-
-	if _, exists := burstLimits[phone]; !exists {
-		burstLimits[phone] = make(map[int64]int)
-	}
-	// Evict old windows (keep only last 2 buckets)
-	for k := range burstLimits[phone] {
-		if k < windowKey-1 {
-			delete(burstLimits[phone], k)
-		}
-	}
-	burstLimits[phone][windowKey]++
-	return burstLimits[phone][windowKey] > 8
-}
-
-// checkHourLimit returns true if the user exceeded 40 msgs in the current hour.
-func checkHourLimit(phone string) bool {
-	rlMutex.Lock()
-	defer rlMutex.Unlock()
-
-	now := time.Now()
-	hourKey := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, now.Location()).Unix()
-
-	if _, exists := hourLimits[phone]; !exists {
-		hourLimits[phone] = make(map[int64]int)
-	}
-	for k := range hourLimits[phone] {
-		if k < hourKey {
-			delete(hourLimits[phone], k)
-		}
-	}
-	hourLimits[phone][hourKey]++
-	return hourLimits[phone][hourKey] > 40
-}
 
 type Pipeline struct{}
 
@@ -122,6 +69,16 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 	isSandbox := from == "99900000000"
 
 	var pLog *models.PipelineLog
+	var routerDecision CommerceDecision
+	routerDecisionReady := false
+	getRouterDecision := func() CommerceDecision {
+		if !routerDecisionReady {
+			routerDecision = RouteCommerceMessage(BuildCommerceRoutingContext(business, from), text)
+			routerDecisionReady = true
+		}
+		return routerDecision
+	}
+
 	shouldLog := business.DebugMode && business.DebugModeUntil != nil && business.DebugModeUntil.After(time.Now())
 	if shouldLog {
 		startTime := time.Now()
@@ -129,7 +86,7 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 		var cartBefore models.Cart
 		database.DB.Where("phone = ? AND business_id = ?", from, business.ID).First(&cartBefore)
 		legacyIntent := ClassifyMessageIntent(text)
-		routerDecision := RouteCommerceMessage(BuildCommerceRoutingContext(business, from), text)
+		routerDecision := getRouterDecision()
 		log.Printf("🧭 [%s] Router shadow: intent=%s route=%s confidence=%.2f cart=%s usage=%s legacy=%s reasons=%v",
 			business.Name,
 			routerDecision.Intent,
@@ -303,6 +260,10 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 	database.DB.Model(business).Update("system_message_count", business.SystemMessageCount+1)
 	business.SystemMessageCount++
 
+	// Snapshot the commerce decision before any bot-side messages in this request
+	// can change conversation context such as LastBotAskedQuestion.
+	getRouterDecision()
+
 	// --- FIRST-OF-DAY GREETING (between bot-pause and usage limit check) ---
 	// Fires once per customer per calendar day per business. Sends a warm,
 	// time-of-day-aware greeting before processing the actual message.
@@ -341,6 +302,17 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 	// Runs in-session (customer messaged us) → no template required.
 	if handled := HandleDeliveryDetection(business, from, fromRaw, text); handled {
 		log.Printf("📦 [%s] Delivery confirmed by %s — auto-marking delivered", business.Name, from)
+		return
+	}
+
+	if pLog != nil {
+		cleanMsg := CleanMessage(text)
+		pLog.CleanMessage = cleanMsg
+		pLog.ReducedMessage = ReduceMessage(cleanMsg)
+	}
+
+	if decision := getRouterDecision(); p.enforceCommerceDecision(business, from, fromRaw, text, decision, pLog) {
+		log.Printf("🧭 [%s] Commerce router enforced: intent=%s route=%s for %s", business.Name, decision.Intent, decision.Route, from)
 		return
 	}
 
