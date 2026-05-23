@@ -1,6 +1,5 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { Bot } from 'lucide-react';
 
 interface AuthShellProps {
   children: React.ReactNode;
@@ -59,7 +58,7 @@ export default function AuthShell({ children, panelTitle, panelSub }: AuthShellP
           {/* Logo */}
           <div className="absolute -top-10 right-2 flex items-center gap-1">
             <div className="w-[24px] h-[24px] bg-linear-to-br  flex items-center justify-center  shrink-0">
-              <Image src="/assets/logo-no-bg.png" alt="SalesPilot" width={55} height={55} />
+              <Image src="/assets/logo-sm.png" alt="SalesPilot" width={55} height={55} />
             </div>
             <Link href="/" className="font-bold text-[1.15rem] text-black no-underline tracking-[.5px] drop-shadow-md">
               SalesPilot
