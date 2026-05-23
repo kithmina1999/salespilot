@@ -76,8 +76,25 @@ type PipelineLog = {
   state_after?: string;
   execution_time_ms?: number;
   intent_classified?: string;
+  legacy_intent?: string;
+  router_intent?: string;
+  router_route?: string;
+  router_confidence?: number;
+  router_cart_policy?: string;
+  router_usage_class?: string;
+  router_reasons?: string;
   model_used?: string;
   signal_logs?: PipelineSignalLog[];
+};
+
+type RouterShadowDecision = {
+  intent: string;
+  route: string;
+  confidence: number;
+  cartPolicy: string;
+  usageClass: string;
+  reasons: string[];
+  legacyIntent: string;
 };
 
 type BusinessDebugState = {
@@ -116,6 +133,57 @@ function formatTime(dateString: string) {
   );
 }
 
+function normalizeConfidence(value?: number) {
+  if (!value || Number.isNaN(value)) return 0;
+  return value <= 1 ? value * 100 : value;
+}
+
+function asString(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
+
+function asNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function getRouterShadow(log?: PipelineLog | null): RouterShadowDecision | null {
+  if (!log) return null;
+
+  if (log.router_intent || log.router_route) {
+    return {
+      intent: log.router_intent || log.intent_classified || "",
+      route: log.router_route || "",
+      confidence: normalizeConfidence(log.router_confidence),
+      cartPolicy: log.router_cart_policy || "",
+      usageClass: log.router_usage_class || "",
+      reasons: (log.router_reasons || "").split("\n").map((reason) => reason.trim()).filter(Boolean),
+      legacyIntent: log.legacy_intent || "",
+    };
+  }
+
+  if (!log.bot_reply_payload) return null;
+
+  try {
+    const parsed = JSON.parse(log.bot_reply_payload) as Record<string, unknown>;
+    if (parsed.shadow !== true) return null;
+    const reasons = Array.isArray(parsed.reasons)
+      ? parsed.reasons.map((reason) => String(reason)).filter(Boolean)
+      : [];
+
+    return {
+      intent: asString(parsed.intent),
+      route: asString(parsed.route),
+      confidence: normalizeConfidence(asNumber(parsed.confidence)),
+      cartPolicy: asString(parsed.cart_policy),
+      usageClass: asString(parsed.usage_class),
+      reasons,
+      legacyIntent: asString(parsed.legacy),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function RouteTag({ route }: { route: string }) {
   const map: Record<string, { bg: string; text: string; border: string; label: string }> = {
     faq_high: { bg: "bg-green-500/10", text: "text-green-500", border: "border-green-500/20", label: "FAQ High" },
@@ -124,6 +192,12 @@ function RouteTag({ route }: { route: string }) {
     semantic_hint: { bg: "bg-purple-500/10", text: "text-purple-400", border: "border-purple-500/20", label: "Semantic Hint" },
     gemini_raw: { bg: "bg-indigo-500/10", text: "text-indigo-400", border: "border-indigo-500/20", label: "Gemini Raw" },
     catalog: { bg: "bg-blue-500/10", text: "text-blue-400", border: "border-blue-500/20", label: "Catalog" },
+    faq_or_gemini: { bg: "bg-indigo-500/10", text: "text-indigo-400", border: "border-indigo-500/20", label: "FAQ/Gemini" },
+    order_bot: { bg: "bg-blue-500/10", text: "text-blue-400", border: "border-blue-500/20", label: "Order Bot" },
+    native_catalog: { bg: "bg-cyan-500/10", text: "text-cyan-400", border: "border-cyan-500/20", label: "Native Catalog" },
+    native_product: { bg: "bg-cyan-500/10", text: "text-cyan-400", border: "border-cyan-500/20", label: "Native Product" },
+    clarify: { bg: "bg-amber-500/10", text: "text-amber-400", border: "border-amber-500/20", label: "Clarify" },
+    context_bridge: { bg: "bg-purple-500/10", text: "text-purple-400", border: "border-purple-500/20", label: "Context Bridge" },
     system_limit: { bg: "bg-amber-500/10", text: "text-amber-400", border: "border-amber-500/20", label: "System Limit" },
     gibberish: { bg: "bg-red-500/10", text: "text-red-400", border: "border-red-500/20", label: "Gibberish" },
     drop: { bg: "bg-red-500/10", text: "text-red-400", border: "border-red-500/20", label: "Dropped" },
@@ -194,6 +268,7 @@ export default function PipelineLogsPage() {
   const meta = data?.meta || { total: 0 };
   const detail = detailData?.log;
   const detailSignals = detail?.signal_logs || [];
+  const routerShadow = getRouterShadow(detail);
   const business = businessData?.business;
 
   const startDebug = async () => {
@@ -500,7 +575,15 @@ export default function PipelineLogsPage() {
                 </TableCell>
 
                 <TableCell className="px-6 py-4">
-                  <RouteTag route={log.route_taken} />
+                  <div className="flex flex-col items-start gap-1.5">
+                    <RouteTag route={log.route_taken} />
+                    {getRouterShadow(log) && (
+                      <div className="flex items-center gap-1.5 text-[0.65rem] font-semibold uppercase tracking-wider text-cyan-300">
+                        <span className="text-muted-foreground">Router</span>
+                        <RouteTag route={getRouterShadow(log)?.route || ""} />
+                      </div>
+                    )}
+                  </div>
                 </TableCell>
 
                 <TableCell className="px-6 py-4">
@@ -628,6 +711,67 @@ export default function PipelineLogsPage() {
                     )}
                   </CardContent>
                 </Card>
+
+                {routerShadow && (
+                  <Card className="overflow-hidden border-l-4 border-l-cyan-500 bg-card shadow-sm">
+                    <CardContent className="p-5">
+                      <div className="mb-3.5 flex items-center gap-1.5 text-[0.7rem] font-bold tracking-widest text-muted-foreground uppercase">
+                        <Network className="size-3.5" /> Router Shadow Decision
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-3">
+                          {[
+                            {
+                              label: "Intent",
+                              value: routerShadow.intent ? (
+                                <Badge variant="outline" className="px-1.5 py-0 font-mono text-[0.65rem]">
+                                  {routerShadow.intent}
+                                </Badge>
+                              ) : "N/A",
+                            },
+                            { label: "Route", value: <RouteTag route={routerShadow.route} /> },
+                            {
+                              label: "Confidence",
+                              value: <ConfidenceBar value={routerShadow.confidence} />,
+                            },
+                          ].map(({ label, value }) => (
+                            <div key={label} className="flex items-center justify-between gap-3">
+                              <span className="text-sm text-muted-foreground">{label}</span>
+                              {value}
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="space-y-3">
+                          {[
+                            { label: "Legacy Intent", value: routerShadow.legacyIntent || "N/A" },
+                            { label: "Cart Policy", value: routerShadow.cartPolicy || "N/A" },
+                            { label: "Usage Class", value: routerShadow.usageClass || "N/A" },
+                          ].map(({ label, value }) => (
+                            <div key={label} className="flex items-center justify-between gap-3">
+                              <span className="text-sm text-muted-foreground">{label}</span>
+                              <span className="font-mono text-[0.75rem] font-semibold text-foreground">{value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {routerShadow.reasons.length > 0 && (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {routerShadow.reasons.map((reason) => (
+                            <Badge
+                              key={reason}
+                              variant="outline"
+                              className="rounded-full border-cyan-400/20 bg-cyan-400/10 px-2.5 py-1 font-mono text-[0.65rem] text-cyan-300"
+                            >
+                              {reason}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* ── Routing + Flags ─────────────────────────── */}
                 <div className="grid grid-cols-2 gap-4">

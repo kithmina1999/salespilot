@@ -130,16 +130,6 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 		database.DB.Where("phone = ? AND business_id = ?", from, business.ID).First(&cartBefore)
 		legacyIntent := ClassifyMessageIntent(text)
 		routerDecision := RouteCommerceMessage(BuildCommerceRoutingContext(business, from), text)
-		routerPayload, _ := json.Marshal(map[string]interface{}{
-			"shadow":      true,
-			"intent":      routerDecision.Intent,
-			"route":       routerDecision.Route,
-			"confidence":  routerDecision.Confidence,
-			"cart_policy": routerDecision.CartPolicy,
-			"usage_class": routerDecision.UsageClass,
-			"reasons":     routerDecision.Reasons,
-			"legacy":      legacyIntent,
-		})
 		log.Printf("🧭 [%s] Router shadow: intent=%s route=%s confidence=%.2f cart=%s usage=%s legacy=%s reasons=%v",
 			business.Name,
 			routerDecision.Intent,
@@ -159,7 +149,13 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 			DebugMode:        business.DebugMode,
 			StateBefore:      cartBefore.State,
 			IntentClassified: string(routerDecision.Intent),
-			BotReplyPayload:  string(routerPayload),
+			LegacyIntent:     legacyIntent,
+			RouterIntent:     string(routerDecision.Intent),
+			RouterRoute:      string(routerDecision.Route),
+			RouterConfidence: routerDecision.Confidence,
+			RouterCartPolicy: string(routerDecision.CartPolicy),
+			RouterUsageClass: string(routerDecision.UsageClass),
+			RouterReasons:    strings.Join(routerDecision.Reasons, "\n"),
 		}
 
 		defer func() {
