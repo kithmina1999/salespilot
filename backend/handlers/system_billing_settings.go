@@ -308,26 +308,26 @@ func sanitizePlans(in []billingSettingsPlanRequest) ([]models.SubscriptionPlan, 
 
 func planUpdateMap(plan models.SubscriptionPlan) map[string]interface{} {
 	return map[string]interface{}{
-		"display_name":             plan.DisplayName,
-		"badge":                    plan.Badge,
-		"description":              plan.Description,
-		"currency":                 plan.Currency,
-		"monthly_price":            plan.MonthlyPrice,
-		"annual_price":             plan.AnnualPrice,
-		"is_active":                plan.IsActive,
-		"is_public":                plan.IsPublic,
-		"sort_order":               plan.SortOrder,
-		"max_products":             plan.MaxProducts,
-		"max_rules":                plan.MaxRules,
-		"max_ai_messages":          plan.MaxAIMessages,
-		"max_system_messages":      plan.MaxSystemMessages,
-		"max_rule_gens":            plan.MaxRuleGens,
-		"max_simulations":          plan.MaxSimulations,
-		"max_storage_bytes":        plan.MaxStorageBytes,
-		"max_file_size_bytes":      plan.MaxFileSizeBytes,
-		"can_upload_cloudinary":    plan.CanUploadCloudinary,
-		"can_send_whatsapp_images": plan.CanSendWhatsAppImages,
-		"can_use_gemini_vision":    plan.CanUseGeminiVision,
+		"display_name":              plan.DisplayName,
+		"badge":                     plan.Badge,
+		"description":               plan.Description,
+		"currency":                  plan.Currency,
+		"monthly_price":             plan.MonthlyPrice,
+		"annual_price":              plan.AnnualPrice,
+		"is_active":                 plan.IsActive,
+		"is_public":                 plan.IsPublic,
+		"sort_order":                plan.SortOrder,
+		"max_products":              plan.MaxProducts,
+		"max_rules":                 plan.MaxRules,
+		"max_ai_messages":           plan.MaxAIMessages,
+		"max_system_messages":       plan.MaxSystemMessages,
+		"max_rule_gens":             plan.MaxRuleGens,
+		"max_simulations":           plan.MaxSimulations,
+		"max_storage_bytes":         plan.MaxStorageBytes,
+		"max_file_size_bytes":       plan.MaxFileSizeBytes,
+		"can_upload_cloudinary":     plan.CanUploadCloudinary,
+		"can_send_whats_app_images": plan.CanSendWhatsAppImages,
+		"can_use_gemini_vision":     plan.CanUseGeminiVision,
 	}
 }
 
@@ -424,9 +424,18 @@ func GetBillingOptions(c *gin.Context) {
 	businessID := c.GetUint("business_id")
 
 	var biz models.Business
-	if err := database.DB.Select("wa_status", "connected_at").First(&biz, businessID).Error; err != nil {
+	if err := database.DB.Select("id", "wa_status", "connected_at", "wa_phone_number_id", "waba_id").First(&biz, businessID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load business details"})
 		return
+	}
+	checkoutType := normalizeCheckoutType(c.Query("checkout_type"))
+	if checkoutType == "" {
+		switch strings.ToLower(strings.TrimSpace(c.Query("plan"))) {
+		case "addons":
+			checkoutType = checkoutTypeAddonOnly
+		case models.PlanStarter, models.PlanPro:
+			checkoutType = checkoutTypeSubscription
+		}
 	}
 
 	bank, err := platform.GetBankDetails(database.DB)
@@ -445,21 +454,57 @@ func GetBillingOptions(c *gin.Context) {
 		return
 	}
 
-	var addons []models.BillingAddon
-	if err := database.DB.Where("is_active = ?", true).Order("sort_order ASC").Find(&addons).Error; err != nil {
+	var rawAddons []models.BillingAddon
+	if err := database.DB.Where("is_active = ? AND visibility = ?", true, models.AddonVisibilityPublic).Order("sort_order ASC").Find(&rawAddons).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load addons"})
 		return
 	}
 
-	var purchasedAddons []string
-	database.DB.Raw(`
-		SELECT l.key
-		FROM payment_proof_line_items l
-		JOIN payment_proofs p ON p.id = l.payment_proof_id
-		WHERE p.business_id = ? AND p.status IN (?, ?) AND l.item_type = ?
-	`, businessID, models.PaymentStatusPending, models.PaymentStatusApproved, models.ItemTypeAddon).Scan(&purchasedAddons)
-	if purchasedAddons == nil {
-		purchasedAddons = []string{}
+	purchaseStates, err := loadAddonPurchaseStates(database.DB, businessID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load purchased addons"})
+		return
+	}
+	purchasedAddons := uniquePurchasedAddonKeys(purchaseStates)
+
+	type addonResponse struct {
+		models.BillingAddon
+		Includes       []string `json:"includes"`
+		NotIncluded    []string `json:"not_included"`
+		IsAvailable    bool     `json:"is_available"`
+		DisabledReason string   `json:"disabled_reason"`
+	}
+
+	var addons []addonResponse
+	for _, a := range rawAddons {
+		isAvailable := true
+		disabledReason := ""
+
+		if reason := billingAddonDisabledReason(a, biz, checkoutType, purchaseStates); reason != "" {
+			isAvailable = false
+			disabledReason = reason
+		}
+
+		var includes []string
+		for _, s := range strings.Split(a.IncludesText, "\n") {
+			if strings.TrimSpace(s) != "" {
+				includes = append(includes, strings.TrimSpace(s))
+			}
+		}
+		var notIncluded []string
+		for _, s := range strings.Split(a.NotIncludedText, "\n") {
+			if strings.TrimSpace(s) != "" {
+				notIncluded = append(notIncluded, strings.TrimSpace(s))
+			}
+		}
+
+		addons = append(addons, addonResponse{
+			BillingAddon:   a,
+			Includes:       includes,
+			NotIncluded:    notIncluded,
+			IsAvailable:    isAvailable,
+			DisabledReason: disabledReason,
+		})
 	}
 
 	c.JSON(http.StatusOK, gin.H{

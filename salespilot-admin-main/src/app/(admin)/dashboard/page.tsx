@@ -1,13 +1,11 @@
 "use client"
 
-import type { ReactNode } from "react"
 import useSWR from "swr"
 import {
   Activity,
   ArrowUpRight,
   Bot,
   MessageSquare,
-  Server,
   TrendingUp,
   Users,
   Zap,
@@ -16,6 +14,7 @@ import {
   WifiOff,
   Ban,
   CheckCircle2,
+  type LucideIcon,
 } from "lucide-react"
 import Link from "next/link"
 import {
@@ -179,7 +178,7 @@ export default function DashboardPage() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {metrics.action_queue.pending_payments > 0 && (
               <ActionCard 
-                href="/activation-codes" // Using activation-codes as proxy since payments page is missing
+                href="/payments"
                 icon={CreditCard} 
                 count={metrics.action_queue.pending_payments} 
                 label="Pending Payments" 
@@ -346,7 +345,7 @@ function ActionCard({
   tone = "warning",
 }: {
   href: string
-  icon: any
+  icon: LucideIcon
   count: number
   label: string
   tone?: "primary" | "warning" | "destructive"

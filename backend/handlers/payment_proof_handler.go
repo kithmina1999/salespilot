@@ -19,6 +19,7 @@ import (
 
 	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
+	"github.com/kithmina1999/salespilot/services"
 )
 
 // ─────────────────────────────────────────────────────────────────
@@ -49,19 +50,30 @@ func SubmitPaymentProof(c *gin.Context) {
 		addonKeys = c.PostFormArray("addon_keys[]") // fallback
 	}
 
+	declaredAmountStr := c.PostForm("declared_amount")
+	declaredAmount, _ := strconv.ParseFloat(declaredAmountStr, 64)
+	paidAtStr := c.PostForm("paid_at")
+	var paidAt *time.Time
+	if paidAtStr != "" {
+		if t, err := time.Parse("2006-01-02T15:04", paidAtStr); err == nil {
+			paidAt = &t
+		}
+	}
+	paymentRef := c.PostForm("payment_reference")
+
 	var checkoutType string
 	if plan != "" && len(addonKeys) > 0 {
-		checkoutType = "mixed"
+		checkoutType = checkoutTypeMixed
 	} else if plan != "" {
-		checkoutType = "subscription"
+		checkoutType = checkoutTypeSubscription
 	} else if len(addonKeys) > 0 {
-		checkoutType = "addon_only"
+		checkoutType = checkoutTypeAddonOnly
 	} else {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Must select a plan or at least one add-on"})
 		return
 	}
 
-	if checkoutType == "subscription" || checkoutType == "mixed" {
+	if checkoutType == checkoutTypeSubscription || checkoutType == checkoutTypeMixed {
 		if plan == "" || cycle == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Plan and billing cycle are required for subscription checkout"})
 			return
@@ -72,9 +84,9 @@ func SubmitPaymentProof(c *gin.Context) {
 	var pendingProofs []models.PaymentProof
 	database.DB.Preload("LineItems").Where("business_id = ? AND status = ?", businessID, models.PaymentStatusPending).Find(&pendingProofs)
 
-	if checkoutType == "subscription" || checkoutType == "mixed" {
+	if checkoutType == checkoutTypeSubscription || checkoutType == checkoutTypeMixed {
 		for _, p := range pendingProofs {
-			if p.CheckoutType == "subscription" || p.CheckoutType == "mixed" {
+			if p.CheckoutType == checkoutTypeSubscription || p.CheckoutType == checkoutTypeMixed {
 				c.JSON(http.StatusConflict, gin.H{
 					"error":        "You already have a subscription payment proof waiting for approval. Please wait for it to be reviewed.",
 					"submitted_at": p.CreatedAt,
@@ -87,7 +99,7 @@ func SubmitPaymentProof(c *gin.Context) {
 	var lineItems []models.PaymentProofLineItem
 	var planAmount, oneTimeTotal, monthlyAddonTotal, totalAmount float64
 
-	if checkoutType == "subscription" || checkoutType == "mixed" {
+	if checkoutType == checkoutTypeSubscription || checkoutType == checkoutTypeMixed {
 		amt, err := platform.AmountFor(database.DB, plan, cycle)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid billing configuration: " + err.Error()})
@@ -110,33 +122,22 @@ func SubmitPaymentProof(c *gin.Context) {
 	}
 
 	if len(addonKeys) > 0 {
-		var purchasedAddons []string
-		database.DB.Raw(`
-			SELECT l.key
-			FROM payment_proof_line_items l
-			JOIN payment_proofs p ON p.id = l.payment_proof_id
-			WHERE p.business_id = ? AND p.status IN (?, ?) AND l.item_type = ?
-		`, businessID, models.PaymentStatusPending, models.PaymentStatusApproved, models.ItemTypeAddon).Scan(&purchasedAddons)
-
-		purchasedMap := make(map[string]bool)
-		for _, k := range purchasedAddons {
-			purchasedMap[k] = true
+		purchaseStates, err := loadAddonPurchaseStates(database.DB, businessID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load purchased addons"})
+			return
 		}
+		serviceInstanceKey := addonServiceInstanceKey(biz)
 
 		for _, key := range addonKeys {
 			var addon models.BillingAddon
-			if err := database.DB.Where("key = ? AND is_active = ?", key, true).First(&addon).Error; err != nil {
+			if err := database.DB.Where("key = ? AND is_active = ? AND visibility = ?", key, true, models.AddonVisibilityPublic).First(&addon).Error; err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or inactive addon: " + key})
 				return
 			}
 
-			if addon.PurchasePolicy == models.PurchasePolicyOncePerBusiness && purchasedMap[key] {
-				c.JSON(http.StatusConflict, gin.H{"error": "Addon already purchased or pending: " + addon.Name})
-				return
-			}
-
-			if addon.Key == "dfy_meta_setup" && biz.WAStatus == "connected" {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Business is already connected, select Reconfiguration Support instead."})
+			if reason := billingAddonDisabledReason(addon, biz, checkoutType, purchaseStates); reason != "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Addon " + addon.Name + " is unavailable: " + reason})
 				return
 			}
 
@@ -148,14 +149,15 @@ func SubmitPaymentProof(c *gin.Context) {
 			totalAmount += addon.Amount
 
 			lineItems = append(lineItems, models.PaymentProofLineItem{
-				ItemType:    models.ItemTypeAddon,
-				Key:         addon.Key,
-				Name:        addon.Name,
-				Description: addon.Description,
-				BillingType: addon.BillingType,
-				Quantity:    1,
-				UnitPrice:   addon.Amount,
-				Total:       addon.Amount,
+				ItemType:           models.ItemTypeAddon,
+				Key:                addon.Key,
+				Name:               addon.Name,
+				Description:        addon.Description,
+				BillingType:        addon.BillingType,
+				ServiceInstanceKey: serviceInstanceKey,
+				Quantity:           1,
+				UnitPrice:          addon.Amount,
+				Total:              addon.Amount,
 			})
 		}
 	}
@@ -180,47 +182,83 @@ func SubmitPaymentProof(c *gin.Context) {
 		return
 	}
 
-	// Upload to Cloudinary
-	cld, err := cloudinary.NewFromURL(os.Getenv("CLOUDINARY_URL"))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize image storage"})
+	// Save locally first
+	uploadDir := "uploads/receipts"
+	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload directory"})
 		return
 	}
 
-	src, err := file.Open()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read uploaded file"})
+	filename := fmt.Sprintf("proof_%d_%d_%s", businessID, time.Now().Unix(), file.Filename)
+	localPath := fmt.Sprintf("%s/%s", uploadDir, filename)
+	if err := c.SaveUploadedFile(file, localPath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file locally"})
 		return
 	}
-	defer src.Close()
 
-	publicID := fmt.Sprintf("proof-%d-%d", businessID, time.Now().Unix())
-	resp, err := cld.Upload.Upload(context.Background(), src, uploader.UploadParams{
-		Folder:   "salespilot/payments",
-		PublicID: publicID,
-	})
+	// Read bytes for AI
+	imageBytes, err := os.ReadFile(localPath)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload screenshot: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read saved file"})
 		return
+	}
+
+	// Run AI Scanner
+	analysis := services.AnalyzePaymentReceipt(imageBytes, contentType)
+
+	status := models.PaymentStatusPending
+	if !analysis.IsValid {
+		status = models.PaymentStatusNeedsResubmission
+	}
+
+	var mismatchFlags []string
+	if analysis.IsValid {
+		// Only check mismatches if valid
+		if analysis.ExtractedAmount > 0 && analysis.ExtractedAmount != totalAmount {
+			mismatchFlags = append(mismatchFlags, "amount_mismatch")
+		}
+		// Add more checks if needed
+	}
+
+	mismatchStr := strings.Join(mismatchFlags, ",")
+	scanStatus := "success"
+	if !analysis.IsValid {
+		scanStatus = "needs_resubmission"
+	}
+	if analysis.Reason == "AI scan unavailable" {
+		scanStatus = "failed"
 	}
 
 	// Create PaymentProof record
 	proof := models.PaymentProof{
-		BusinessID:        businessID,
-		BusinessName:      biz.Name,
-		BusinessPhone:     biz.Phone,
-		BusinessEmail:     user.Email,
-		CheckoutType:      checkoutType,
-		BillingCycle:      cycle,
-		Plan:              plan,
-		Amount:            totalAmount,
-		PlanAmount:        planAmount,
-		OneTimeTotal:      oneTimeTotal,
-		MonthlyAddonTotal: monthlyAddonTotal,
-		TotalAmount:       totalAmount,
-		ScreenshotURL:     resp.SecureURL,
-		Status:            models.PaymentStatusPending,
-		LineItems:         lineItems,
+		BusinessID:          businessID,
+		BusinessName:        biz.Name,
+		BusinessPhone:       biz.Phone,
+		BusinessEmail:       user.Email,
+		CheckoutType:        checkoutType,
+		BillingCycle:        cycle,
+		Plan:                plan,
+		Amount:              totalAmount,
+		PlanAmount:          planAmount,
+		OneTimeTotal:        oneTimeTotal,
+		MonthlyAddonTotal:   monthlyAddonTotal,
+		TotalAmount:         totalAmount,
+		ScreenshotURL:       "/" + localPath, // Serve statically
+		Status:              status,
+		LineItems:           lineItems,
+		DeclaredAmount:      declaredAmount,
+		PaidAt:              paidAt,
+		PaymentReference:    paymentRef,
+		ScanStatus:          scanStatus,
+		ScanExtractedAmount: analysis.ExtractedAmount,
+		ScanExtractedDate:   analysis.ExtractedDate,
+		ScanExtractedRef:    analysis.ExtractedRef,
+		ScanExtractedBank:   analysis.ExtractedBank,
+		ScanExtractedPayer:  analysis.ExtractedPayer,
+		ScanConfidence:      analysis.Confidence,
+		ScanReason:          analysis.Reason,
+		MismatchFlags:       mismatchStr,
+		RawScanSummary:      analysis.RawSummary,
 	}
 
 	if err := database.DB.Create(&proof).Error; err != nil {
@@ -233,10 +271,17 @@ func SubmitPaymentProof(c *gin.Context) {
 	LogActivity(businessID, "user", c.GetUint("user_id"), "payment_proof_submitted", "billing", strconv.FormatUint(uint64(proof.ID), 10),
 		map[string]interface{}{"cycle": cycle, "amount": totalAmount, "checkout_type": checkoutType}, c.ClientIP(), "medium", biz.Name, biz.Plan)
 
+	responseMessage := "Payment proof submitted successfully! Our team will verify and send your activation code via email within a few hours."
+	if proof.Status == models.PaymentStatusNeedsResubmission {
+		responseMessage = "Payment proof needs resubmission. Please upload a valid bank transfer or payment receipt."
+	}
+
 	c.JSON(http.StatusCreated, gin.H{
-		"message":       "Payment proof submitted successfully! Our team will verify and send your activation code via email within a few hours.",
+		"message":       responseMessage,
 		"proof_id":      proof.ID,
 		"status":        proof.Status,
+		"scan_status":   proof.ScanStatus,
+		"scan_reason":   proof.ScanReason,
 		"billing_cycle": cycle,
 		"amount":        totalAmount,
 		"checkout_type": checkoutType,
@@ -265,6 +310,8 @@ func GetPaymentStatus(c *gin.Context) {
 		"amount":          proof.Amount,
 		"activation_code": proof.ActivationCode, // non-empty only if approved
 		"admin_note":      proof.AdminNote,      // non-empty only if rejected
+		"scan_reason":     proof.ScanReason,
+		"scan_status":     proof.ScanStatus,
 		"submitted_at":    proof.CreatedAt,
 		"reviewed_at":     proof.ReviewedAt,
 	})
@@ -324,21 +371,30 @@ func ApprovePayment(c *gin.Context) {
 
 	var code string
 	now := time.Now()
+	var businessForInstance models.Business
+	if err := database.DB.Select("id", "wa_phone_number_id", "waba_id", "connected_at").First(&businessForInstance, proof.BusinessID).Error; err != nil {
+		businessForInstance.ID = proof.BusinessID
+	}
 
 	// Create BillingServicePurchases for addon line items
 	for _, li := range proof.LineItems {
 		if li.ItemType == models.ItemTypeAddon {
+			serviceInstanceKey := li.ServiceInstanceKey
+			if serviceInstanceKey == "" {
+				serviceInstanceKey = addonServiceInstanceKey(businessForInstance)
+			}
 			database.DB.Create(&models.BillingServicePurchase{
-				BusinessID:     proof.BusinessID,
-				AddonKey:       li.Key,
-				PaymentProofID: proof.ID,
-				Status:         models.ServiceStatusPaid,
-				PurchasedAt:    now,
+				BusinessID:         proof.BusinessID,
+				AddonKey:           li.Key,
+				PaymentProofID:     proof.ID,
+				Status:             models.ServiceStatusPaid,
+				ServiceInstanceKey: serviceInstanceKey,
+				PurchasedAt:        now,
 			})
 		}
 	}
 
-	if proof.CheckoutType == "subscription" || proof.CheckoutType == "mixed" {
+	if proof.CheckoutType == checkoutTypeSubscription || proof.CheckoutType == checkoutTypeMixed {
 		code = generateProofActivationCode(proof.Plan)
 
 		durationDays, err := platform.DaysForCycle(proof.BillingCycle)
@@ -378,10 +434,37 @@ func ApprovePayment(c *gin.Context) {
 		log.Printf("ℹ️ Add-on only payment approved for %s, no activation code generated.", proof.BusinessName)
 	}
 
+	// Upload local file to Cloudinary
+	cloudinaryURL := os.Getenv("CLOUDINARY_RECEIPTS_URL")
+	if cloudinaryURL == "" {
+		cloudinaryURL = os.Getenv("CLOUDINARY_URL") // Fallback
+	}
+
+	newScreenshotURL := proof.ScreenshotURL
+	if strings.HasPrefix(proof.ScreenshotURL, "/uploads/") && cloudinaryURL != "" {
+		cld, err := cloudinary.NewFromURL(cloudinaryURL)
+		if err == nil {
+			localPath := strings.TrimPrefix(proof.ScreenshotURL, "/")
+			resp, err := cld.Upload.Upload(context.Background(), localPath, uploader.UploadParams{
+				Folder:   "salespilot/payments",
+				PublicID: fmt.Sprintf("proof-%d-%d", proof.BusinessID, time.Now().Unix()),
+			})
+			if err == nil {
+				newScreenshotURL = resp.SecureURL
+				os.Remove(localPath) // Delete local file after upload
+			} else {
+				log.Printf("⚠️ Failed to upload receipt to Cloudinary: %v", err)
+			}
+		} else {
+			log.Printf("⚠️ Failed to initialize Cloudinary for receipts: %v", err)
+		}
+	}
+
 	// Update PaymentProof
 	if err := database.DB.Model(&proof).Updates(map[string]interface{}{
 		"status":          models.PaymentStatusApproved,
 		"activation_code": code,
+		"screenshot_url":  newScreenshotURL,
 		"reviewed_at":     &now,
 	}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update proof status"})
@@ -445,6 +528,12 @@ func RejectPayment(c *gin.Context) {
 	}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update proof status"})
 		return
+	}
+
+	// Optionally delete local file
+	if strings.HasPrefix(proof.ScreenshotURL, "/uploads/") {
+		localPath := strings.TrimPrefix(proof.ScreenshotURL, "/")
+		os.Remove(localPath)
 	}
 
 	LogActivity(proof.BusinessID, "super_admin", 0, "payment_rejected", "billing", strconv.FormatUint(uint64(proof.ID), 10),

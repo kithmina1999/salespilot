@@ -8,19 +8,20 @@ import { TableRow, TableCell } from "@/components/ui/table";
 import { PlanBadge } from "@/components/admin/status-badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
+import type { UsageBusiness } from "../types";
 
-export function UsageTable({ 
-  businesses, 
-  loading, 
-  filterPlan, 
-  nearLimitOnly, 
-  onReset 
-}: { 
-  businesses: any[], 
+export function UsageTable({
+  businesses,
+  loading,
+  filterPlan,
+  nearLimitOnly,
+  onReset
+}: {
+  businesses: UsageBusiness[],
   loading: boolean,
   filterPlan: string,
   nearLimitOnly: boolean,
-  onReset: (business: any) => void
+  onReset: (business: UsageBusiness) => void
 }) {
   const [sortCol, setSortCol] = useState<string>("ai_pct");
   const [sortDesc, setSortDesc] = useState<boolean>(true);
@@ -35,7 +36,7 @@ export function UsageTable({
     return (count / limit) * 100;
   };
 
-  const isNearLimit = (b: any) => {
+  const isNearLimit = (b: UsageBusiness) => {
     return getPct(b.ai_message_count, b.ai_message_limit) >= 80 ||
            getPct(b.system_message_count, b.system_message_limit) >= 80 ||
            getPct(b.simulation_count, b.simulation_limit) >= 80 ||
@@ -51,7 +52,7 @@ export function UsageTable({
   const sorted = [...filtered].sort((a, b) => {
     let valA = 0;
     let valB = 0;
-    
+
     switch (sortCol) {
       case "ai_pct":
         valA = getPct(a.ai_message_count, a.ai_message_limit);
@@ -113,7 +114,7 @@ export function UsageTable({
     const pct = isUnlimited ? 0 : Math.min(100, Math.round((count / limit) * 100)) || 0;
     const isDanger = pct >= 90;
     const isWarning = pct >= 80 && pct < 90;
-    
+
     return (
       <div className="flex flex-col gap-1 w-full min-w-[100px] max-w-[140px]">
         <div className="flex justify-between items-baseline">
@@ -122,9 +123,9 @@ export function UsageTable({
         </div>
         <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
           {!isUnlimited && (
-            <div 
-              className={`h-full rounded-full transition-all duration-500 ${isDanger ? 'bg-destructive' : isWarning ? 'bg-amber-500' : 'bg-primary'}`} 
-              style={{ width: `${pct}%` }} 
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${isDanger ? 'bg-destructive' : isWarning ? 'bg-amber-500' : 'bg-primary'}`}
+              style={{ width: `${pct}%` }}
             />
           )}
         </div>
@@ -137,7 +138,7 @@ export function UsageTable({
       columns={columns.map(c => ({
         ...c,
         header: c.sortable ? (
-          <button 
+          <button
             className="flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer outline-none"
             onClick={() => handleSort(c.key)}
           >
@@ -178,7 +179,7 @@ export function UsageTable({
             <ProgressBar count={business.rule_generation_count} limit={business.rule_generation_limit} />
           </TableCell>
           <TableCell className="px-4 py-3 text-sm font-semibold text-muted-foreground">
-            {formatStorage(business.total_storage_used)}
+            {formatStorage(business.total_storage_used || 0)}
           </TableCell>
           <TableCell className="px-4 py-3">
             <div className="flex justify-end gap-1.5">

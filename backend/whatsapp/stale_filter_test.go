@@ -8,7 +8,7 @@ import (
 )
 
 func TestStaleMessageFilter(t *testing.T) {
-	const staleThreshold = 5 * time.Minute
+	const staleThreshold = 60 * time.Minute
 
 	tests := []struct {
 		name      string
@@ -17,8 +17,7 @@ func TestStaleMessageFilter(t *testing.T) {
 	}{
 		{"fresh (10s ago)", -10 * time.Second, false},
 		{"fresh (4m59s ago)", -(5*time.Minute - time.Second), false},
-		{"exactly 5 minutes ago", -5 * time.Minute, true},
-		{"stale (10 minutes ago)", -10 * time.Minute, true},
+		{"fresh (10 minutes ago)", -10 * time.Minute, false},
 		{"stale (1 hour ago)", -1 * time.Hour, true},
 		{"stale (24 hours ago — Meta retry storm)", -24 * time.Hour, true},
 	}

@@ -35,6 +35,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
+import { AddonsManager } from "./AddonsManager"
 
 type BankSettings = {
   bank_name: string
@@ -327,6 +328,8 @@ export default function PlatformSettingsPage() {
           </AdminCard>
         ))}
       </AdminSectionCard>
+
+      <AddonsManager />
 
       {message && (
         <p className={message.startsWith("Error") ? "text-sm font-semibold text-destructive" : "text-sm font-semibold text-emerald-500"}>

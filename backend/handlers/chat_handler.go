@@ -48,12 +48,12 @@ func ListChats(c *gin.Context) {
 			c.name as customer_name
 		FROM messages m
 		LEFT JOIN customers c ON m.phone = c.phone AND m.business_id = c.business_id
-		WHERE m.business_id = ? AND m.deleted_at IS NULL
+		WHERE m.business_id = ? AND m.phone <> ? AND m.deleted_at IS NULL
 		GROUP BY m.phone, m.business_id, c.name
 		ORDER BY message_time DESC
 	`
 
-	if err := database.DB.Raw(query, businessID).Scan(&summaries).Error; err != nil {
+	if err := database.DB.Raw(query, businessID, sandboxSimulatorPhone).Scan(&summaries).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch chat list"})
 		return
 	}
@@ -138,36 +138,42 @@ func GetNotifications(c *gin.Context) {
 			(
 				SELECT m2.id FROM messages m2
 				INNER JOIN customers c2 ON m2.phone = c2.phone AND m2.business_id = c2.business_id
-				WHERE m2.business_id = ? AND m2.role = 'user' AND m2.is_read = false AND m2.deleted_at IS NULL
+				WHERE m2.business_id = ? AND m2.phone <> ? AND m2.role = 'user' AND m2.is_read = false AND m2.deleted_at IS NULL
 				  AND c2.bot_paused = true AND (c2.bot_paused_until IS NULL OR c2.bot_paused_until > NOW())
 				ORDER BY m2.created_at DESC LIMIT 1
 			) AS message_id,
 			(
 				SELECT m2.phone FROM messages m2
 				INNER JOIN customers c2 ON m2.phone = c2.phone AND m2.business_id = c2.business_id
-				WHERE m2.business_id = ? AND m2.role = 'user' AND m2.is_read = false AND m2.deleted_at IS NULL
+				WHERE m2.business_id = ? AND m2.phone <> ? AND m2.role = 'user' AND m2.is_read = false AND m2.deleted_at IS NULL
 				  AND c2.bot_paused = true AND (c2.bot_paused_until IS NULL OR c2.bot_paused_until > NOW())
 				ORDER BY m2.created_at DESC LIMIT 1
 			) AS phone,
 			(
 				SELECT m2.content FROM messages m2
 				INNER JOIN customers c2 ON m2.phone = c2.phone AND m2.business_id = c2.business_id
-				WHERE m2.business_id = ? AND m2.role = 'user' AND m2.is_read = false AND m2.deleted_at IS NULL
+				WHERE m2.business_id = ? AND m2.phone <> ? AND m2.role = 'user' AND m2.is_read = false AND m2.deleted_at IS NULL
 				  AND c2.bot_paused = true AND (c2.bot_paused_until IS NULL OR c2.bot_paused_until > NOW())
 				ORDER BY m2.created_at DESC LIMIT 1
 			) AS preview,
 			(
 				SELECT c2.name FROM messages m2
 				INNER JOIN customers c2 ON m2.phone = c2.phone AND m2.business_id = c2.business_id
-				WHERE m2.business_id = ? AND m2.role = 'user' AND m2.is_read = false AND m2.deleted_at IS NULL
+				WHERE m2.business_id = ? AND m2.phone <> ? AND m2.role = 'user' AND m2.is_read = false AND m2.deleted_at IS NULL
 				  AND c2.bot_paused = true AND (c2.bot_paused_until IS NULL OR c2.bot_paused_until > NOW())
 				ORDER BY m2.created_at DESC LIMIT 1
 			) AS customer_name
 		FROM messages m
 		INNER JOIN customers c ON m.phone = c.phone AND m.business_id = c.business_id
-		WHERE m.business_id = ? AND m.role = 'user' AND m.is_read = false AND m.deleted_at IS NULL
+		WHERE m.business_id = ? AND m.phone <> ? AND m.role = 'user' AND m.is_read = false AND m.deleted_at IS NULL
 		  AND c.bot_paused = true AND (c.bot_paused_until IS NULL OR c.bot_paused_until > NOW())
-	`, businessID, businessID, businessID, businessID, businessID).Scan(&result)
+	`,
+		businessID, sandboxSimulatorPhone,
+		businessID, sandboxSimulatorPhone,
+		businessID, sandboxSimulatorPhone,
+		businessID, sandboxSimulatorPhone,
+		businessID, sandboxSimulatorPhone,
+	).Scan(&result)
 
 	// Build the latest object only when there are actual unread messages
 	type NotifLatest struct {
@@ -200,7 +206,7 @@ func MarkAllNotificationsRead(c *gin.Context) {
 
 	var phones []string
 	database.DB.Model(&models.Customer{}).
-		Where("business_id = ? AND bot_paused = true AND (bot_paused_until IS NULL OR bot_paused_until > NOW())", businessID).
+		Where("business_id = ? AND phone <> ? AND bot_paused = true AND (bot_paused_until IS NULL OR bot_paused_until > NOW())", businessID, sandboxSimulatorPhone).
 		Pluck("phone", &phones)
 
 	if len(phones) > 0 {

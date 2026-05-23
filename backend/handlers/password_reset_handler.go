@@ -3,7 +3,6 @@ package handlers
 import (
 	"fmt"
 	"log"
-	"math/rand"
 	"net/http"
 	"time"
 	"unicode"
@@ -109,7 +108,11 @@ func ForgotPassword(c *gin.Context) {
 	database.DB.Where("phone = ? AND used_at IS NULL", input.Phone).Delete(&models.PasswordResetToken{})
 
 	// Generate 6-digit OTP
-	otp := fmt.Sprintf("%06d", rand.Intn(1000000))
+	otp, err := generateSixDigitOTP()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate reset code"})
+		return
+	}
 
 	record := models.PasswordResetToken{
 		Phone:     input.Phone,

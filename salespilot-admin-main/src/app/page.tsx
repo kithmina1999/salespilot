@@ -30,12 +30,10 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [mounted, setMounted] = useState(false)
   const router = useRouter()
   const { login, isAuthenticated } = useAuth()
 
   useEffect(() => {
-    setMounted(true)
     if (isAuthenticated) {
       router.push("/dashboard")
     }
@@ -68,7 +66,7 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background p-6 text-foreground">
-      <Card className={mounted ? "w-full max-w-[420px] border-border/70 py-8 shadow-xl animate-fade-up" : "w-full max-w-[420px] border-border/70 py-8 shadow-xl"}>
+      <Card className="w-full max-w-[420px] animate-fade-up border-border/70 py-8 shadow-xl">
         <CardHeader className="items-center px-8 text-center">
           <div className="mb-2 flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/15">
             <Shield className="size-6" strokeWidth={2.25} />

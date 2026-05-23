@@ -1,6 +1,7 @@
 import { Package, BookOpen, Users, ShoppingCart, DollarSign, MonitorSmartphone } from "lucide-react";
+import type { BusinessCounts } from "../types";
 
-export function CountsOverview({ counts }: { counts: any }) {
+export function CountsOverview({ counts }: { counts: BusinessCounts | null }) {
   if (!counts) return null;
 
   const cards = [

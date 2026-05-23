@@ -6,15 +6,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { AlertTriangle, Loader2 } from "lucide-react";
+import type { UsageBusiness } from "../types";
 
-export function ResetUsageDialog({ 
-  business, 
-  isOpen, 
-  onClose, 
-  onSuccess 
-}: { 
-  business: any | null, 
-  isOpen: boolean, 
+function getApiErrorMessage(err: unknown) {
+  if (typeof err === "object" && err !== null && "response" in err) {
+    const response = (err as { response?: { data?: { error?: string } } }).response;
+    if (response?.data?.error) return response.data.error;
+  }
+  if (err instanceof Error) return err.message;
+  return "Failed to reset usage";
+}
+
+export function ResetUsageDialog({
+  business,
+  isOpen,
+  onClose,
+  onSuccess
+}: {
+  business: UsageBusiness | null,
+  isOpen: boolean,
   onClose: () => void,
   onSuccess: () => void
 }) {
@@ -53,8 +63,8 @@ export function ResetUsageDialog({
       });
       onSuccess();
       handleClose();
-    } catch (err: any) {
-      setError(err?.response?.data?.error || err.message || "Failed to reset usage");
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -92,8 +102,8 @@ export function ResetUsageDialog({
             <label className="text-sm font-bold text-foreground">Select counters to reset:</label>
             <div className="grid grid-cols-2 gap-2">
               {counters.map(c => (
-                <div 
-                  key={c.id} 
+                <div
+                  key={c.id}
                   onClick={() => handleToggle(c.id)}
                   className={`flex flex-col p-2 border rounded-lg cursor-pointer transition-colors ${selectedCounters.includes(c.id) ? 'bg-primary/10 border-primary text-primary' : 'bg-secondary border-border text-muted-foreground hover:bg-secondary/80'}`}
                 >
@@ -106,9 +116,9 @@ export function ResetUsageDialog({
 
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-foreground">Reason <span className="text-destructive">*</span></label>
-            <Input 
-              value={reason} 
-              onChange={(e) => setReason(e.target.value)} 
+            <Input
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
               placeholder="e.g. Courtesy reset for customer support"
             />
             <p className="text-[0.65rem] text-muted-foreground">This action will be recorded in the audit log.</p>

@@ -21,6 +21,10 @@ package whatsapp
 import (
 	"fmt"
 	"log"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
@@ -35,6 +39,20 @@ type PaymentOrderResult struct {
 	Order     *models.Order  // the single resolved order (nil when Ambiguous or no match)
 	Orders    []models.Order // all candidates when Ambiguous = true
 	Ambiguous bool
+}
+
+const pendingPaymentProofTTL = 30 * time.Minute
+
+type pendingPaymentProofSelection struct {
+	Description   string
+	ScreenshotURL string
+	ExpiresAt     time.Time
+}
+
+var pendingPaymentProofSelections sync.Map
+
+func paymentProofSelectionKey(businessID uint, phone string) string {
+	return fmt.Sprintf("%d:%s", businessID, phone)
 }
 
 // ─── resolvePaymentOrder ─────────────────────────────────────────────────────
@@ -148,7 +166,7 @@ func handleReviewImage(business *models.Business, fromNormalized, fromRaw string
 // handlePaymentProofImage replaces the old single-order-lookup version.
 // It uses resolvePaymentOrder to detect multi-order ambiguity and respond
 // with a disambiguation list when needed.
-func handlePaymentProofImage(business *models.Business, fromNormalized, fromRaw, description string) {
+func handlePaymentProofImage(business *models.Business, fromNormalized, fromRaw, description, screenshotURL string) {
 	log.Printf("💳 [MediaBridge] Payment proof from %s — %s", fromNormalized, description)
 
 	result := resolvePaymentOrder(business, fromNormalized)
@@ -171,6 +189,22 @@ func handlePaymentProofImage(business *models.Business, fromNormalized, fromRaw,
 	// Case: multiple pending orders — ask which one
 	if result.Ambiguous {
 		log.Printf("⚠️ [MediaBridge] %s has %d pending orders — sending disambiguation", fromNormalized, len(result.Orders))
+		selectionKey := paymentProofSelectionKey(business.ID, fromNormalized)
+		pendingPaymentProofSelections.Store(
+			selectionKey,
+			pendingPaymentProofSelection{
+				Description:   description,
+				ScreenshotURL: screenshotURL,
+				ExpiresAt:     time.Now().Add(pendingPaymentProofTTL),
+			},
+		)
+		time.AfterFunc(pendingPaymentProofTTL+time.Minute, func() {
+			if raw, ok := pendingPaymentProofSelections.Load(selectionKey); ok {
+				if selection, ok := raw.(pendingPaymentProofSelection); ok && time.Now().After(selection.ExpiresAt) {
+					pendingPaymentProofSelections.Delete(selectionKey)
+				}
+			}
+		})
 
 		// Build the disambiguation buttons (max 3 due to WhatsApp API limit)
 		var buttons []Button
@@ -206,6 +240,7 @@ func handlePaymentProofImage(business *models.Business, fromNormalized, fromRaw,
 		OrderID:       pendingOrder.ID,
 		CustomerPhone: fromNormalized,
 		Amount:        pendingOrder.TotalPrice,
+		ScreenshotURL: screenshotURL,
 		Description:   description,
 		Status:        "pending",
 	}
@@ -234,28 +269,102 @@ func handlePaymentProofImage(business *models.Business, fromNormalized, fromRaw,
 			"Our team will review and confirm your payment. We'll update you shortly. 🙏",
 		pendingOrder.BusinessOrderNum))
 
-	// Alert merchant
-	go func() {
-		reportPhone := business.ReportPhone
-		if reportPhone == "" {
-			reportPhone = business.Phone
-		}
-		if reportPhone == "" {
-			return
-		}
-		alert := fmt.Sprintf(
-			"💳 *Payment Proof Received!*\n\n"+
-				"Order: #%d\nCustomer: %s\nAmount: Rs.%.0f\n\n"+
-				"What was sent: %s\n\n"+
-				"Open your dashboard to approve or reject this payment.",
-			pendingOrder.BusinessOrderNum,
-			pendingOrder.CustomerPhone,
-			pendingOrder.TotalPrice,
-			description,
-		)
-		SendText(business.WAPhoneNumberID, business.WAAccessToken, reportPhone, alert)
-	}()
+	go notifyMerchantPaymentProof(business, *pendingOrder, description)
 
 	log.Printf("✅ [MediaBridge] Payment proof #%d for Order #%d — awaiting_verification",
 		proof.ID, pendingOrder.BusinessOrderNum)
+}
+
+func handlePaymentProofOrderSelection(business *models.Business, fromNormalized, fromRaw, msg string) bool {
+	if !strings.HasPrefix(msg, "proof_order:") {
+		return false
+	}
+
+	orderID, err := strconv.ParseUint(strings.TrimSpace(strings.TrimPrefix(msg, "proof_order:")), 10, 64)
+	if err != nil {
+		botSendText(business, fromRaw, "Sorry, I couldn't match that payment proof to an order. Please send the screenshot again.")
+		return true
+	}
+
+	key := paymentProofSelectionKey(business.ID, fromNormalized)
+	raw, ok := pendingPaymentProofSelections.Load(key)
+	if !ok {
+		botSendText(business, fromRaw, "That payment proof selection has expired. Please send the payment screenshot again.")
+		return true
+	}
+
+	selection, ok := raw.(pendingPaymentProofSelection)
+	if !ok || time.Now().After(selection.ExpiresAt) {
+		pendingPaymentProofSelections.Delete(key)
+		botSendText(business, fromRaw, "That payment proof selection has expired. Please send the payment screenshot again.")
+		return true
+	}
+
+	var order models.Order
+	if err := database.DB.Where(
+		"id = ? AND business_id = ? AND customer_phone = ? AND payment_method = ? AND payment_status = ? AND status IN ?",
+		uint(orderID), business.ID, fromNormalized, "bank_transfer", "pending",
+		[]string{models.OrderStatusNew, models.OrderStatusConfirmed},
+	).First(&order).Error; err != nil {
+		botSendText(business, fromRaw, "Sorry, that order is no longer waiting for a bank transfer proof.")
+		return true
+	}
+
+	proof := models.OrderPaymentProof{
+		BusinessID:    business.ID,
+		OrderID:       order.ID,
+		CustomerPhone: fromNormalized,
+		Amount:        order.TotalPrice,
+		ScreenshotURL: selection.ScreenshotURL,
+		Description:   selection.Description,
+		Status:        "pending",
+	}
+	if err := database.DB.Create(&proof).Error; err != nil {
+		log.Printf("❌ [MediaBridge] Failed to create selected OrderPaymentProof: %v", err)
+		botSendText(business, fromRaw, "Sorry, I couldn't save that payment proof. Please try again.")
+		return true
+	}
+
+	if err := database.DB.Model(&order).UpdateColumn("payment_status", "awaiting_verification").Error; err != nil {
+		log.Printf("❌ [MediaBridge] Failed to update selected order payment status: %v", err)
+	}
+
+	database.DB.Create(&models.Message{
+		BusinessID:  business.ID,
+		Phone:       fromNormalized,
+		Role:        "user",
+		Content:     fmt.Sprintf("[Payment proof for Order #%d: %s]", order.BusinessOrderNum, selection.Description),
+		IsUnmatched: true,
+	})
+	pendingPaymentProofSelections.Delete(key)
+
+	botSendText(business, fromRaw, fmt.Sprintf(
+		"✅ *Payment proof received for Order #%d!*\nOur team will review and confirm your payment shortly. 🙏",
+		order.BusinessOrderNum,
+	))
+	go notifyMerchantPaymentProof(business, order, selection.Description)
+
+	log.Printf("✅ [MediaBridge] Payment proof #%d linked to selected Order #%d", proof.ID, order.BusinessOrderNum)
+	return true
+}
+
+func notifyMerchantPaymentProof(business *models.Business, order models.Order, description string) {
+	reportPhone := business.ReportPhone
+	if reportPhone == "" {
+		reportPhone = business.Phone
+	}
+	if reportPhone == "" {
+		return
+	}
+	alert := fmt.Sprintf(
+		"💳 *Payment Proof Received!*\n\n"+
+			"Order: #%d\nCustomer: %s\nAmount: Rs.%.0f\n\n"+
+			"What was sent: %s\n\n"+
+			"Open your dashboard to approve or reject this payment.",
+		order.BusinessOrderNum,
+		order.CustomerPhone,
+		order.TotalPrice,
+		description,
+	)
+	SendText(business.WAPhoneNumberID, business.WAAccessToken, reportPhone, alert)
 }

@@ -1,6 +1,7 @@
 import { Bot, Globe2, CreditCard, CheckCircle2, AlertCircle, BarChart3 } from "lucide-react";
+import type { BusinessDetail } from "../types";
 
-export function BotConfigCard({ business }: { business: any }) {
+export function BotConfigCard({ business }: { business: BusinessDetail }) {
   const supportedLangs = business.bot_supported_langs?.split(",") || ["en"];
 
   return (

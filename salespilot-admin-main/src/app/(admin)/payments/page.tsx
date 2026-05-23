@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import useSWR from "swr";
 import { api } from "@/lib/api";
 import {
   Banknote, Clock, CheckCircle, XCircle, Search,
-  RefreshCw, ZoomIn, X, AlertTriangle, ChevronDown,
-  ImageIcon, Loader2,
+  RefreshCw, ZoomIn, X,
+  AlertCircle, ImageIcon, Loader2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
-type ProofStatus = "pending" | "approved" | "rejected";
+type ProofStatus = "pending" | "approved" | "rejected" | "needs_resubmission";
 
 type PaymentProofLineItem = {
   id: number;
@@ -39,24 +39,89 @@ type PaymentProof = {
   activation_code: string;
   admin_note: string;
   line_items?: PaymentProofLineItem[];
+  // AI & Declarations
+  declared_amount: number;
+  paid_at: string | null;
+  payment_reference: string;
+  scan_status: string;
+  scan_extracted_amount: number;
+  scan_extracted_date: string | null;
+  scan_extracted_ref: string;
+  scan_extracted_bank: string;
+  scan_extracted_payer: string;
+  scan_confidence: number;
+  scan_reason: string;
+  mismatch_flags: string;
+  raw_scan_summary: string;
+
   submitted_at: string;
   reviewed_at: string | null;
   created_at: string;
 };
 
 const STATUS_STYLES: Record<ProofStatus, { bg: string; color: string; border: string; label: string }> = {
-  pending:  { bg: "rgba(245,158,11,0.12)", color: "#fbbf24", border: "rgba(245,158,11,0.3)", label: "⏳ Pending" },
-  approved: { bg: "rgba(34,197,94,0.10)",  color: "#4ade80", border: "rgba(34,197,94,0.3)",  label: "✅ Approved" },
-  rejected: { bg: "rgba(239,68,68,0.10)",  color: "#f87171", border: "rgba(239,68,68,0.3)",  label: "❌ Rejected" },
+  pending:  { bg: "rgba(245,158,11,0.12)", color: "#fbbf24", border: "rgba(245,158,11,0.3)", label: "Pending" },
+  approved: { bg: "rgba(34,197,94,0.10)",  color: "#4ade80", border: "rgba(34,197,94,0.3)",  label: "Approved" },
+  rejected: { bg: "rgba(239,68,68,0.10)",  color: "#f87171", border: "rgba(239,68,68,0.3)",  label: "Rejected" },
+  needs_resubmission: { bg: "rgba(249,115,22,0.10)", color: "#f97316", border: "rgba(249,115,22,0.3)", label: "Resubmit" },
 };
 
-const CYCLE_LABEL: Record<string, string> = {
-  monthly: "Monthly", quarterly: "Quarterly", annual: "Annual",
+const STATUS_FILTER_LABELS: Record<ProofStatus | "all", string> = {
+  all: "All",
+  pending: "Pending",
+  approved: "Approved",
+  rejected: "Rejected",
+  needs_resubmission: "Resubmit",
 };
 
 function formatLKR(n: number) { return `LKR ${n.toLocaleString("en-LK")}`; }
 function fmtDate(s: string) {
+  if (!s) return "";
   return new Date(s).toLocaleDateString("en-LK", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function getApiErrorMessage(err: unknown) {
+  if (typeof err === "object" && err !== null && "response" in err) {
+    const response = (err as { response?: { data?: { error?: string } } }).response;
+    if (response?.data?.error) return response.data.error;
+  }
+  if (err instanceof Error) return err.message;
+  return "Unknown error";
+}
+
+function getImageUrl(url: string) {
+  if (!url) return "";
+  if (url.startsWith("/")) {
+    return `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}${url}`;
+  }
+  return url;
+}
+
+function getProofStatusNotice(proof: PaymentProof) {
+  const scanReason = proof.scan_reason?.trim();
+  const adminNote = proof.admin_note?.trim();
+
+  if (proof.status === "needs_resubmission" && scanReason) {
+    return {
+      label: "Resubmission reason",
+      message: scanReason,
+      color: "#f97316",
+      background: "rgba(249,115,22,0.12)",
+      border: "rgba(249,115,22,0.35)",
+    };
+  }
+
+  if (proof.status === "rejected" && adminNote) {
+    return {
+      label: "Rejection reason",
+      message: adminNote,
+      color: "#f87171",
+      background: "rgba(239,68,68,0.12)",
+      border: "rgba(239,68,68,0.35)",
+    };
+  }
+
+  return null;
 }
 
 export default function PaymentsPage() {
@@ -64,7 +129,7 @@ export default function PaymentsPage() {
     "/system/payments",
     (url: string) => api.get(url).then((res) => res.data)
   );
-  const proofs: PaymentProof[] = data?.proofs || [];
+  const proofs: PaymentProof[] = useMemo(() => data?.proofs || [], [data?.proofs]);
   const pendingCount = data?.pending_count || 0;
   const approvedCount = data?.approved_count || 0;
 
@@ -109,8 +174,8 @@ export default function PaymentsPage() {
       await api.post(`/system/payments/${proof.id}/approve`);
       setApproving(null);
       mutate();
-    } catch (err: any) {
-      alert("Failed to approve: " + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      alert("Failed to approve: " + getApiErrorMessage(err));
     } finally {
       setApproveLoading(false);
     }
@@ -124,8 +189,8 @@ export default function PaymentsPage() {
       setRejecting(null);
       setRejectReason("");
       mutate();
-    } catch (err: any) {
-      alert("Failed to reject: " + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      alert("Failed to reject: " + getApiErrorMessage(err));
     } finally {
       setRejectLoading(false);
     }
@@ -182,27 +247,30 @@ export default function PaymentsPage() {
         <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
           {/* Status tabs */}
           <div style={{ display: "flex", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "0.75rem", padding: "0.25rem", gap: "0.25rem" }}>
-            {(["all", "pending", "approved", "rejected"] as const).map(s => (
-              <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                style={{
-                  padding: "0.375rem 0.875rem",
-                  borderRadius: "0.5rem",
-                  fontSize: "0.8125rem",
-                  fontWeight: 600,
-                  border: "none",
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  background: statusFilter === s ? "var(--accent)" : "transparent",
-                  color: statusFilter === s ? "#fff" : "var(--muted)",
-                  transition: "all 0.15s",
-                  textTransform: "capitalize",
-                }}
-              >
-                {s === "all" ? "All" : s}{s === "pending" && pendingCount > 0 ? ` (${pendingCount})` : ""}
-              </button>
-            ))}
+            {(["all", "pending", "approved", "rejected", "needs_resubmission"] as const).map(s => {
+              const active = statusFilter === s;
+
+              return (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  style={{
+                    padding: "0.375rem 0.875rem",
+                    borderRadius: "0.5rem",
+                    fontSize: "0.8125rem",
+                    fontWeight: active ? 800 : 700,
+                    border: "none",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    background: active ? "var(--primary)" : "transparent",
+                    color: active ? "var(--primary-foreground)" : "var(--muted-foreground)",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {STATUS_FILTER_LABELS[s]}{s === "pending" && pendingCount > 0 ? ` (${pendingCount})` : ""}
+                </button>
+              );
+            })}
           </div>
 
           {/* Search */}
@@ -237,6 +305,7 @@ export default function PaymentsPage() {
           ) : (
             filtered.map((proof, idx) => {
               const s = STATUS_STYLES[proof.status];
+              const statusNotice = getProofStatusNotice(proof);
               return (
                 <div
                   key={proof.id}
@@ -253,11 +322,23 @@ export default function PaymentsPage() {
 
                   {/* Cycle / Items */}
                   <div>
-                    <p style={{ fontSize: "0.8375rem", fontWeight: 700, color: "var(--text)" }}>{formatLKR(proof.amount)}</p>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", marginTop: "0.1rem" }}>
+                    <p style={{ fontSize: "0.8375rem", fontWeight: 700, color: "var(--text)" }}>Expected: {formatLKR(proof.amount)}</p>
+                    <p style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted-foreground)" }}>Declared: {formatLKR(proof.declared_amount)}</p>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", marginTop: "0.3rem", flexWrap: "wrap" }}>
                       <span style={{ fontSize: "0.65rem", fontWeight: 600, padding: "0.1rem 0.3rem", borderRadius: "0.25rem", background: "var(--surface-2)", color: "var(--muted-foreground)" }}>
                         {proof.checkout_type === 'subscription' ? 'Sub' : proof.checkout_type === 'addon_only' ? 'Add-on' : 'Mixed'}
                       </span>
+                      {proof.mismatch_flags?.includes("amount_mismatch") && (
+                        <span style={{ fontSize: "0.65rem", fontWeight: 600, padding: "0.1rem 0.3rem", borderRadius: "0.25rem", background: "rgba(239,68,68,0.1)", color: "#f87171" }} title="Extracted amount doesn't match expected">
+                          ⚠️ Amount Mismatch
+                        </span>
+                      )}
+                      {proof.scan_status === "failed" && (
+                        <span style={{ fontSize: "0.65rem", fontWeight: 600, padding: "0.1rem 0.3rem", borderRadius: "0.25rem", background: "rgba(245,158,11,0.1)", color: "#fbbf24" }} title="AI couldn't scan this image">
+                          🤖 Scan Failed
+                        </span>
+                      )}
                     </div>
                     {proof.line_items && proof.line_items.length > 0 && (
                       <div style={{ marginTop: "0.2rem", display: "flex", flexDirection: "column", gap: "0.1rem" }}>
@@ -277,11 +358,11 @@ export default function PaymentsPage() {
                   <div>
                     {proof.screenshot_url ? (
                       <button
-                        onClick={() => setLightboxUrl(proof.screenshot_url)}
+                        onClick={() => setLightboxUrl(getImageUrl(proof.screenshot_url))}
                         style={{ background: "none", border: "1px solid var(--border-2)", borderRadius: "0.5rem", padding: "2px", cursor: "pointer", display: "flex", overflow: "hidden", position: "relative", width: 60, height: 44 }}
                         title="Click to view full screenshot"
                       >
-                        <img src={proof.screenshot_url} alt="Receipt" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "0.375rem" }} />
+                        <img src={getImageUrl(proof.screenshot_url)} alt="Receipt" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "0.375rem" }} />
                         <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s" }}
                           onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
                           onMouseLeave={e => (e.currentTarget.style.opacity = "0")}
@@ -298,12 +379,31 @@ export default function PaymentsPage() {
 
                   {/* Status */}
                   <div>
-                    <span style={{ padding: "0.2rem 0.6rem", background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: "999px", fontSize: "0.7rem", fontWeight: 700 }}>{s.label}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                      <span style={{ padding: "0.2rem 0.6rem", background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: "999px", fontSize: "0.7rem", fontWeight: 700 }}>{s.label}</span>
+                      {statusNotice && (
+                        <span
+                          aria-label={statusNotice.label}
+                          title={statusNotice.message}
+                          style={{
+                            width: 22,
+                            height: 22,
+                            borderRadius: "999px",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: statusNotice.color,
+                            background: statusNotice.background,
+                            border: `1px solid ${statusNotice.border}`,
+                            flexShrink: 0,
+                          }}
+                        >
+                          <AlertCircle size={13} />
+                        </span>
+                      )}
+                    </div>
                     {proof.status === "approved" && proof.activation_code && (
                       <p style={{ fontSize: "0.7rem", color: "var(--muted-foreground)", marginTop: "0.2rem", fontFamily: "monospace" }}>{proof.activation_code}</p>
-                    )}
-                    {proof.status === "rejected" && proof.admin_note && (
-                      <p style={{ fontSize: "0.7rem", color: "#f87171", marginTop: "0.2rem", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={proof.admin_note}>{proof.admin_note}</p>
                     )}
                   </div>
 

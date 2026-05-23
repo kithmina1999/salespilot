@@ -10,6 +10,8 @@ export interface PaymentStatus {
   amount: number;
   activation_code: string;
   admin_note: string;
+  scan_reason?: string;
+  scan_status?: string;
   submitted_at: string;
   reviewed_at: string | null;
 }

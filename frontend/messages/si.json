@@ -184,6 +184,8 @@
     "general": "සාමාන්‍ය",
     "language": "භාෂා සැකසුම්",
     "security": "ආරක්ෂාව",
+    "audit_logs":"මෙහෙයුම් වාර්ථා ",
+    "blocked_numbers":"",
     "dashboard_language": "Dashboard භාෂාව",
     "dashboard_language_hint": "Dashboard interface භාෂාව වෙනස් කරයි",
     "bot_reply_language": "Bot Default Reply භාෂාව",

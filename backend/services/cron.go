@@ -70,10 +70,11 @@ func StartCronJobs() {
 
 func checkExpiredPlans() {
 	now := time.Now()
+	graceCutoff := now.Add(-3 * 24 * time.Hour)
 	var businesses []models.Business
 
-	// Find businesses where the plan has expired
-	database.DB.Where("plan_expires_at IS NOT NULL AND plan_expires_at < ? AND plan != ?", now, models.PlanFree).Find(&businesses)
+	// Downgrade only after the 3-day billing grace window has elapsed.
+	database.DB.Where("plan_expires_at IS NOT NULL AND plan_expires_at < ? AND plan != ?", graceCutoff, models.PlanFree).Find(&businesses)
 
 	for _, biz := range businesses {
 		log.Printf("⚠️ Plan expired for business %d (%s) — Downgrading to Free", biz.ID, biz.Name)

@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Banknote, CheckCircle2, Clock, AlertCircle, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Banknote, CheckCircle2, Clock, ChevronRight, ChevronLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useBillingStatus } from '@/hooks/useBillingStatus';
@@ -14,8 +14,16 @@ import CheckoutTotals from '@/components/billing/CheckoutTotals';
 import CheckoutAddons from '@/components/billing/CheckoutAddons';
 import BankTransferDetails from '@/components/billing/BankTransferDetails';
 import BillingCycleSelector from '@/components/billing/BillingCycleSelector';
-import PaymentProofUploader from '@/components/billing/PaymentProofUploader';
+import PaymentProofUploader, { type PaymentProofFeedback } from '@/components/billing/PaymentProofUploader';
 import BillingPageHeader from '@/components/billing/BillingPageHeader';
+
+type SubmitProofResponse = {
+  message?: string;
+  error?: string;
+  status?: string;
+  scan_reason?: string;
+  scan_status?: string;
+};
 
 function CheckoutContent() {
   const router = useRouter();
@@ -24,19 +32,29 @@ function CheckoutContent() {
   const queryPlan = searchParams.get('plan') as 'starter' | 'pro' | 'addons' | null;
   const queryCycle = searchParams.get('cycle') as 'monthly' | 'annual' | null;
 
+  const checkoutOptionsType = queryPlan === 'addons' ? 'addon_only' : 'subscription';
   const { paymentStatus, refreshStatus } = useBillingStatus();
-  const { billingOptions, isLoading: loadingOptions } = useBillingOptions();
+  const { billingOptions, isLoading: loadingOptions } = useBillingOptions(checkoutOptionsType);
   const pricing = useAppStore((s) => s.pricing);
   
   const [cycle, setCycle] = useState<'monthly' | 'annual'>(queryCycle ?? 'monthly');
   const [uploading, setUploading] = useState(false);
   const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
+  const [uploadFeedback, setUploadFeedback] = useState<PaymentProofFeedback | null>(null);
 
   useEffect(() => {
     if (!queryPlan || (queryPlan !== 'starter' && queryPlan !== 'pro' && queryPlan !== 'addons')) {
       router.replace('/dashboard/plans');
     }
   }, [queryPlan, router]);
+
+  useEffect(() => {
+    if (!billingOptions?.addons) return;
+    const availableAddonKeys = new Set(
+      billingOptions.addons.filter((addon) => addon.is_available !== false).map((addon) => addon.key)
+    );
+    setSelectedAddons((prev) => prev.filter((key) => availableAddonKeys.has(key)));
+  }, [billingOptions?.addons]);
 
   if (!queryPlan || (queryPlan !== 'starter' && queryPlan !== 'pro' && queryPlan !== 'addons')) {
     return null; // Will redirect
@@ -45,6 +63,7 @@ function CheckoutContent() {
   const hasPending = paymentStatus?.status === 'pending';
   const hasRejected = paymentStatus?.status === 'rejected';
   const hasApproved = paymentStatus?.status === 'approved';
+  const needsResubmission = paymentStatus?.status === 'needs_resubmission';
 
   const isSubscription = queryPlan === 'starter' || queryPlan === 'pro';
   const latestCheckoutType = paymentStatus?.checkout_type ?? (paymentStatus?.plan ? 'subscription' : 'addon_only');
@@ -56,11 +75,26 @@ function CheckoutContent() {
   const currentPrice = cycle === 'monthly' ? monthlyPrice : annualPrice;
   const bankConfigured = Boolean(billingOptions?.bank_details?.configured);
 
-  const selectedAddonObjects = (billingOptions?.addons ?? []).filter(a => selectedAddons.includes(a.key));
+  const selectedAddonObjects = (billingOptions?.addons ?? []).filter(a => selectedAddons.includes(a.key) && a.is_available !== false);
   const addonsTotal = selectedAddonObjects.reduce((sum, a) => sum + a.amount, 0);
   const totalAmount = currentPrice + addonsTotal;
+  const paymentIssueFeedback: PaymentProofFeedback | null = uploadFeedback ?? (
+    needsResubmission
+      ? {
+          tone: 'warning',
+          title: 'Payment proof needs resubmission',
+          message: paymentStatus?.scan_reason?.trim() || 'Please upload a valid bank transfer or payment receipt.',
+        }
+      : hasRejected
+        ? {
+            tone: 'error',
+            title: 'Payment could not be verified',
+            message: paymentStatus?.admin_note?.trim() || 'Please upload a clearer payment screenshot.',
+          }
+        : null
+  );
 
-  async function handleProofSubmit(file: File) {
+  async function handleProofSubmit(file: File, declaredAmount: string, paidAt: string, paymentReference: string) {
     if (!bankConfigured) { toast.error('Bank transfer details are not configured yet'); return; }
     
     setUploading(true);
@@ -68,6 +102,11 @@ function CheckoutContent() {
     try {
       const form = new FormData();
       form.append('image', file);
+      form.append('declared_amount', declaredAmount);
+      form.append('paid_at', paidAt);
+      if (paymentReference) {
+        form.append('payment_reference', paymentReference);
+      }
       if (isSubscription) {
         form.append('billing_cycle', cycle);
         form.append('plan', queryPlan as string);
@@ -81,13 +120,25 @@ function CheckoutContent() {
         headers: { Authorization: `Bearer ${token}` },
         body: form,
       });
-      const data = await res.json();
+      const data = await res.json() as SubmitProofResponse;
       if (!res.ok) throw new Error(data.error || 'Upload failed');
-      
-      toast.success("Payment proof submitted! We'll verify and send your code via email soon.");
+
+      if (data.status === 'needs_resubmission') {
+        const reason = data.scan_reason?.trim() || 'Please upload a valid bank transfer or payment receipt.';
+        setUploadFeedback({
+          tone: 'warning',
+          title: 'Payment proof needs resubmission',
+          message: reason,
+        });
+        refreshStatus();
+        return;
+      }
+
+      setUploadFeedback(null);
+      toast.success("Payment proof submitted. We'll verify it before approval.");
       refreshStatus();
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setUploading(false);
     }
@@ -145,19 +196,6 @@ function CheckoutContent() {
           </div>
         )}
 
-        {hasRejected && (
-          <div className="flex items-center gap-3 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400">
-            <AlertCircle size={20} className="shrink-0" />
-            <div>
-              <p className="font-bold">Payment Could Not Be Verified ❌</p>
-              {paymentStatus?.admin_note && (
-                <p className="text-sm opacity-80 mt-0.5">Reason: <strong>{paymentStatus.admin_note}</strong></p>
-              )}
-              <p className="text-sm opacity-70 mt-0.5">Please resubmit a clearer screenshot below.</p>
-            </div>
-          </div>
-        )}
-
         {!blocksCurrentCheckout && (
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
             <div className="space-y-6">
@@ -174,8 +212,8 @@ function CheckoutContent() {
                 addons={billingOptions?.addons ?? []}
                 purchasedAddonKeys={billingOptions?.purchased_addons ?? []}
                 selectedAddonKeys={selectedAddons}
-                waStatus={billingOptions?.business_connection_status?.wa_status}
                 onToggleAddon={(addon) => {
+                  if (addon.is_available === false) return;
                   setSelectedAddons(prev =>
                     prev.includes(addon.key)
                       ? prev.filter(k => k !== addon.key)
@@ -194,6 +232,7 @@ function CheckoutContent() {
                 onSubmit={handleProofSubmit}
                 disabled={!bankConfigured || totalAmount <= 0}
                 supportPhone={billingOptions?.bank_details?.support_phone}
+                feedback={paymentIssueFeedback}
               />
             </div>
             <div>

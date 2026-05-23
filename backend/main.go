@@ -32,10 +32,12 @@ func main() {
 	// Init database (PostgreSQL)
 	database.Init(cfg.DatabaseURL)
 
-	// Pluggable state store — backs BehaviorScorer, PromptShield token budgets,
-	// and first-message-of-day checks. Swap NewInMemoryStore → NewRedisStore
-	// in this single line when horizontal scaling requires shared state.
-	appStore := cache.NewInMemoryStore(cache.DefaultConfig())
+	// Shared pipeline state backs BehaviorScorer, PromptShield budgets, and
+	// first-message-of-day checks.
+	appStore, err := newAppStateStore(cfg)
+	if err != nil {
+		log.Fatalf("failed to initialize pipeline state store: %v", err)
+	}
 	whatsapp.SetStateStore(appStore)
 
 	// 10 concurrent workers
@@ -56,6 +58,7 @@ func main() {
 
 	// Create uploads directory
 	os.MkdirAll("uploads/products", 0755)
+	os.MkdirAll("uploads/receipts", 0755)
 
 	// Setup Gin
 	r := gin.Default()
@@ -147,6 +150,12 @@ func main() {
 		system.GET("/settings/billing", middleware.RequireSuperPermission(middleware.PermBillingView), handlers.GetSystemBillingSettings)
 		system.PUT("/settings/billing", middleware.RequireSuperPermission(middleware.PermBillingManage), middleware.HighRiskRoute("update_billing_settings"), handlers.UpdateSystemBillingSettings)
 
+		// Billing Addons
+		system.GET("/billing/addons", middleware.RequireSuperPermission(middleware.PermBillingView), handlers.ListSystemBillingAddons)
+		system.POST("/billing/addons", middleware.RequireSuperPermission(middleware.PermBillingManage), middleware.HighRiskRoute("create_addon"), handlers.CreateSystemBillingAddon)
+		system.PUT("/billing/addons/:key", middleware.RequireSuperPermission(middleware.PermBillingManage), middleware.HighRiskRoute("update_addon"), handlers.UpdateSystemBillingAddon)
+		system.POST("/billing/addons/:key/archive", middleware.RequireSuperPermission(middleware.PermBillingManage), middleware.HighRiskRoute("archive_addon"), handlers.ArchiveSystemBillingAddon)
+
 		// Platform Notices
 		system.GET("/notices", middleware.RequireSuperPermission(middleware.PermBusinessView), handlers.ListPlatformNotices)
 		system.POST("/notices", middleware.RequireSuperPermission(middleware.PermBusinessManage), handlers.CreatePlatformNotice)
@@ -166,7 +175,7 @@ func main() {
 	// Dashboard Authentication
 	auth := r.Group("/api/v1/auth")
 	{
-		auth.POST("/login", handlers.Login)
+		auth.POST("/login", middleware.RateLimit(20), handlers.Login)
 		auth.POST("/register", handlers.Register)
 		auth.POST("/verify-email", handlers.VerifyEmailOTP)
 		auth.POST("/resend-verification", handlers.ResendEmailOTP)
@@ -228,10 +237,10 @@ func main() {
 		dash.PATCH("/orders/:id/status", middleware.RequireBusinessActive(), handlers.UpdateOrderStatus)
 		dash.PATCH("/orders/:id/late-alert", middleware.RequireBusinessActive(), handlers.ToggleLateAlert)
 		// Slice 4: Payment proof review
-		dash.GET("/orders/proofs", handlers.ListOrderProofs)
 		dash.GET("/orders/:id/proofs", handlers.GetOrderProofs)
-		dash.POST("/orders/proofs/:id/approve", middleware.RequireBusinessActive(), handlers.ApproveOrderProof)
-		dash.POST("/orders/proofs/:id/reject", middleware.RequireBusinessActive(), handlers.RejectOrderProof)
+		dash.GET("/order-proofs", handlers.ListOrderProofs)
+		dash.POST("/order-proofs/:id/approve", middleware.RequireBusinessActive(), handlers.ApproveOrderProof)
+		dash.POST("/order-proofs/:id/reject", middleware.RequireBusinessActive(), handlers.RejectOrderProof)
 
 		// Dashboard Finance Analytics
 		dash.GET("/finance/stats", handlers.FinanceStats)
@@ -282,9 +291,16 @@ func main() {
 	{
 		// Product routes (customer-facing)
 		api.GET("/products", handlers.ListProducts)
-		api.GET("/products/:id", handlers.GetProduct)
-		api.GET("/products/search", handlers.SearchProducts)
-		api.GET("/products/categories", handlers.ListCategories)
+		api.GET("/products/:id", func(c *gin.Context) {
+			switch c.Param("id") {
+			case "search":
+				handlers.SearchProducts(c)
+			case "categories":
+				handlers.ListCategories(c)
+			default:
+				handlers.GetProduct(c)
+			}
+		})
 
 		// Order routes
 		api.POST("/orders", handlers.CreateOrder)
@@ -338,6 +354,42 @@ func main() {
 
 	log.Println("🛑 HTTP server stopped — draining worker pool...")
 	utils.DrainAndWait()
-	appStore.Stop() // stop cache GC goroutine cleanly
+	closeStateStore(appStore)
 	log.Println("✅ All workers finished — exiting cleanly")
+}
+
+func newAppStateStore(cfg *config.Config) (cache.StateStore, error) {
+	backend := cache.NormalizeStateStoreBackend(cfg.StateStoreBackend)
+	store, err := cache.NewStateStore(cache.StateStoreOptions{
+		Backend: backend,
+		Memory:  cache.DefaultConfig(),
+		Redis: cache.RedisStoreOptions{
+			URL:       cfg.RedisURL,
+			Addr:      cfg.RedisAddr,
+			Password:  cfg.RedisPassword,
+			DB:        cfg.RedisDB,
+			KeyPrefix: cfg.RedisKeyPrefix,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if cfg.GinMode == gin.ReleaseMode && backend != "redis" {
+		log.Println("WARNING: STATE_STORE=memory in release mode. Use STATE_STORE=redis for multi-instance deployments.")
+	}
+	log.Printf("Pipeline state store initialized: %s", backend)
+
+	return store, nil
+}
+
+func closeStateStore(store cache.StateStore) {
+	if stopper, ok := store.(interface{ Stop() }); ok {
+		stopper.Stop()
+	}
+	if closer, ok := store.(interface{ Close() error }); ok {
+		if err := closer.Close(); err != nil {
+			log.Printf("state store close warning: %v", err)
+		}
+	}
 }

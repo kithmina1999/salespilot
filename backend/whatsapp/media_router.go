@@ -2,6 +2,7 @@ package whatsapp
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -10,10 +11,15 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/cloudinary/cloudinary-go/v2"
+	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
 )
+
+const maxMetaImageBytes int64 = 10 << 20
 
 // ImageAnalysis is the result of a single Gemini Vision call.
 // Both intent and description are extracted together so we never
@@ -56,7 +62,8 @@ func HandleImageWebhook(business *models.Business, fromNormalized, fromRaw, medi
 	case "product_inquiry":
 		handleProductImageInquiry(business, fromNormalized, fromRaw, analysis.Description)
 	case "payment_proof":
-		handlePaymentProofImage(business, fromNormalized, fromRaw, analysis.Description)
+		screenshotURL := uploadPaymentProofImageToCloudinary(business.ID, imageBytes, mimeType)
+		handlePaymentProofImage(business, fromNormalized, fromRaw, analysis.Description, screenshotURL)
 	case "review":
 		// Route to media_bridge.go: creates IsUnmatched merchant alert if shipped order
 		// exists. Does NOT auto-mark as delivered — merchant confirms from dashboard.
@@ -259,6 +266,30 @@ func handleProductImageInquiry(business *models.Business, fromNormalized, fromRa
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+func uploadPaymentProofImageToCloudinary(businessID uint, imageBytes []byte, mimeType string) string {
+	cloudinaryURL := os.Getenv("CLOUDINARY_URL")
+	if cloudinaryURL == "" {
+		log.Println("⚠️ [MediaRouter] CLOUDINARY_URL not set; storing payment proof without screenshot URL")
+		return ""
+	}
+
+	cld, err := cloudinary.NewFromURL(cloudinaryURL)
+	if err != nil {
+		log.Printf("⚠️ [MediaRouter] Failed to initialize Cloudinary for payment proof: %v", err)
+		return ""
+	}
+
+	resp, err := cld.Upload.Upload(context.Background(), bytes.NewReader(imageBytes), uploader.UploadParams{
+		Folder:   "salespilot/order-proofs",
+		PublicID: fmt.Sprintf("proof-%d-%d", businessID, time.Now().UnixNano()),
+	})
+	if err != nil {
+		log.Printf("⚠️ [MediaRouter] Failed to upload payment proof image (%s): %v", mimeType, err)
+		return ""
+	}
+	return resp.SecureURL
+}
+
 // localizedWaitMessage returns a short "please wait" in the business's bot language.
 func localizedWaitMessage(business *models.Business) string {
 	switch business.BotReplyLanguage {
@@ -309,10 +340,16 @@ func downloadMetaMedia(mediaURL, accessToken string) ([]byte, string, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, "", fmt.Errorf("download failed: status %d", resp.StatusCode)
 	}
+	if resp.ContentLength > maxMetaImageBytes {
+		return nil, "", fmt.Errorf("media too large: %d bytes", resp.ContentLength)
+	}
 
-	data, err := io.ReadAll(resp.Body)
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxMetaImageBytes+1))
 	if err != nil {
 		return nil, "", fmt.Errorf("reading bytes: %w", err)
+	}
+	if int64(len(data)) > maxMetaImageBytes {
+		return nil, "", fmt.Errorf("media too large: exceeds %d bytes", maxMetaImageBytes)
 	}
 
 	mimeType := resp.Header.Get("Content-Type")

@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -30,6 +32,170 @@ type AdminCreateProductRequest struct {
 	RetailerID  string  `json:"retailer_id"` // Meta Commerce Catalog Retailer ID
 }
 
+func validateProductArrayField(raw, field string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	var values []string
+	if err := json.Unmarshal([]byte(raw), &values); err != nil {
+		return "", fmt.Errorf("%s must be a JSON string array", field)
+	}
+	cleaned := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return "", fmt.Errorf("%s cannot contain empty values", field)
+		}
+		cleaned = append(cleaned, value)
+	}
+	out, _ := json.Marshal(cleaned)
+	return string(out), nil
+}
+
+func validateCreateProductRequest(req *AdminCreateProductRequest) error {
+	req.Name = strings.TrimSpace(req.Name)
+	req.Category = strings.TrimSpace(req.Category)
+	req.ImageURL = strings.TrimSpace(req.ImageURL)
+	req.RetailerID = strings.TrimSpace(req.RetailerID)
+	if req.Name == "" {
+		return fmt.Errorf("product name is required")
+	}
+	if req.Price <= 0 {
+		return fmt.Errorf("price must be greater than zero")
+	}
+	if req.Stock < 0 {
+		return fmt.Errorf("stock cannot be negative")
+	}
+	sizes, err := validateProductArrayField(req.Sizes, "sizes")
+	if err != nil {
+		return err
+	}
+	colors, err := validateProductArrayField(req.Colors, "colors")
+	if err != nil {
+		return err
+	}
+	req.Sizes = sizes
+	req.Colors = colors
+	return nil
+}
+
+func numberFromUpdate(value interface{}, field string) (float64, error) {
+	switch v := value.(type) {
+	case float64:
+		return v, nil
+	case float32:
+		return float64(v), nil
+	case int:
+		return float64(v), nil
+	case int64:
+		return float64(v), nil
+	case json.Number:
+		n, err := v.Float64()
+		if err != nil {
+			return 0, fmt.Errorf("%s must be numeric", field)
+		}
+		return n, nil
+	default:
+		return 0, fmt.Errorf("%s must be numeric", field)
+	}
+}
+
+func intFromUpdate(value interface{}, field string) (int, error) {
+	n, err := numberFromUpdate(value, field)
+	if err != nil {
+		return 0, err
+	}
+	asInt := int(n)
+	if n != float64(asInt) {
+		return 0, fmt.Errorf("%s must be a whole number", field)
+	}
+	return asInt, nil
+}
+
+func sanitizeProductUpdates(updates map[string]interface{}) (map[string]interface{}, error) {
+	clean := map[string]interface{}{}
+	for key, value := range updates {
+		switch key {
+		case "name":
+			s, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("name must be a string")
+			}
+			s = strings.TrimSpace(s)
+			if s == "" {
+				return nil, fmt.Errorf("product name is required")
+			}
+			clean["name"] = s
+		case "description", "category", "image_url", "retailer_id", "variant_type":
+			s, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("%s must be a string", key)
+			}
+			clean[key] = strings.TrimSpace(s)
+		case "sizes", "colors":
+			s, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("%s must be a JSON string array", key)
+			}
+			normalized, err := validateProductArrayField(s, key)
+			if err != nil {
+				return nil, err
+			}
+			clean[key] = normalized
+		case "price":
+			price, err := numberFromUpdate(value, "price")
+			if err != nil {
+				return nil, err
+			}
+			if price <= 0 {
+				return nil, fmt.Errorf("price must be greater than zero")
+			}
+			clean["price"] = price
+		case "stock", "max_stock":
+			n, err := intFromUpdate(value, key)
+			if err != nil {
+				return nil, err
+			}
+			if n < 0 {
+				return nil, fmt.Errorf("%s cannot be negative", key)
+			}
+			clean[key] = n
+		case "active":
+			active, ok := value.(bool)
+			if !ok {
+				return nil, fmt.Errorf("active must be a boolean")
+			}
+			clean["active"] = active
+		case "id", "ID", "business_id", "BusinessID", "created_at", "CreatedAt", "updated_at", "UpdatedAt":
+			continue
+		default:
+			return nil, fmt.Errorf("unsupported product field: %s", key)
+		}
+	}
+	return clean, nil
+}
+
+func isAllowedImageFile(contentType string, sample []byte) bool {
+	contentType = strings.ToLower(contentType)
+	if !strings.HasPrefix(contentType, "image/") {
+		return false
+	}
+	if len(sample) >= 3 && sample[0] == 0xff && sample[1] == 0xd8 && sample[2] == 0xff {
+		return true
+	}
+	if len(sample) >= 8 && string(sample[:8]) == "\x89PNG\r\n\x1a\n" {
+		return true
+	}
+	if len(sample) >= 6 && (string(sample[:6]) == "GIF87a" || string(sample[:6]) == "GIF89a") {
+		return true
+	}
+	if len(sample) >= 12 && string(sample[:4]) == "RIFF" && string(sample[8:12]) == "WEBP" {
+		return true
+	}
+	return false
+}
+
 // AdminListProducts returns all products for the dashboard, including drafts
 func AdminListProducts(c *gin.Context) {
 	db := c.MustGet("db").(*gorm.DB)
@@ -49,6 +215,10 @@ func AdminCreateProduct(c *gin.Context) {
 	var req AdminCreateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Name and price are required: " + err.Error()})
+		return
+	}
+	if err := validateCreateProductRequest(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -120,14 +290,15 @@ func AdminUpdateProduct(c *gin.Context) {
 		return
 	}
 
-	delete(updates, "id")
-	delete(updates, "ID")
-	delete(updates, "business_id")
-	delete(updates, "BusinessID")
-	delete(updates, "created_at")
-	delete(updates, "CreatedAt")
-	delete(updates, "updated_at")
-	delete(updates, "UpdatedAt")
+	updates, err = sanitizeProductUpdates(updates)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if len(updates) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No product fields to update"})
+		return
+	}
 
 	if err := database.DB.Model(&product).Where("business_id = ?", businessID).Updates(updates).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product"})
@@ -154,20 +325,24 @@ func AdminUpdateStock(c *gin.Context) {
 	}
 
 	var req struct {
-		Stock int `json:"stock" binding:"required"`
+		Stock *int `json:"stock" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Stock value is required"})
 		return
 	}
+	if req.Stock == nil || *req.Stock < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Stock must be zero or greater"})
+		return
+	}
 
-	result := db.Model(&models.Product{}).Where("id = ?", id).Update("stock", req.Stock)
+	result := db.Model(&models.Product{}).Where("id = ?", id).Update("stock", *req.Stock)
 	if result.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Stock updated ✅", "product_id": id, "new_stock": req.Stock})
+	c.JSON(http.StatusOK, gin.H{"message": "Stock updated ✅", "product_id": id, "new_stock": *req.Stock})
 }
 
 // AdminDeleteProduct soft-deletes a product (sets active to false)
@@ -266,6 +441,20 @@ func AdminUploadImage(serverURL string) gin.HandlerFunc {
 			return
 		}
 		defer src.Close()
+		sample := make([]byte, 512)
+		n, readErr := src.Read(sample)
+		if readErr != nil && readErr != io.EOF {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read uploaded image"})
+			return
+		}
+		if _, err := src.Seek(0, io.SeekStart); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to prepare uploaded image"})
+			return
+		}
+		if !isAllowedImageFile(contentType, sample[:n]) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Only JPG, PNG, GIF, or WebP images are accepted"})
+			return
+		}
 
 		// Generate a unique public ID
 		publicID := fmt.Sprintf("product-%d-%d", id, time.Now().Unix())

@@ -5,8 +5,7 @@ import useSWR from "swr";
 import { api } from "@/lib/api";
 import {
   KeyRound, Copy, CheckCircle, Plus, Search, Trash2,
-  Clock, Shield, MessageCircle, RefreshCw, AlertTriangle,
-  ChevronDown,
+  Clock, MessageCircle, RefreshCw, AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
@@ -24,6 +23,15 @@ type ActivationCode = {
   expires_at: string | null;
   created_at: string;
 };
+
+function getApiErrorMessage(err: unknown) {
+  if (typeof err === "object" && err !== null && "response" in err) {
+    const response = (err as { response?: { data?: { error?: string } } }).response;
+    if (response?.data?.error) return response.data.error;
+  }
+  if (err instanceof Error) return err.message;
+  return "Request failed";
+}
 
 function PlanBadge({ plan }: { plan: string }) {
   const styles: Record<string, { bg: string; color: string; border: string }> = {
@@ -134,8 +142,8 @@ export default function ActivationCodesPage() {
       setShowCreate(false);
       setNewNote(""); setNewPhone("");
       mutate();
-    } catch (err: any) {
-      setCreateError(err.response?.data?.error || err.message);
+    } catch (err: unknown) {
+      setCreateError(getApiErrorMessage(err));
     } finally {
       setCreating(false);
     }
@@ -146,8 +154,8 @@ export default function ActivationCodesPage() {
     try {
       await api.delete(`/system/activation-codes/${code}`);
       mutate();
-    } catch (err: any) {
-      alert("Failed to revoke: " + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      alert("Failed to revoke: " + getApiErrorMessage(err));
     }
   }
 

@@ -15,8 +15,8 @@ const (
 
 type Order struct {
 	ID               uint    `json:"id"             gorm:"primaryKey"`
-	BusinessOrderNum uint    `json:"order_num"      gorm:"index"` // per-business sequential: #1, #2... (shown to customers)
-	BusinessID       uint    `json:"business_id"    gorm:"index;not null"`
+	BusinessOrderNum uint    `json:"order_num"      gorm:"index;uniqueIndex:idx_orders_business_order_num"` // per-business sequential: #1, #2... (shown to customers)
+	BusinessID       uint    `json:"business_id"    gorm:"index;uniqueIndex:idx_orders_business_order_num;not null"`
 	CartID           uint    `json:"cart_id"` // originating cart session
 	CustomerPhone    string  `json:"customer_phone" gorm:"not null;index"`
 	CustomerName     string  `json:"customer_name"`

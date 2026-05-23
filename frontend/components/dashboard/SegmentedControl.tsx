@@ -37,7 +37,7 @@ export default function SegmentedControl<T extends string>({
               onClick={() => onChange(option.value)}
               className={`inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${
                 active
-                  ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-300 shadow-sm'
+                  ? 'border-emerald-500/40 bg-emerald-300/20 text-emerald-500 shadow-sm'
                   : 'border-transparent text-muted-foreground hover:border-border hover:bg-secondary hover:text-foreground'
               }`}
             >

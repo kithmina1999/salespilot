@@ -192,6 +192,8 @@
     "notifications": "Notifications",
     "whatsapp": "WhatsApp",
     "billing": "Billing",
+    "audit_logs":"Audit Logs",
+    "blocked_numbers":"Blocked Numbers",
     "dashboard_language": "Dashboard Language",
     "dashboard_language_hint": "Changes the language of this dashboard interface",
     "bot_reply_language": "Bot Default Reply Language",

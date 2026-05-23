@@ -65,7 +65,7 @@ function FeatureRow({
   return (
     <div className="grid grid-cols-[2fr_1fr_1.5fr_1.5fr] items-center py-2.5 border-b border-border/60 last:border-0">
       <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-xs text-zinc-600 text-center">{free}</span>
+      <span className="text-xs text-zinc-300 text-center">{free}</span>
       <span className="text-xs text-center font-semibold text-muted-foreground">{starter}</span>
       <span className="text-xs text-center font-semibold text-muted-foreground">{pro}</span>
     </div>

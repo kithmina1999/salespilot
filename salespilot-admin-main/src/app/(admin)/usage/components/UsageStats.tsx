@@ -1,7 +1,8 @@
 import { Bot, MessageSquare, AlertTriangle, AlertCircle } from "lucide-react";
 import { AdminStatCard } from "@/components/admin/page";
+import type { UsageMetrics } from "../types";
 
-export function UsageStats({ metrics, loading }: { metrics: any, loading: boolean }) {
+export function UsageStats({ metrics, loading }: { metrics?: UsageMetrics, loading: boolean }) {
   if (loading || !metrics) {
     return (
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 animate-pulse">

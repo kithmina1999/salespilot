@@ -61,6 +61,14 @@ func botSendList(business *models.Business, phone, body, label string, sections 
 	return err
 }
 
+func findActiveProductForBusiness(db *gorm.DB, businessID, productID uint) (models.Product, error) {
+	var product models.Product
+	err := db.
+		Where("id = ? AND business_id = ? AND active = ?", productID, businessID, true).
+		First(&product).Error
+	return product, err
+}
+
 // ─── Public Entry Point ─────────────────────────────────────────────────────────
 
 // handleCartMessage is the main entry point called from the pipeline BEFORE FAQ/Gemini.
@@ -98,6 +106,9 @@ func handleCartMessage(business *models.Business, phone, fromRaw, msg string) bo
 		if strings.HasPrefix(msg, "order_detail:") {
 			showOrderDetail(business, phone, fromRaw, msg)
 			return true
+		}
+		if strings.HasPrefix(msg, "proof_order:") {
+			return handlePaymentProofOrderSelection(business, phone, fromRaw, msg)
 		}
 		// Explicit browse request — customer wants to SEE the product list
 		if isExplicitBrowseRequest(msg) {
@@ -195,8 +206,8 @@ func handleBrowsing(cart *models.Cart, business *models.Business, phone, fromRaw
 			showProductList(business, fromRaw)
 			return true
 		}
-		var product models.Product
-		if err := database.DB.First(&product, uint(productID)).Error; err != nil {
+		product, err := findActiveProductForBusiness(database.DB, business.ID, uint(productID))
+		if err != nil {
 			showProductList(business, fromRaw)
 			return true
 		}
@@ -290,8 +301,8 @@ func handleBrowsing(cart *models.Cart, business *models.Business, phone, fromRaw
 func handleItemSelected(cart *models.Cart, business *models.Business, fromRaw, msg string) bool {
 	switch msg {
 	case "add_to_cart":
-		var product models.Product
-		if err := database.DB.First(&product, cart.PendingProductID).Error; err != nil {
+		product, err := findActiveProductForBusiness(database.DB, business.ID, cart.PendingProductID)
+		if err != nil {
 			showProductList(business, fromRaw)
 			return true
 		}
@@ -318,8 +329,8 @@ func handleItemSelected(cart *models.Cart, business *models.Business, fromRaw, m
 			updateCart(cart, map[string]interface{}{"state": models.CartStateBrowsing})
 			return false
 		}
-		var product models.Product
-		if err := database.DB.First(&product, cart.PendingProductID).Error; err == nil {
+		product, err := findActiveProductForBusiness(database.DB, business.ID, cart.PendingProductID)
+		if err == nil {
 			showProductCard(business, fromRaw, &product)
 		}
 	}
@@ -330,8 +341,11 @@ func handlePendingSize(cart *models.Cart, business *models.Business, fromRaw, ms
 	sizeVal := strings.TrimPrefix(msg, "size:")
 	sizeVal = strings.TrimSpace(sizeVal)
 	if sizeVal == "" {
-		var product models.Product
-		database.DB.First(&product, cart.PendingProductID)
+		product, err := findActiveProductForBusiness(database.DB, business.ID, cart.PendingProductID)
+		if err != nil {
+			showProductList(business, fromRaw)
+			return
+		}
 		showSizeButtons(business, fromRaw, &product, parseSizes(product.Sizes))
 		return
 	}
@@ -354,14 +368,30 @@ func handlePendingQty(cart *models.Cart, business *models.Business, fromRaw, msg
 		return
 	}
 
-	subtotal := float64(qty) * cart.PendingPrice
+	product, err := findActiveProductForBusiness(database.DB, business.ID, cart.PendingProductID)
+	if err != nil {
+		botSendText(business, fromRaw, "Sorry, that product is no longer available. Please choose another item.")
+		updateCart(cart, map[string]interface{}{"state": models.CartStateBrowsing})
+		showProductList(business, fromRaw)
+		return
+	}
+	if product.Stock < qty {
+		botSendButtons(
+			business, fromRaw,
+			fmt.Sprintf("Sorry, only %d of *%s* are available right now. Please choose a smaller quantity.", product.Stock, product.Name),
+			[]Button{{ID: "qty:1", Title: "1"}, {ID: "qty:2", Title: "2"}, {ID: "qty:3", Title: "3"}},
+		)
+		return
+	}
+
+	subtotal := float64(qty) * product.Price
 	newItem := models.CartItem{
 		ProductID: cart.PendingProductID,
-		Name:      cart.PendingProductName,
+		Name:      product.Name,
 		Qty:       qty,
 		Size:      cart.PendingSize,
 		Color:     cart.PendingColor,
-		Price:     cart.PendingPrice,
+		Price:     product.Price,
 		Subtotal:  subtotal,
 	}
 	items := loadCartItems(cart.Items)
@@ -450,7 +480,9 @@ func handlePendingAddress(cart *models.Cart, business *models.Business, phone, f
 		addrID, err := strconv.ParseUint(val, 10, 32)
 		if err == nil {
 			var saved models.SavedAddress
-			if err := database.DB.First(&saved, uint(addrID)).Error; err == nil {
+			if err := database.DB.
+				Where("id = ? AND business_id = ? AND phone = ?", uint(addrID), business.ID, phone).
+				First(&saved).Error; err == nil {
 				commitAddress(cart, business, phone, fromRaw, saved.Address)
 				return
 			}
@@ -518,6 +550,11 @@ func handlePendingNotes(cart *models.Cart, business *models.Business, fromRaw, m
 		notes = strings.TrimSpace(msg)
 	}
 
+	if !business.AllowCOD && !business.AllowTransfer {
+		botSendText(business, fromRaw, "Sorry, this shop has not enabled a payment method yet. Please contact us directly to complete the order.")
+		return
+	}
+
 	// If bank transfer is enabled, we must ask the customer which method they want.
 	// If only COD is enabled, we skip the payment selection step and auto-select COD.
 	if business.AllowTransfer {
@@ -541,7 +578,9 @@ func askPaymentMethod(business *models.Business, cart *models.Cart, fromRaw stri
 	if business.AllowCOD {
 		buttons = append(buttons, Button{ID: "pay:cod", Title: "💵 Cash on Delivery"})
 	}
-	buttons = append(buttons, Button{ID: "pay:bank_transfer", Title: "🏦 Bank Transfer"})
+	if business.AllowTransfer {
+		buttons = append(buttons, Button{ID: "pay:bank_transfer", Title: "🏦 Bank Transfer"})
+	}
 
 	botSendButtons(business, fromRaw, "How would you like to pay?", buttons)
 }
@@ -549,12 +588,22 @@ func askPaymentMethod(business *models.Business, cart *models.Cart, fromRaw stri
 func handlePendingPaymentMethod(cart *models.Cart, business *models.Business, phone, fromRaw, msg string) {
 	switch msg {
 	case "pay:cod":
+		if !business.AllowCOD {
+			botSendText(business, fromRaw, "Cash on Delivery is not available for this shop right now.")
+			askPaymentMethod(business, cart, fromRaw)
+			return
+		}
 		updateCart(cart, map[string]interface{}{
 			"state":          models.CartStatePendingConfirm,
 			"payment_method": "cod",
 		})
 		showOrderSummary(business, cart, fromRaw, cart.Notes)
 	case "pay:bank_transfer":
+		if !business.AllowTransfer {
+			botSendText(business, fromRaw, "Bank transfer is not available for this shop right now.")
+			askPaymentMethod(business, cart, fromRaw)
+			return
+		}
 		updateCart(cart, map[string]interface{}{
 			"state":          models.CartStatePendingConfirm,
 			"payment_method": "bank_transfer",
@@ -596,6 +645,29 @@ func finalizeOrder(cart *models.Cart, business *models.Business, phone, fromRaw 
 	// 3. Create the order record
 	// All three steps succeed together or roll back together.
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if cart.PaymentMethod == "" {
+			if business.AllowCOD {
+				cart.PaymentMethod = "cod"
+			} else if business.AllowTransfer {
+				cart.PaymentMethod = "bank_transfer"
+			}
+		}
+		if cart.PaymentMethod == "cod" && !business.AllowCOD {
+			return fmt.Errorf("cod payment is disabled")
+		}
+		if cart.PaymentMethod == "bank_transfer" && !business.AllowTransfer {
+			return fmt.Errorf("bank transfer payment is disabled")
+		}
+		if cart.PaymentMethod != "cod" && cart.PaymentMethod != "bank_transfer" {
+			return fmt.Errorf("unsupported payment method %q", cart.PaymentMethod)
+		}
+
+		if tx.Dialector.Name() == "postgres" {
+			if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", int64(business.ID)).Error; err != nil {
+				return fmt.Errorf("order sequence lock: %w", err)
+			}
+		}
+
 		// Step 1: get next order number atomically
 		var maxNum struct{ Max uint }
 		if err := tx.Model(&models.Order{}).
@@ -608,22 +680,25 @@ func finalizeOrder(cart *models.Cart, business *models.Business, phone, fromRaw 
 
 		// Step 2: lock each product row and decrement stock
 		items := loadCartItems(cart.Items)
+		if len(items) == 0 {
+			return fmt.Errorf("cart has no items")
+		}
 		for _, item := range items {
+			if item.Qty <= 0 {
+				return fmt.Errorf("invalid quantity for product %d", item.ProductID)
+			}
 			var product models.Product
 			if err := tx.
 				Clauses(clause.Locking{Strength: "UPDATE"}).
-				First(&product, item.ProductID).Error; err != nil {
+				Where("id = ? AND business_id = ? AND active = ?", item.ProductID, business.ID, true).
+				First(&product).Error; err != nil {
 				return fmt.Errorf("product %d not found: %w", item.ProductID, err)
 			}
-			// Only decrement if stock is tracked (> 0)
-			if product.Stock > 0 {
-				newStock := product.Stock - item.Qty
-				if newStock < 0 {
-					newStock = 0
-				}
-				if err := tx.Model(&product).UpdateColumn("stock", newStock).Error; err != nil {
-					return fmt.Errorf("stock decrement for product %d: %w", item.ProductID, err)
-				}
+			if product.Stock < item.Qty {
+				return fmt.Errorf("insufficient stock for product %d: have %d need %d", item.ProductID, product.Stock, item.Qty)
+			}
+			if err := tx.Model(&product).UpdateColumn("stock", product.Stock-item.Qty).Error; err != nil {
+				return fmt.Errorf("stock decrement for product %d: %w", item.ProductID, err)
 			}
 		}
 

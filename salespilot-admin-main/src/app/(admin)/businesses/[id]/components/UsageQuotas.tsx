@@ -3,8 +3,18 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { Edit2, Save, X, Settings2 } from "lucide-react";
+import type { BusinessDetail } from "../types";
 
-export function UsageQuotas({ business, mutate }: { business: any, mutate: () => void }) {
+function getApiErrorMessage(err: unknown) {
+  if (typeof err === "object" && err !== null && "response" in err) {
+    const response = (err as { response?: { data?: { error?: string } } }).response;
+    if (response?.data?.error) return response.data.error;
+  }
+  if (err instanceof Error) return err.message;
+  return "Failed to update quotas";
+}
+
+export function UsageQuotas({ business, mutate }: { business: BusinessDetail, mutate: () => void }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   
@@ -34,8 +44,8 @@ export function UsageQuotas({ business, mutate }: { business: any, mutate: () =>
       mutate();
       setEditing(false);
       setReason("");
-    } catch (err: any) {
-      setError(err?.response?.data?.error || err.message || "Failed to update quotas");
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -132,7 +142,7 @@ export function UsageQuotas({ business, mutate }: { business: any, mutate: () =>
                     <input 
                       type="number" 
                       value={q.stateVal}
-                      onChange={(e) => q.setState(e.target.value)}
+                      onChange={(e) => q.setState(Number(e.target.value))}
                       className="w-20 bg-secondary border border-border rounded-md px-2 py-0.5 text-xs font-bold text-foreground outline-none focus:border-primary text-right"
                     />
                   ) : (
@@ -156,7 +166,7 @@ export function UsageQuotas({ business, mutate }: { business: any, mutate: () =>
         <div className="flex flex-col gap-1.5 col-span-1 md:col-span-2">
           <div className="flex justify-between items-end">
             <span className="text-xs font-semibold text-muted-foreground">Storage Used</span>
-            <span className="text-sm font-bold text-foreground">{formatStorage(business.total_storage_used)}</span>
+            <span className="text-sm font-bold text-foreground">{formatStorage(business.total_storage_used || 0)}</span>
           </div>
         </div>
       </div>

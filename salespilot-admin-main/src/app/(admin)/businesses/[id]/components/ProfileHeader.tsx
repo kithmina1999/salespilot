@@ -1,5 +1,6 @@
 import { ArrowLeft, Phone, Hash, Calendar, ShieldAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
+import type { BusinessDetail } from "../types";
 
 export function PlanBadge({ plan }: { plan: string }) {
   const styles: Record<string, string> = {
@@ -16,7 +17,7 @@ export function PlanBadge({ plan }: { plan: string }) {
   );
 }
 
-export function ProfileHeader({ business }: { business: any }) {
+export function ProfileHeader({ business }: { business: BusinessDetail }) {
   const router = useRouter();
   
   return (

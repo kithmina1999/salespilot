@@ -18,8 +18,16 @@ export interface BillingAddon {
   amount: number;
   billing_type: 'one_time' | 'monthly';
   purchase_policy: 'once_per_business' | 'once_per_connection' | 'repeatable';
+  checkout_availability?: 'subscription_or_standalone' | 'subscription_only' | 'standalone_only';
   is_active: boolean;
   sort_order: number;
+  badge?: string;
+  includes_text?: string;
+  not_included_text?: string;
+  includes?: string[];
+  not_included?: string[];
+  is_available?: boolean;
+  disabled_reason?: string;
 }
 
 export interface BillingOptions {
@@ -36,10 +44,13 @@ export interface BillingOptions {
   };
 }
 
-export function useBillingOptions() {
+export function useBillingOptions(checkoutType?: 'subscription' | 'addon_only' | 'mixed') {
+  const path = checkoutType
+    ? `/api/v1/billing/options?checkout_type=${encodeURIComponent(checkoutType)}`
+    : '/api/v1/billing/options';
   const { data, error, isLoading, mutate } = useSWR<BillingOptions>(
-    '/api/v1/billing/options',
-    (path: string) => apiFetch<BillingOptions>(path),
+    path,
+    (url: string) => apiFetch<BillingOptions>(url),
     { revalidateOnFocus: false }
   );
 

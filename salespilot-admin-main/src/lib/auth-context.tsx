@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, ReactNode } from "react";
 import { setToken } from "./api";
 
 export interface AdminProfile {
@@ -24,12 +24,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setTokenState] = useState<string | null>(null);
   const [admin, setAdmin] = useState<AdminProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // Because tokens are strictly in memory, we always start logged out on fresh load.
-    setIsLoading(false);
-  }, []);
+  // Tokens are strictly in memory, so a fresh page load always starts logged out.
+  const isLoading = false;
 
   const login = (newToken: string, newAdmin: AdminProfile) => {
     setTokenState(newToken);

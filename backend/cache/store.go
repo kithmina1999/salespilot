@@ -1,8 +1,8 @@
 // Package cache provides a pluggable state storage layer for high-frequency,
 // short-lived counters (rate-limit scores, token budgets, first-message flags).
 //
-// The StateStore interface is designed so that swapping from the in-memory
-// implementation to Redis requires only changing the constructor call in main.go.
+// The StateStore interface is designed so the app can use an in-memory store
+// for local development and Redis for horizontally scaled production.
 // Keys should follow time-bucketed patterns (e.g. "user:{phone}:budget:{hour}")
 // so they map directly to Redis key conventions.
 package cache
@@ -22,8 +22,8 @@ var ErrKeyNotFound = errors.New("cache: key not found")
 // PromptShield token budgets, and first-message-of-day checks.
 //
 // Implementations:
-//   - InMemoryStore (current — ristretto/go-cache style with TTL + LRU)
-//   - RedisStore    (future — drop-in replacement for horizontal scaling)
+//   - InMemoryStore for local/dev and single-instance deployments
+//   - RedisStore for shared state across horizontally scaled instances
 type StateStore interface {
 	// Set stores a value with a TTL. Overwrites if the key already exists.
 	Set(key string, value int, ttl time.Duration) error

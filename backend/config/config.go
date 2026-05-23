@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 )
@@ -25,6 +26,12 @@ type Config struct {
 	ResendAPIKey        string
 	ResendFromEmail     string // Sender address shown in transactional emails (RESEND_FROM_EMAIL)
 	WhatsAppOTPTemplate string // To bypass the 24-hour service window limit
+	StateStoreBackend   string // "memory" for local/dev, "redis" for multi-instance production
+	RedisURL            string
+	RedisAddr           string
+	RedisPassword       string
+	RedisDB             int
+	RedisKeyPrefix      string
 }
 
 // dangerousWeakDefaults lists known unsafe placeholder values that must never
@@ -59,6 +66,12 @@ func Load() *Config {
 		ResendAPIKey:        os.Getenv("RESEND_API_KEY"),
 		ResendFromEmail:     getEnv("RESEND_FROM_EMAIL", "SalesPilot <onboarding@resend.dev>"),
 		WhatsAppOTPTemplate: getEnv("WHATSAPP_OTP_TEMPLATE", "salespilot_otp"),
+		StateStoreBackend:   getEnv("STATE_STORE", "memory"),
+		RedisURL:            os.Getenv("REDIS_URL"),
+		RedisAddr:           getEnv("REDIS_ADDR", "localhost:6379"),
+		RedisPassword:       os.Getenv("REDIS_PASSWORD"),
+		RedisDB:             getEnvInt("REDIS_DB", 0),
+		RedisKeyPrefix:      getEnv("REDIS_KEY_PREFIX", "salespilot"),
 	}
 
 	// ── Critical key validation — crash fast, not silently ────────────────────
@@ -83,4 +96,17 @@ func getEnv(key, fallback string) string {
 		return val
 	}
 	return fallback
+}
+
+func getEnvInt(key string, fallback int) int {
+	val := os.Getenv(key)
+	if val == "" {
+		return fallback
+	}
+
+	parsed, err := strconv.Atoi(val)
+	if err != nil {
+		log.Fatalf("invalid integer value for %s: %q", key, val)
+	}
+	return parsed
 }

@@ -29,13 +29,17 @@ func InitWorkerPool(workers int) {
 	}
 }
 
-// EnqueueWebhook submits a job. Non-blocking; drops if channel is full (> 5000 backlog).
-func EnqueueWebhook(job WebhookJob) {
+// EnqueueWebhook submits a job. Non-blocking; returns false if the channel is full.
+// Callers that are still holding an external delivery ACK should return a retryable
+// error when this fails instead of silently losing the payload.
+func EnqueueWebhook(job WebhookJob) bool {
 	select {
 	case jobQueue <- job:
+		return true
 	default:
 		log.Println("⚠️ Worker pool queue full — dropping webhook payload")
 		go AlertWorkerPoolFull() // alert team without blocking the HTTP handler
+		return false
 	}
 }
 
