@@ -9,7 +9,7 @@ import {
   RadialBarChart, RadialBar, Legend,
 } from 'recharts';
 import {
-  Users, Bot, Layers, AlertCircle, PlusCircle, Sparkles, CheckCircle2,
+  Users, PlusCircle, Sparkles, CheckCircle2,
   TrendingUp, TrendingDown, ShoppingCart, Clock, Zap, Target,
   BarChart3, Activity,
 } from 'lucide-react';
@@ -176,6 +176,7 @@ export default function OverviewPage() {
     }
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchStats(); }, [fetchStats]);
 
   if (loading) {
@@ -315,9 +316,9 @@ export default function OverviewPage() {
               />
             )}
           />
-          <div className="flex-1 min-h-[280px]">
+          <div className="flex-1 w-full min-w-0 min-h-[280px]">
             {trend30d.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <ComposedChart data={trend30d} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
@@ -370,8 +371,8 @@ export default function OverviewPage() {
 
           {donutData.length > 0 ? (
             <>
-              <div className="relative flex-1 min-h-[200px]">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="relative flex-1 w-full min-w-0 min-h-[200px]">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <PieChart>
                     <Pie
                       data={donutData}
@@ -467,8 +468,8 @@ export default function OverviewPage() {
               <Activity className="w-4 h-4" />
             </div>
           </div>
-          <div className="flex-1 min-h-[150px]">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="flex-1 w-full min-w-0 min-h-[150px]">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <RadialBarChart
                 cx="50%" cy="50%"
                 innerRadius="30%"
@@ -573,9 +574,9 @@ export default function OverviewPage() {
             title="7-Day Message Traffic"
             description="Customer messages and AI replies over the last 7 days."
           />
-          <div className="flex-1 w-full min-h-0">
+          <div className="flex-1 w-full min-w-0 min-h-0">
             {trafficData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <AreaChart data={trafficData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorAI"   x1="0" y1="0" x2="0" y2="1">

@@ -1,11 +1,24 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useAppStore } from '@/lib/store';
 import { Zap, ArrowRight, Clock, Bot, Sparkles, AlertTriangle, X, MessageCircle } from 'lucide-react';
 import Link from 'next/link';
 
 type Phase = 'comfortable' | 'urgent' | 'expiring';
+
+type TimeLeft = {
+  d: number;
+  h: number;
+  m: number;
+  s: number;
+};
+
+type PhaseMeta = {
+  badge: string;
+  badgeIcon: ReactNode;
+  dismissible: boolean;
+};
 
 function getPhase(daysLeft: number): Phase {
   if (daysLeft >= 4) return 'comfortable';
@@ -14,10 +27,76 @@ function getPhase(daysLeft: number): Phase {
 }
 
 const FEATURES_AT_RISK = [
-  { icon: <Bot size={11} />,            label: 'AI Replies' },
-  { icon: <Sparkles size={11} />,       label: 'AI Rule Gen' },
-  { icon: <MessageCircle size={11} />,  label: 'Unlimited FAQs' },
+  { icon: <Bot size={11} />, label: 'AI Replies' },
+  { icon: <Sparkles size={11} />, label: 'AI Rule Gen' },
+  { icon: <MessageCircle size={11} />, label: 'Unlimited FAQs' },
 ];
+
+const PHASE_META: Record<Phase, PhaseMeta> = {
+  comfortable: {
+    badge: 'Free Trial Active',
+    badgeIcon: <Sparkles size={12} />,
+    dismissible: true,
+  },
+  urgent: {
+    badge: 'Trial Ending Soon',
+    badgeIcon: <Clock size={12} />,
+    dismissible: true,
+  },
+  expiring: {
+    badge: 'AI Offline',
+    badgeIcon: <AlertTriangle size={12} />,
+    dismissible: false,
+  },
+};
+
+function Countdown({ timeLeft, compact = false }: { timeLeft: TimeLeft; compact?: boolean }) {
+  const segments = compact
+    ? [
+        { label: 'd', value: timeLeft.d },
+        { label: 'h', value: timeLeft.h },
+        { label: 'm', value: timeLeft.m },
+      ]
+    : [
+        { label: 'd', value: timeLeft.d },
+        { label: 'h', value: timeLeft.h },
+        { label: 'm', value: timeLeft.m },
+        { label: 's', value: timeLeft.s },
+      ];
+
+  return (
+    <div className="flex items-center gap-1 shrink-0" aria-hidden="true">
+      {segments.map((seg, i) => (
+        <span key={seg.label} className="flex items-center gap-0.5">
+          {i > 0 && <span className="trial-banner__count-divider text-xs">:</span>}
+          <span className="trial-banner__count-cell inline-flex flex-col items-center justify-center rounded-md font-black tabular-nums min-w-[26px] py-0.5 lg:min-w-[30px] lg:py-1">
+            {String(seg.value).padStart(2, '0')}
+            <span className="trial-banner__count-label text-[0.5rem] leading-none lg:text-[0.55rem]">
+              {seg.label}
+            </span>
+          </span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function CTA({ phase, monthlyPrice, compact = false }: { phase: Phase; monthlyPrice?: string; compact?: boolean }) {
+  const label = phase === 'expiring' ? 'Reactivate' : 'Subscribe';
+  const desktopLabel = monthlyPrice ? `${label} - LKR ${monthlyPrice}/mo` : label;
+
+  return (
+    <Link
+      href="/dashboard/usage"
+      className="trial-banner__cta flex items-center justify-center gap-1.5 rounded-lg text-[12px] font-black px-3 py-1.5 transition-all whitespace-nowrap shrink-0 lg:px-4 lg:py-2"
+      aria-label={desktopLabel}
+    >
+      <Zap size={compact ? 11 : 12} className="trial-banner__cta-zap" />
+      <span>{compact ? label : desktopLabel}</span>
+      <ArrowRight size={compact ? 11 : 12} className="trial-banner__cta-arrow" />
+    </Link>
+  );
+}
 
 export default function TrialBanner() {
   const usage = useAppStore((s) => s.usage);
@@ -25,7 +104,6 @@ export default function TrialBanner() {
   const [now, setNow] = useState(() => Date.now());
   const [dismissed, setDismissed] = useState(false);
 
-  // Read trial data from store (no fetch needed — DashboardGuard already called fetchAll)
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
@@ -49,214 +127,110 @@ export default function TrialBanner() {
 
   const daysLeft = timeLeft?.d ?? 0;
   const phase = isExpired ? 'expiring' : getPhase(daysLeft);
-  
+  const meta = PHASE_META[phase];
   const monthlyPrice = pricing?.starter?.monthly?.toLocaleString();
 
-  // ── Per-phase style tokens ────────────────────────────────────
-  const style = {
-    comfortable: {
-      accent: '#818cf8', accentBg: 'rgba(99,102,241,0.10)', accentBorder: 'rgba(99,102,241,0.22)',
-      gradientFrom: 'rgba(99,102,241,0.08)', borderColor: 'rgba(99,102,241,0.15)',
-      ctaBg: 'rgba(245,158,11,0.14)', ctaBorder: 'rgba(245,158,11,0.30)', ctaColor: '#fbbf24',
-      ctaHoverBg: 'rgba(245,158,11,0.26)',
-      badge: 'Free Trial Active', badgeIcon: <Sparkles size={12} />, dismissible: true,
-    },
-    urgent: {
-      accent: '#fb923c', accentBg: 'rgba(251,146,60,0.12)', accentBorder: 'rgba(251,146,60,0.30)',
-      gradientFrom: 'rgba(251,146,60,0.09)', borderColor: 'rgba(251,146,60,0.20)',
-      ctaBg: 'rgba(245,158,11,0.20)', ctaBorder: 'rgba(245,158,11,0.40)', ctaColor: '#fde68a',
-      ctaHoverBg: 'rgba(245,158,11,0.32)',
-      badge: 'Trial Ending Soon', badgeIcon: <Clock size={12} />, dismissible: true,
-    },
-    expiring: {
-      accent: '#f87171', accentBg: 'rgba(239,68,68,0.12)', accentBorder: 'rgba(239,68,68,0.30)',
-      gradientFrom: 'rgba(239,68,68,0.09)', borderColor: 'rgba(239,68,68,0.20)',
-      ctaBg: 'rgba(239,68,68,0.20)', ctaBorder: 'rgba(239,68,68,0.40)', ctaColor: '#fca5a5',
-      ctaHoverBg: 'rgba(239,68,68,0.32)',
-      badge: 'AI Offline', badgeIcon: <AlertTriangle size={12} />, dismissible: false,
-    },
-  }[phase];
-
   return (
-    <div
-      className="shrink-0 border-b transition-all duration-500"
-      style={{
-        background: `linear-gradient(90deg, ${style.gradientFrom} 0%, rgba(13,13,18,0.99) 30%, rgba(13,13,18,0.99) 70%, ${style.gradientFrom} 100%)`,
-        borderColor: style.borderColor,
-      }}
-    >
-      {/* ── Row 1: Badge + Dismiss (always visible) ── */}
-      <div className="px-4 pt-3 pb-1 lg:hidden flex items-center justify-between gap-3">
-        <div
-          className="flex items-center gap-1.5 shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest"
-          style={{ background: style.accentBg, border: `1px solid ${style.accentBorder}`, color: style.accent }}
-        >
-          {style.badgeIcon}
-          <span>{style.badge}</span>
-        </div>
-        {style.dismissible && (
-          <button
-            onClick={() => setDismissed(true)}
-            className="p-1.5 rounded-lg text-zinc-600 hover:text-muted-foreground hover:bg-white/5 transition-all shrink-0"
-            aria-label="Dismiss"
+    <div className="trial-banner shrink-0 border-b transition-colors duration-500" data-phase={phase}>
+      <div className="relative z-10">
+        <div className="px-3 pt-2.5 pb-1.5 lg:hidden flex items-center justify-between gap-2">
+          <div
+            className={`trial-banner__badge ${phase === 'expiring' ? 'trial-banner__badge--scan' : ''} flex items-center gap-1.5 shrink-0 max-w-[calc(100%_-_2.5rem)] px-2.5 py-1.5 rounded-lg text-[11px] font-black uppercase`}
           >
-            <X size={14} />
-          </button>
-        )}
-      </div>
-
-      {/* ── Row 2: Message + Countdown + CTA (small/tablet) ── */}
-      <div className="px-4 pb-3 lg:hidden flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-        {/* Message */}
-        <div className="flex-1 min-w-0">
-          {phase === 'comfortable' && (
-            <p className="text-sm font-semibold text-muted-foreground">
-              <span style={{ color: style.accent }}>{daysLeft} days</span> of full access remaining.
-              {monthlyPrice && <span className="text-zinc-600 text-xs font-normal ml-1">· LKR {monthlyPrice}/mo</span>}
-            </p>
-          )}
-          {phase === 'urgent' && (
-            <p className="text-sm font-bold text-foreground">
-              Only <span style={{ color: style.accent }}>{daysLeft} day{daysLeft !== 1 ? 's' : ''} left</span> — AI features stop working soon.
-            </p>
-          )}
-          {phase === 'expiring' && (
-            <p className="text-sm font-bold" style={{ color: style.accent }}>
-              Your Starter Trial has expired and AI is disabled. Upgrade to reactivate.
-            </p>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Countdown */}
-          {!isExpired && timeLeft && (
-            <div className="flex items-center gap-1 shrink-0">
-              {[
-                { label: 'd', value: timeLeft.d },
-                { label: 'h', value: timeLeft.h },
-                { label: 'm', value: timeLeft.m },
-                { label: 's', value: timeLeft.s },
-              ].map((seg, i) => (
-                <span key={seg.label} className="flex items-center gap-0.5">
-                  {i > 0 && <span className="text-zinc-700 text-xs">:</span>}
-                  <span
-                    className="inline-flex flex-col items-center justify-center rounded-md font-black tabular-nums min-w-[26px] py-0.5"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: style.accent, fontSize: '0.72rem' }}
-                  >
-                    {String(seg.value).padStart(2, '0')}
-                    <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.44rem', lineHeight: 1 }}>{seg.label}</span>
-                  </span>
-                </span>
-              ))}
-            </div>
-          )}
-          {/* CTA */}
-          <Link
-            href="/dashboard/usage"
-            className="flex items-center gap-1.5 text-[12px] font-black px-3 py-1.5 rounded-xl transition-all whitespace-nowrap"
-            style={{ background: style.ctaBg, border: `1px solid ${style.ctaBorder}`, color: style.ctaColor }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = style.ctaHoverBg; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = style.ctaBg; }}
-          >
-            <Zap size={11} />
-            {phase === 'expiring' ? 'Reactivate' : 'Subscribe'}
-            <ArrowRight size={11} />
-          </Link>
-        </div>
-      </div>
-
-      {/* ── Desktop: single row (lg+) ── */}
-      <div className="hidden lg:flex px-5 py-3.5 items-center gap-4 max-w-7xl mx-auto">
-        {/* Phase badge */}
-        <div
-          className="flex items-center gap-1.5 shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest whitespace-nowrap"
-          style={{ background: style.accentBg, border: `1px solid ${style.accentBorder}`, color: style.accent }}
-        >
-          {style.badgeIcon}
-          <span>{style.badge}</span>
-        </div>
-
-        {/* Main message */}
-        <div className="flex-1 min-w-0">
-          {phase === 'comfortable' && (
-            <p className="text-sm font-semibold text-muted-foreground">
-              Your AI assistant is running.{' '}
-              <span style={{ color: style.accent }}>{daysLeft} days of full access remaining.</span>
-              {monthlyPrice && <span className="text-zinc-600 text-xs font-normal ml-2">· LKR {monthlyPrice}/mo to continue</span>}
-            </p>
-          )}
-          {phase === 'urgent' && (
-            <div>
-              <p className="text-sm font-bold text-foreground">
-                Only <span style={{ color: style.accent }}>{daysLeft} day{daysLeft !== 1 ? 's' : ''} left</span> —
-                {' '}these features will stop working:
-              </p>
-              <div className="flex items-center gap-4 mt-1">
-                {FEATURES_AT_RISK.map((f) => (
-                  <span key={f.label} className="flex items-center gap-1 text-[11px] font-bold" style={{ color: style.accent }}>
-                    {f.icon} {f.label}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-          {phase === 'expiring' && (
-            <p className="text-sm font-bold" style={{ color: style.accent }}>
-              Your Starter Trial has expired and AI is disabled. Upgrade to a paid plan to reactivate your AI Assistant, unlock up to 5,000 AI replies, and get unlimited inbound messages.
-            </p>
-          )}
-        </div>
-
-        {/* Countdown */}
-        {!isExpired && timeLeft && (
-          <div className="flex items-center gap-1 shrink-0">
-            {[
-              { label: 'd', value: timeLeft.d },
-              { label: 'h', value: timeLeft.h },
-              { label: 'm', value: timeLeft.m },
-              { label: 's', value: timeLeft.s },
-            ].map((seg, i) => (
-              <span key={seg.label} className="flex items-center gap-0.5">
-                {i > 0 && <span className="text-zinc-700 text-xs mr-0.5">:</span>}
-                <span
-                  className="inline-flex flex-col items-center justify-center rounded-md font-black tabular-nums min-w-[30px] py-1"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: style.accent, fontSize: '0.78rem' }}
-                >
-                  {String(seg.value).padStart(2, '0')}
-                  <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.48rem', fontFamily: 'inherit', lineHeight: 1 }}>
-                    {seg.label}
-                  </span>
-                </span>
-              </span>
-            ))}
+            {meta.badgeIcon}
+            <span className="truncate">{meta.badge}</span>
           </div>
-        )}
 
-        {/* CTA */}
-        <Link
-          href="/dashboard/usage"
-          className="flex items-center gap-1.5 text-[12px] font-black px-4 py-2 rounded-xl transition-all whitespace-nowrap shrink-0"
-          style={{ background: style.ctaBg, border: `1px solid ${style.ctaBorder}`, color: style.ctaColor }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = style.ctaHoverBg; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = style.ctaBg; }}
-        >
-          <Zap size={12} />
-          {phase === 'expiring'
-            ? monthlyPrice ? `Reactivate · LKR ${monthlyPrice}/mo` : 'Reactivate'
-            : monthlyPrice ? `Subscribe · LKR ${monthlyPrice}/mo` : 'Subscribe'}
-          <ArrowRight size={12} />
-        </Link>
+          {meta.dismissible && (
+            <button
+              onClick={() => setDismissed(true)}
+              className="trial-banner__dismiss p-1.5 rounded-lg transition-colors shrink-0"
+              aria-label="Dismiss"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
 
-        {/* Dismiss */}
-        {style.dismissible && (
-          <button
-            onClick={() => setDismissed(true)}
-            className="p-1.5 rounded-lg text-zinc-700 hover:text-muted-foreground hover:bg-white/5 transition-all shrink-0"
-            aria-label="Dismiss"
+        <div className="px-3 pb-3 lg:hidden flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+          <div className="flex-1 min-w-0">
+            {phase === 'comfortable' && (
+              <p className="text-xs sm:text-sm font-semibold text-muted-foreground leading-snug">
+                <span className="trial-banner__accent-text">{daysLeft}d full access left.</span>
+                {monthlyPrice && <span className="hidden sm:inline"> LKR {monthlyPrice}/mo after trial.</span>}
+              </p>
+            )}
+            {phase === 'urgent' && (
+              <p className="text-xs sm:text-sm font-bold text-foreground leading-snug">
+                Only <span className="trial-banner__accent-text">{daysLeft}d left</span>. AI stops soon.
+              </p>
+            )}
+            {phase === 'expiring' && (
+              <p className="text-xs sm:text-sm font-bold leading-snug trial-banner__accent-text">
+                Trial expired. AI is offline.
+              </p>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between gap-2 sm:justify-start">
+            {!isExpired && timeLeft && <Countdown timeLeft={timeLeft} compact />}
+            <CTA phase={phase} monthlyPrice={monthlyPrice} compact />
+          </div>
+        </div>
+
+        <div className="hidden lg:flex px-5 py-3.5 items-center gap-4 max-w-7xl mx-auto">
+          <div
+            className={`trial-banner__badge ${phase === 'expiring' ? 'trial-banner__badge--scan' : ''} flex items-center gap-1.5 shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-black uppercase whitespace-nowrap`}
           >
-            <X size={14} />
-          </button>
-        )}
+            {meta.badgeIcon}
+            <span>{meta.badge}</span>
+          </div>
+
+          <div className="flex-1 min-w-0">
+            {phase === 'comfortable' && (
+              <p className="text-sm font-semibold text-muted-foreground">
+                Your AI assistant is running.{' '}
+                <span className="trial-banner__accent-text">{daysLeft} days of full access remaining.</span>
+                {monthlyPrice && <span className="text-muted-foreground/75 text-xs font-normal ml-2">LKR {monthlyPrice}/mo to continue</span>}
+              </p>
+            )}
+
+            {phase === 'urgent' && (
+              <div>
+                <p className="text-sm font-bold text-foreground">
+                  Only <span className="trial-banner__accent-text">{daysLeft} day{daysLeft !== 1 ? 's' : ''} left</span> - these features will stop working:
+                </p>
+                <div className="flex items-center gap-4 mt-1">
+                  {FEATURES_AT_RISK.map((f) => (
+                    <span key={f.label} className="flex items-center gap-1 text-[11px] font-bold trial-banner__accent-text">
+                      {f.icon} {f.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {phase === 'expiring' && (
+              <p className="text-sm font-bold trial-banner__accent-text">
+                Your Starter Trial has expired and AI is disabled. Upgrade to a paid plan to reactivate your AI Assistant, unlock up to 5,000 AI replies, and get unlimited inbound messages.
+              </p>
+            )}
+          </div>
+
+          {!isExpired && timeLeft && <Countdown timeLeft={timeLeft} />}
+
+          <CTA phase={phase} monthlyPrice={monthlyPrice} />
+
+          {meta.dismissible && (
+            <button
+              onClick={() => setDismissed(true)}
+              className="trial-banner__dismiss p-1.5 rounded-lg transition-colors shrink-0"
+              aria-label="Dismiss"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

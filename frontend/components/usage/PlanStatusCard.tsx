@@ -190,7 +190,7 @@ export default function PlanStatusCard({ onUpgrade }: Props) {
             {isPaid && !returnedToFree && expiryLabel && (
               <p className="text-sm text-muted-foreground mt-1.5 flex items-center gap-1.5">
                 <Clock size={12} className="text-emerald-500/60 shrink-0" />
-                {timeLabel ?? 'Active'} · Renews {expiryLabel}
+                {timeLabel ?? 'Active'} - Renews {expiryLabel}
               </p>
             )}
 
