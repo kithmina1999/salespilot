@@ -134,9 +134,7 @@ export default function TrialBanner() {
     <div className="trial-banner shrink-0 border-b transition-colors duration-500" data-phase={phase}>
       <div className="relative z-10">
         <div className="px-3 pt-2.5 pb-1.5 lg:hidden flex items-center justify-between gap-2">
-          <div
-            className={`trial-banner__badge ${phase === 'expiring' ? 'trial-banner__badge--scan' : ''} flex items-center gap-1.5 shrink-0 max-w-[calc(100%_-_2.5rem)] px-2.5 py-1.5 rounded-lg text-[11px] font-black uppercase`}
-          >
+          <div className="trial-banner__badge trial-banner__badge--scan flex items-center gap-1.5 shrink-0 max-w-[calc(100%_-_2.5rem)] px-2.5 py-1.5 rounded-lg text-[11px] font-black uppercase">
             {meta.badgeIcon}
             <span className="truncate">{meta.badge}</span>
           </div>
@@ -179,9 +177,7 @@ export default function TrialBanner() {
         </div>
 
         <div className="hidden lg:flex px-5 py-3.5 items-center gap-4 max-w-7xl mx-auto">
-          <div
-            className={`trial-banner__badge ${phase === 'expiring' ? 'trial-banner__badge--scan' : ''} flex items-center gap-1.5 shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-black uppercase whitespace-nowrap`}
-          >
+          <div className="trial-banner__badge trial-banner__badge--scan flex items-center gap-1.5 shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-black uppercase whitespace-nowrap">
             {meta.badgeIcon}
             <span>{meta.badge}</span>
           </div>
