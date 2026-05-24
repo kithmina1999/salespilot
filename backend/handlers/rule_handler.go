@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
+	"github.com/kithmina1999/salespilot/knowledge"
 	"github.com/kithmina1999/salespilot/models"
 	"github.com/kithmina1999/salespilot/whatsapp"
 	"gorm.io/gorm"
@@ -70,6 +71,9 @@ func CloneTemplate(c *gin.Context) {
 		IsActive:        true,
 		IsDropRule:      template.IsDropRule,
 		IsContextBridge: template.IsContextBridge,
+		KnowledgeType:   models.KnowledgeTypeStaticFAQ,
+		SourceType:      models.SourceTypeManual,
+		SystemManaged:   false,
 	}
 
 	if err := database.DB.Create(&rule).Error; err != nil {
@@ -164,6 +168,7 @@ func CreateRule(c *gin.Context) {
 		Responses       map[string]string `json:"responses"`        // new: {"en": "...", "si": "...", "ta": "..."}
 		IsActive        bool              `json:"is_active"`
 		ResolvedMessage string            `json:"resolved_message"`
+		GapID           uint              `json:"gap_id"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -184,9 +189,10 @@ func CreateRule(c *gin.Context) {
 		return
 	}
 
+	// Exclude system_managed from quota check
 	var ruleCount int64
 	db := c.MustGet("db").(*gorm.DB)
-	db.Model(&models.Rule{}).Count(&ruleCount)
+	db.Model(&models.Rule{}).Where("business_id = ? AND system_managed = ?", businessID, false).Count(&ruleCount)
 
 	ent, err := GetUsageEntitlements(biz, time.Now())
 	if err != nil {
@@ -210,6 +216,9 @@ func CreateRule(c *gin.Context) {
 		Response:        req.Response,
 		SinhalaResponse: req.SinhalaResponse,
 		IsActive:        req.IsActive,
+		KnowledgeType:   models.KnowledgeTypeStaticFAQ,
+		SourceType:      models.SourceTypeManual,
+		SystemManaged:   false,
 	}
 
 	// Build the Responses JSON map
@@ -228,16 +237,32 @@ func CreateRule(c *gin.Context) {
 		}
 	}
 
+	// Validation: if active, must have responses for all bot supported languages
+	if rule.IsActive {
+		supportedLangs := strings.Split(biz.BotSupportedLangs, ",")
+		for _, lang := range supportedLangs {
+			lang = strings.TrimSpace(lang)
+			if lang == "" {
+				continue
+			}
+			resp := rule.GetExactResponse(lang)
+			if strings.TrimSpace(resp) == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Response for supported language '%s' is required to activate the rule", lang)})
+				return
+			}
+		}
+	}
+
 	if err := database.DB.Create(&rule).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create rule"})
 		return
 	}
 
-	// Auto-resolve any Unmatched Messages that exactly match the seed
-	if req.ResolvedMessage != "" {
-		database.DB.Model(&models.UnmatchedMessage{}).
-			Where("business_id = ? AND message = ?", businessID, req.ResolvedMessage).
-			Update("resolved", true)
+	// Auto-resolve gap if gap_id is provided
+	if req.GapID > 0 {
+		go func() {
+			knowledge.AutoResolveGapByID(database.DB, req.GapID, "create_static_faq", &rule.ID)
+		}()
 	}
 
 	// Embed in background — non-blocking so API responds immediately
@@ -263,6 +288,12 @@ func UpdateRule(c *gin.Context) {
 	db := c.MustGet("db").(*gorm.DB)
 	if err := db.Where("id = ?", id).First(&rule).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Rule not found or you don't have permission to edit global rules"})
+		return
+	}
+
+	// Block updates to system-managed rules
+	if rule.SystemManaged {
+		c.JSON(http.StatusForbidden, gin.H{"error": "System-managed rules cannot be edited directly"})
 		return
 	}
 
@@ -317,6 +348,25 @@ func UpdateRule(c *gin.Context) {
 		}
 	}
 
+	// Active language validation
+	if rule.IsActive {
+		var biz models.Business
+		if err := database.DB.First(&biz, businessID).Error; err == nil {
+			supportedLangs := strings.Split(biz.BotSupportedLangs, ",")
+			for _, lang := range supportedLangs {
+				lang = strings.TrimSpace(lang)
+				if lang == "" {
+					continue
+				}
+				resp := rule.GetExactResponse(lang)
+				if strings.TrimSpace(resp) == "" {
+					c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Response for supported language '%s' is required to activate the rule", lang)})
+					return
+				}
+			}
+		}
+	}
+
 	if err := database.DB.Save(&rule).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update rule"})
 		return
@@ -348,12 +398,21 @@ func DeleteRule(c *gin.Context) {
 		return
 	}
 
-	// Note: GORM uses soft delete by default if the model has DeletedAt (gorm.Model has it).
-	// Ensure it belongs to the tenant
 	db := c.MustGet("db").(*gorm.DB)
-	result := db.Where("id = ?", id).Delete(&models.Rule{})
+	var rule models.Rule
+	if err := db.Where("id = ?", id).First(&rule).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Rule not found"})
+		return
+	}
+
+	if rule.SystemManaged {
+		c.JSON(http.StatusForbidden, gin.H{"error": "System-managed rules cannot be deleted"})
+		return
+	}
+
+	result := db.Delete(&rule)
 	if result.Error != nil || result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Rule not found or you don't have permission"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Rule could not be deleted"})
 		return
 	}
 
@@ -363,7 +422,7 @@ func DeleteRule(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Rule deleted ✅", "rule_id": id})
 }
 
-// DraftFAQ asks Gemini to draft an FAQ answer in English and Sinhala.
+// DraftFAQ asks Gemini to draft an FAQ answer in all languages configured for the business.
 //
 // Dual-mode:
 //   - from_inbox=true  → Generalizes the raw customer message into a broader intent,
@@ -410,11 +469,26 @@ func DraftFAQ(c *gin.Context) {
 		// Unlimited — no quota check
 	}
 
+	// Build language instructions based on business settings
+	supportedLangs := strings.Split(biz.BotSupportedLangs, ",")
+	var langList []string
+	var jsonResponsesFormat string
+	for _, l := range supportedLangs {
+		l = strings.TrimSpace(l)
+		if l == "" {
+			continue
+		}
+		langList = append(langList, l)
+		jsonResponsesFormat += fmt.Sprintf(`"%s": "*Bold Header* emoji\nShort %s response body here.", `, l, l)
+	}
+	if jsonResponsesFormat != "" {
+		jsonResponsesFormat = jsonResponsesFormat[:len(jsonResponsesFormat)-2] // strip last comma
+	}
+
 	var prompt string
 
 	if req.FromInbox {
 		// ── Inbox Generalization Mode ────────────────────────────────────────────
-		// Transforms a specific raw customer message into a broadly-scoped FAQ rule.
 		prompt = `You are an AI assistant helping a Sri Lankan eCommerce business owner build a WhatsApp FAQ knowledge base.
 Business Name: ` + biz.Name + `
 Bot Personality: ` + biz.BotPersonality + `
@@ -427,39 +501,32 @@ A customer sent this message that the bot failed to answer:
 Your job is to:
 1. GENERALIZE this specific question into a BROAD FAQ topic that would cover many similar questions from different customers.
    e.g. "when will my order arrive bro" → generalized intent: "Delivery timeline and order status"
-   Think: what is the CATEGORY of question being asked, not the exact phrasing.
 
 2. Generate TRIGGER KEYWORDS for this generalized topic:
-   - At least 8 CORE meaningful keywords (English + Singlish romanized Sinhala variants)
+   - At least 8 CORE meaningful keywords (English + Singlish romanized Sinhala/Tamil variants depending on context)
    - These 8 must be real words/phrases, NOT typos
    - After the 8 core keywords, add 2-3 AND-combo entries using '+' syntax (e.g. "when+arrive", "order+status") for precision matching
    - Cover the full range of ways a Sri Lankan customer might ask this: English phrases, romanized Sinhala (Singlish), common short forms
    - Format: comma-separated list
 
-3. Write a WhatsApp-style ENGLISH reply:
-   - Start with a *bold topic header* using WhatsApp bold syntax: *Header Text* (asterisks, no spaces inside)
+3. Write WhatsApp-style replies for exactly these language codes: ` + strings.Join(langList, ", ") + `.
+   - Start each reply with a *bold topic header* using WhatsApp bold syntax: *Header Text* (asterisks, no spaces inside)
    - Add ONE relevant emoji after the header
    - Keep the body short: 1-2 warm, friendly sentences
-   - Sound like a Sri Lankan business owner texting, not a formal email
-
-4. Write a WhatsApp-style SINHALA reply:
-   - Start with the same *bold header* in Sinhala or simple English
-   - ONE emoji (same as English)
-   - Write NATURAL Sinhala as Sri Lankans actually type on WhatsApp
-   - Use English loanwords freely: 'delivery', 'order', 'free', 'COD', 'stock', 'price', 'available'
-   - Do NOT use formal academic Sinhala translations
-   - Keep it short and warm
+   - For English: conversational tone
+   - For Sinhala: write NATURAL conversational WhatsApp Sinhala, using English loanwords freely (delivery, order, COD, stock, price). Never use formal academic Sinhala or formal pronouns (like Oba, Obata, Oyage).
+   - For Tamil: natural WhatsApp Tamil, conversational not bookish.
 
 Return ONLY a raw JSON object (no markdown, no code fences):
 {
   "generalized_intent": "Short description of the broad FAQ topic",
   "keywords": "keyword1, keyword2, keyword3, keyword4, keyword5, keyword6, keyword7, keyword8, combo1+combo2, combo3+combo4",
-  "response": "*Bold Header* emoji\nShort English reply here.",
-  "sinhala_response": "*Bold Header* emoji\nShort Sinhala reply here."
+  "responses": {
+    ` + jsonResponsesFormat + `
+  }
 }`
 	} else {
 		// ── Plain Response-Only Draft Mode ────────────────────────────────────────
-		// Tenant has typed their own keywords; just draft the responses.
 		prompt = `You are an AI assistant helping a Sri Lankan eCommerce business owner create a WhatsApp FAQ.
 Business Name: ` + biz.Name + `
 Bot Personality: ` + biz.BotPersonality + `
@@ -468,22 +535,20 @@ Operating Hours: ` + biz.OperatingHours + `
 
 The merchant wants to create an FAQ rule for this topic/keywords: "` + req.Message + `"
 
-Draft warm, natural WhatsApp replies for this FAQ topic.
+Draft warm, natural WhatsApp replies for this FAQ topic for exactly these language codes: ` + strings.Join(langList, ", ") + `.
 
 FORMATTING RULES (strictly follow):
-- Start BOTH replies with a *bold topic header* using WhatsApp bold: *Header Text* (asterisks, no spaces inside)
+- Start each reply with a *bold topic header* using WhatsApp bold: *Header Text* (asterisks, no spaces inside)
 - Add ONE relevant emoji right after the bold header
-- English: friendly Sri Lankan business owner tone. If the topic involves steps/a process, use short numbered steps (1. 2. 3.) inside the body.
-- Sinhala: Write NATURAL Sinhala as Sri Lankans actually type on WhatsApp — like texting a friend on the phone, never like writing a formal letter.
-  * Use English loanwords freely: 'delivery', 'order', 'connect', 'scan', 'QR', 'COD', 'stock', 'price'
-  * STRICTLY FORBIDDEN: NEVER use 'Oyage', 'Oba', 'Obata', 'Apith', or any formal Sinhala possessive pronouns. They sound robotic.
-  * INSTEAD: drop pronouns entirely or use direct imperative form. Good: "Connect karanna gihilla...". Bad: "Oyage phone eke..."
-  * If steps are needed, use short numbered steps in Sinhala too
+- For English: friendly Sri Lankan business owner tone. If the topic involves steps/a process, use short numbered steps (1. 2. 3.) inside the body.
+- For Sinhala: Write NATURAL Sinhala as Sri Lankans actually type on WhatsApp. Use English loanwords freely. STRICTLY FORBIDDEN: NEVER use 'Oyage', 'Oba', 'Obata', 'Apith', or any formal Sinhala possessive pronouns.
+- For Tamil: Natural conversational WhatsApp Tamil.
 
 Return ONLY a raw JSON object (no markdown, no code fences):
 {
-  "response": "*Bold Header* emoji\nEnglish reply (use 1.\n2.\n3. for steps if needed).",
-  "sinhala_response": "*Bold Header* emoji\nSinhala reply (use 1.\n2.\n3. for steps if needed)."
+  "responses": {
+    ` + jsonResponsesFormat + `
+  }
 }`
 	}
 
@@ -542,57 +607,59 @@ Return ONLY a raw JSON object (no markdown, no code fences):
 	// Increment AI generation count
 	database.DB.Model(&biz).Update("rule_generation_count", gorm.Expr("rule_generation_count + ?", 1))
 
-	if req.FromInbox {
-		// Inbox mode: parse full response including generalized_intent + keywords
-		var drafted struct {
+	// Parse full response including generalized_intent + keywords + responses map
+	var drafted struct {
+		GeneralizedIntent string            `json:"generalized_intent"`
+		Keywords          string            `json:"keywords"`
+		Responses         map[string]string `json:"responses"`
+	}
+	if err := json.Unmarshal([]byte(reply), &drafted); err != nil {
+		// Fallback parse if Gemini omitted the nested structure and returned flat fields
+		var flatDrafted struct {
 			GeneralizedIntent string `json:"generalized_intent"`
 			Keywords          string `json:"keywords"`
 			Response          string `json:"response"`
 			SinhalaResponse   string `json:"sinhala_response"`
 		}
-		if err := json.Unmarshal([]byte(reply), &drafted); err != nil {
+		if err2 := json.Unmarshal([]byte(reply), &flatDrafted); err2 == nil {
+			drafted.GeneralizedIntent = flatDrafted.GeneralizedIntent
+			drafted.Keywords = flatDrafted.Keywords
+			drafted.Responses = map[string]string{}
+			if flatDrafted.Response != "" {
+				drafted.Responses["en"] = flatDrafted.Response
+			}
+			if flatDrafted.SinhalaResponse != "" {
+				drafted.Responses["si"] = flatDrafted.SinhalaResponse
+			}
+		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse drafted JSON", "raw": reply})
 			return
 		}
-		// Build responses map for new multi-lang rule editor
-		responsesMap := map[string]string{}
-		if drafted.Response != "" {
-			responsesMap["en"] = drafted.Response
-		}
-		if drafted.SinhalaResponse != "" {
-			responsesMap["si"] = drafted.SinhalaResponse
-		}
-		c.JSON(http.StatusOK, gin.H{
-			"generalized_intent": drafted.GeneralizedIntent,
-			"keywords":           drafted.Keywords,
-			"response":           drafted.Response,
-			"sinhala_response":   drafted.SinhalaResponse,
-			"responses":          responsesMap,
-		})
-	} else {
-		// Plain mode: response + sinhala_response only
-		var drafted struct {
-			Response        string `json:"response"`
-			SinhalaResponse string `json:"sinhala_response"`
-		}
-		if err := json.Unmarshal([]byte(reply), &drafted); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse drafted JSON", "raw": reply})
-			return
-		}
-		// Build responses map for new multi-lang rule editor
-		responsesMap := map[string]string{}
-		if drafted.Response != "" {
-			responsesMap["en"] = drafted.Response
-		}
-		if drafted.SinhalaResponse != "" {
-			responsesMap["si"] = drafted.SinhalaResponse
-		}
-		c.JSON(http.StatusOK, gin.H{
-			"response":         drafted.Response,
-			"sinhala_response": drafted.SinhalaResponse,
-			"responses":        responsesMap,
-		})
 	}
+
+	// Double check nil map
+	if drafted.Responses == nil {
+		drafted.Responses = map[string]string{}
+	}
+
+	// Determine missing languages and activation readiness
+	var missingLanguages []string
+	for _, l := range langList {
+		if text, ok := drafted.Responses[l]; text == "" || !ok {
+			missingLanguages = append(missingLanguages, l)
+		}
+	}
+	activationReady := len(missingLanguages) == 0
+
+	c.JSON(http.StatusOK, gin.H{
+		"generalized_intent": drafted.GeneralizedIntent,
+		"keywords":           drafted.Keywords,
+		"response":           drafted.Responses["en"], // backward compat
+		"sinhala_response":   drafted.Responses["si"], // backward compat
+		"responses":          drafted.Responses,
+		"missing_languages":  missingLanguages,
+		"activation_ready":   activationReady,
+	})
 }
 
 // ─── Per-Business Rate Limiter for GenerateRule ────────────────────────────────

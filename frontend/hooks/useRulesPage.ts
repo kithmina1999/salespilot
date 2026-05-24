@@ -28,6 +28,10 @@ export interface RuleEntry {
   is_active: boolean;
   usage_count: number;
   business_id: number | null;
+  knowledge_type?: string;
+  source_type?: string;
+  source_id?: number | null;
+  system_managed?: boolean;
 }
 
 export interface RulesStats {
@@ -37,7 +41,18 @@ export interface RulesStats {
   rule_generation_count: number;
   rule_generation_limit: number;
   no_sinhala_coverage: number;
-  top_unmatched: { message: string; count: number }[];
+  top_unmatched: {
+    id: number;
+    message: string;
+    normalized_message?: string;
+    count: number;
+    router_intent?: string;
+    suggested_knowledge_type?: string;
+    suggested_action?: string;
+    selected_product_id?: number | null;
+    ai_reply_text?: string;
+    last_seen_at?: string;
+  }[];
 }
 
 interface RulesPageData {
@@ -112,6 +127,10 @@ export function useRulesPage() {
   /** Optimistic is_active toggle. Common rules (business_id === null) are skipped. */
   async function toggleRuleStatus(rule: RuleEntry) {
     if (rule.business_id === null) return;
+    if (rule.system_managed) {
+      toast.error('System-managed rules cannot be modified directly');
+      return;
+    }
     const newStatus = !rule.is_active;
 
     await mutate(
@@ -144,6 +163,11 @@ export function useRulesPage() {
    * so the caller can show the upgrade banner instead of a toast.
    */
   async function deleteRule(id: number): Promise<boolean> {
+    const rule = data?.customRules.find(r => r.ID === id);
+    if (rule?.system_managed) {
+      toast.error('System-managed rules cannot be deleted');
+      return false;
+    }
     if (!confirm('Are you sure you want to delete this custom rule?')) return false;
 
     await mutate(
@@ -171,6 +195,39 @@ export function useRulesPage() {
     return true;
   }
 
+  async function resolveGap(id: number, action: string, resolvedRuleId?: number): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_URL}/api/v1/knowledge-gaps/${id}/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify({ resolved_action: action, resolved_rule_id: resolvedRuleId }),
+      });
+      if (!res.ok) throw new Error('Failed to resolve gap');
+      toast.success('Knowledge gap resolved');
+      revalidate();
+      return true;
+    } catch (err) {
+      toast.error('Failed to resolve knowledge gap');
+      return false;
+    }
+  }
+
+  async function markGapNotNeeded(id: number): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_URL}/api/v1/knowledge-gaps/${id}/mark-not-needed`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error('Failed to mark gap not needed');
+      toast.success('Knowledge gap marked as not needed');
+      revalidate();
+      return true;
+    } catch (err) {
+      toast.error('Failed to mark knowledge gap as not needed');
+      return false;
+    }
+  }
+
   return {
     customRules:  data?.customRules  ?? [],
     commonRules:  data?.commonRules  ?? [],
@@ -182,6 +239,8 @@ export function useRulesPage() {
     error,
     toggleRuleStatus,
     deleteRule,
+    resolveGap,
+    markGapNotNeeded,
     revalidate,
   };
 }

@@ -29,7 +29,7 @@ func GetUsageStats(c *gin.Context) {
 	database.DB.Model(&models.Product{}).Where("business_id = ?", businessID).Count(&productCount)
 
 	var ruleCount int64
-	database.DB.Model(&models.Rule{}).Where("business_id = ?", businessID).Count(&ruleCount)
+	database.DB.Model(&models.Rule{}).Where("business_id = ? AND system_managed = ?", businessID, false).Count(&ruleCount)
 
 	ent, err := GetUsageEntitlements(biz, time.Now())
 	if err != nil {

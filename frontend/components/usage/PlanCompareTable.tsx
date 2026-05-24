@@ -140,7 +140,7 @@ export default function PlanCompareTable({ onUpgrade }: Props) {
         pro={<span className="text-purple-400">{fmtMaybeLimit(pro?.ai_messages)}</span>}
       />
       <FeatureRow
-        label="FAQ Rules"
+        label="Knowledge Base"
         free={typeof free?.rules === 'number' ? `${free.rules} max` : '—'}
         starter={<span className="text-emerald-400">{fmtMaybeLimit(starter?.rules)}</span>}
         pro={<span className="text-purple-400">{fmtMaybeLimit(pro?.rules)}</span>}

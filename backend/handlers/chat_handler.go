@@ -25,7 +25,6 @@ func ListChats(c *gin.Context) {
 		MessageTime    string `json:"message_time"`
 		Status         string `json:"status"`
 		CustomerName   string `json:"customer_name"`
-		UnmatchedCount int    `json:"unmatched_count"`
 		UnreadCount    int    `json:"unread_count"`
 	}
 
@@ -37,7 +36,6 @@ func ListChats(c *gin.Context) {
 			(SELECT content FROM messages WHERE phone = m.phone AND business_id = m.business_id ORDER BY created_at DESC LIMIT 1) as latest_message,
 			(SELECT created_at FROM messages WHERE phone = m.phone AND business_id = m.business_id ORDER BY created_at DESC LIMIT 1) as message_time,
 			(SELECT status FROM messages WHERE phone = m.phone AND business_id = m.business_id ORDER BY created_at DESC LIMIT 1) as status,
-			(SELECT COUNT(*) FROM messages WHERE phone = m.phone AND business_id = m.business_id AND is_unmatched = true) as unmatched_count,
 			(
 				SELECT COUNT(*) FROM messages msg
 				LEFT JOIN customers cust ON msg.phone = cust.phone AND msg.business_id = cust.business_id
@@ -284,10 +282,7 @@ func SendManualReply(c *gin.Context) {
 		Where("phone = ? AND status = 'needs_attention'", phone).
 		Update("status", "resolved")
 
-	// Resolve any pending unmatched messages in the fallback queue
-	db.Model(&models.UnmatchedMessage{}).
-		Where("phone = ? AND status = ?", phone, "pending").
-		Update("status", "resolved")
+
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Manual reply sent",

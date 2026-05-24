@@ -71,7 +71,7 @@ const NAV_MAIN: NavSection[] = [
       { href: '/dashboard/orders', labelKey: 'nav.orders', fallback: 'Orders' },
       { href: '/dashboard/finance', labelKey: 'nav.finance', fallback: 'Finance' },
       { href: '/dashboard/products', labelKey: 'nav.products', fallback: 'Products' },
-      { href: '/dashboard/rules', labelKey: 'nav.faq_rules', fallback: 'FAQ Rules' },
+      { href: '/dashboard/rules', labelKey: 'nav.faq_rules', fallback: 'Knowledge Base' },
     ],
   },
   {

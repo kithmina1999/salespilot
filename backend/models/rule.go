@@ -34,7 +34,29 @@ type Rule struct {
 	// Tier 2: Context bridge — check last bot message; re-prompt if it was a question, else silent drop
 	IsContextBridge bool   `json:"is_context_bridge" gorm:"default:false"`
 	Embedding       []byte `json:"-" gorm:"type:bytea"` // JSON-encoded float64 vector, not exposed in API
+
+	// Knowledge Base typed fields
+	KnowledgeType string `json:"knowledge_type" gorm:"default:'static_faq';index"`
+	SourceType    string `json:"source_type" gorm:"index"`
+	SourceID      *uint  `json:"source_id" gorm:"index"`
+	SystemManaged bool   `json:"system_managed" gorm:"default:false;index"`
 }
+
+// Knowledge Types (system_managed is NOT a knowledge type — it's a boolean flag)
+const (
+	KnowledgeTypeStaticFAQ      = "static_faq"
+	KnowledgeTypeDynamicSetting = "dynamic_setting"
+	KnowledgeTypeProductCatalog = "product_catalog"
+	KnowledgeTypeOrderFlow      = "order_flow"
+)
+
+// Source Types
+const (
+	SourceTypeManual           = "manual"
+	SourceTypeProduct          = "product"
+	SourceTypePaymentSettings  = "payment_settings"
+	SourceTypeDeliverySettings = "delivery_settings"
+)
 
 const (
 	TierCritical = "critical" // abuse, spam, blacklist
@@ -69,6 +91,30 @@ func (r *Rule) GetResponse(langCode string) string {
 		return r.SinhalaResponse
 	}
 	return r.Response
+}
+
+// GetExactResponse returns only the response explicitly configured for langCode.
+// Unlike GetResponse, this deliberately does not fall back to English.
+func (r *Rule) GetExactResponse(langCode string) string {
+	langCode = strings.TrimSpace(langCode)
+	if langCode == "" {
+		return ""
+	}
+	if r.Responses != "" && r.Responses != "{}" {
+		var m map[string]string
+		if err := json.Unmarshal([]byte(r.Responses), &m); err == nil {
+			if v, ok := m[langCode]; ok {
+				return v
+			}
+		}
+	}
+	if langCode == "en" {
+		return r.Response
+	}
+	if langCode == "si" {
+		return r.SinhalaResponse
+	}
+	return ""
 }
 
 // SetResponse updates the Responses JSON map for a given language code.

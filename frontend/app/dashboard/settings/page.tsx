@@ -69,6 +69,12 @@ export default function SettingsPage() {
   const [billing, setBilling] = useState<BillingStatus | null>(null);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    if (tab && ['general', 'appearance', 'language', 'payments', 'security', 'blacklist', 'audit', 'reports', 'danger'].includes(tab)) {
+      setActiveTab(tab);
+    }
+
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
 

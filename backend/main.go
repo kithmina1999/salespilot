@@ -16,6 +16,7 @@ import (
 	"github.com/kithmina1999/salespilot/config"
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/handlers"
+	"github.com/kithmina1999/salespilot/knowledge"
 	"github.com/kithmina1999/salespilot/middleware"
 	"github.com/kithmina1999/salespilot/services"
 	"github.com/kithmina1999/salespilot/utils"
@@ -45,6 +46,9 @@ func main() {
 
 	// Run one-time data migrations (idempotent — safe to run on every deploy)
 	database.MigrateRuleResponses()
+	if err := knowledge.SyncAllSystemKnowledge(database.DB); err != nil {
+		log.Printf("knowledge sync failed: %v", err)
+	}
 
 	// Load FAQ Cache & embed missing rules
 	whatsapp.Cache.LoadRules()
@@ -251,6 +255,11 @@ func main() {
 		dash.GET("/dashboard/stats", handlers.GetDashboardStats)
 		dash.GET("/dashboard/notifications", handlers.GetNotifications)
 		dash.POST("/dashboard/notifications/mark-read", handlers.MarkAllNotificationsRead)
+
+		// Dashboard Knowledge Gap Endpoints
+		dash.GET("/knowledge-gaps", handlers.ListKnowledgeGaps)
+		dash.POST("/knowledge-gaps/:id/resolve", handlers.ResolveKnowledgeGap)
+		dash.POST("/knowledge-gaps/:id/mark-not-needed", handlers.MarkGapNotNeeded)
 
 		// Dashboard Settings & Audit
 		dash.GET("/settings/business", handlers.GetBusinessSettings)

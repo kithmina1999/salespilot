@@ -13,7 +13,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
+	"github.com/kithmina1999/salespilot/knowledge"
 	"github.com/kithmina1999/salespilot/models"
+	"github.com/kithmina1999/salespilot/whatsapp"
 	"gorm.io/gorm"
 
 	"github.com/cloudinary/cloudinary-go/v2"
@@ -28,6 +30,7 @@ type AdminCreateProductRequest struct {
 	Category    string  `json:"category"`
 	Sizes       string  `json:"sizes"`
 	Colors      string  `json:"colors"`
+	Aliases     string  `json:"aliases"`
 	ImageURL    string  `json:"image_url"`
 	RetailerID  string  `json:"retailer_id"` // Meta Commerce Catalog Retailer ID
 }
@@ -75,8 +78,13 @@ func validateCreateProductRequest(req *AdminCreateProductRequest) error {
 	if err != nil {
 		return err
 	}
+	aliases, err := validateProductArrayField(req.Aliases, "aliases")
+	if err != nil {
+		return err
+	}
 	req.Sizes = sizes
 	req.Colors = colors
+	req.Aliases = aliases
 	return nil
 }
 
@@ -133,7 +141,7 @@ func sanitizeProductUpdates(updates map[string]interface{}) (map[string]interfac
 				return nil, fmt.Errorf("%s must be a string", key)
 			}
 			clean[key] = strings.TrimSpace(s)
-		case "sizes", "colors":
+		case "sizes", "colors", "aliases":
 			s, ok := value.(string)
 			if !ok {
 				return nil, fmt.Errorf("%s must be a JSON string array", key)
@@ -251,6 +259,7 @@ func AdminCreateProduct(c *gin.Context) {
 		Category:    req.Category,
 		Sizes:       req.Sizes,
 		Colors:      req.Colors,
+		Aliases:     req.Aliases,
 		ImageURL:    req.ImageURL,
 		RetailerID:  req.RetailerID,
 		Active:      true,
@@ -259,6 +268,26 @@ func AdminCreateProduct(c *gin.Context) {
 	if err := database.DB.Create(&product).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create product"})
 		return
+	}
+
+	// Sync product knowledge rule then reload cache
+	go func() {
+		if err := knowledge.SyncProductKnowledge(database.DB, product); err == nil {
+			whatsapp.Cache.LoadRules()
+		}
+	}()
+
+	// Auto-resolve gap if gap_id is provided
+	var gapID uint
+	if gidStr := c.Query("gap_id"); gidStr != "" {
+		if val, err := strconv.ParseUint(gidStr, 10, 32); err == nil {
+			gapID = uint(val)
+		}
+	}
+	if gapID > 0 {
+		go func() {
+			knowledge.AutoResolveGapByID(database.DB, gapID, "update_product_catalog", nil)
+		}()
 	}
 
 	LogActivity(businessID, "user", c.GetUint("user_id"), "product_created", "product", strconv.FormatUint(uint64(product.ID), 10), map[string]interface{}{
@@ -307,6 +336,25 @@ func AdminUpdateProduct(c *gin.Context) {
 
 	database.DB.Where("id = ? AND business_id = ?", id, businessID).First(&product)
 
+	go func() {
+		if err := knowledge.SyncProductKnowledge(database.DB, product); err == nil {
+			whatsapp.Cache.LoadRules()
+		}
+	}()
+
+	// Auto-resolve gap if gap_id is provided
+	var gapID uint
+	if gidStr := c.Query("gap_id"); gidStr != "" {
+		if val, err := strconv.ParseUint(gidStr, 10, 32); err == nil {
+			gapID = uint(val)
+		}
+	}
+	if gapID > 0 {
+		go func() {
+			knowledge.AutoResolveGapByID(database.DB, gapID, "update_product_catalog", nil)
+		}()
+	}
+
 	bizName, bizPlan := GetBusinessContext(businessID)
 	LogActivity(businessID, "user", c.GetUint("user_id"), "product_updated", "product", strconv.FormatUint(uint64(product.ID), 10), map[string]interface{}{
 		"updates_applied": updates,
@@ -342,6 +390,14 @@ func AdminUpdateStock(c *gin.Context) {
 		return
 	}
 
+	var product models.Product
+	db.First(&product, id)
+	go func() {
+		if err := knowledge.SyncProductKnowledge(db, product); err == nil {
+			whatsapp.Cache.LoadRules()
+		}
+	}()
+
 	c.JSON(http.StatusOK, gin.H{"message": "Stock updated ✅", "product_id": id, "new_stock": *req.Stock})
 }
 
@@ -359,6 +415,12 @@ func AdminDeleteProduct(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
 		return
 	}
+
+	go func() {
+		if err := knowledge.DeactivateProductKnowledge(database.DB, businessID, uint(id)); err == nil {
+			whatsapp.Cache.LoadRules()
+		}
+	}()
 
 	bizName, bizPlan := GetBusinessContext(businessID)
 	LogActivity(businessID, "user", c.GetUint("user_id"), "product_deleted", "product", strconv.FormatUint(uint64(id), 10), map[string]interface{}{}, c.ClientIP(), "low", bizName, bizPlan)

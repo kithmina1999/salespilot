@@ -18,6 +18,7 @@ export function BulkTranslateModal({ rules, targetLang, sourceLang, onClose, onA
   
   // Filter rules that actually need translation
   const rulesToTranslate = rules.filter(r => {
+    if (r.system_managed) return false;
     let parsed: Record<string, string> = {};
     try { parsed = JSON.parse(r.responses || '{}'); } catch {}
     
@@ -173,7 +174,7 @@ export function BulkTranslateModal({ rules, targetLang, sourceLang, onClose, onA
           <button
             onClick={handleSave}
             disabled={saving || Object.keys(translations).length === 0}
-            className="px-6 py-2 bg-white hover:bg-zinc-200 text-black rounded-xl font-bold transition-colors flex items-center gap-2 shadow-lg disabled:opacity-50"
+            className="px-6 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-bold transition-colors flex items-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
             Approve & Save

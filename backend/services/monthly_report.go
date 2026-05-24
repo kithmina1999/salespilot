@@ -237,7 +237,7 @@ func collectStats(biz models.Business, monthKey string, refDate time.Time) (*rep
 	database.DB.Model(&models.Message{}).
 		Where("business_id = ? AND role = 'user' AND created_at >= ? AND created_at < ?", biz.ID, monthStart, monthEnd).
 		Count(&totalUserMsgs)
-	database.DB.Model(&models.UnmatchedMessage{}).
+	database.DB.Model(&models.KnowledgeGap{}).
 		Where("business_id = ? AND created_at >= ? AND created_at < ?", biz.ID, monthStart, monthEnd).
 		Count(&unmatchedMsgs)
 	database.DB.Model(&models.Message{}).
@@ -259,7 +259,7 @@ func collectStats(biz models.Business, monthKey string, refDate time.Time) (*rep
 		Message string
 		Count   int
 	}
-	database.DB.Model(&models.UnmatchedMessage{}).
+	database.DB.Model(&models.KnowledgeGap{}).
 		Select("MAX(message) as message, count(*) as count").
 		Where("business_id = ? AND created_at >= ? AND created_at < ? AND resolved = ?", biz.ID, monthStart, monthEnd, false).
 		Group("intent_cluster").

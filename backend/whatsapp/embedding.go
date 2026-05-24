@@ -111,6 +111,17 @@ func buildEmbedText(r models.Rule) string {
 	if r.SinhalaResponse != "" {
 		parts = append(parts, r.SinhalaResponse)
 	}
+	if r.Responses != "" && r.Responses != "{}" {
+		var respMap map[string]string
+		if err := json.Unmarshal([]byte(r.Responses), &respMap); err == nil {
+			for _, text := range respMap {
+				text = strings.TrimSpace(text)
+				if text != "" {
+					parts = append(parts, text)
+				}
+			}
+		}
+	}
 	return strings.Join(parts, ". ")
 }
 

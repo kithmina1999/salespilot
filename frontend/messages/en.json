@@ -32,7 +32,7 @@
     "orders": "Orders",
     "products": "Products",
     "customers": "Customers",
-    "faq_rules": "FAQ Rules",
+    "faq_rules": "Knowledge Base",
     "analytics": "Finance",
     "finance": "Finance",
     "settings": "Settings",
@@ -162,7 +162,7 @@
     "no_customers": "No customers yet"
   },
   "rules": {
-    "title": "FAQ Rules",
+    "title": "Knowledge Base",
     "add_rule": "Add Rule",
     "keywords": "Trigger Keywords",
     "keywords_hint": "Comma-separated keywords that trigger this reply",

@@ -32,7 +32,7 @@
     "orders": "ඇණවුම්",
     "products": "නිෂ්පාදන",
     "customers": "ගනුදෙනුකරුවන්",
-    "faq_rules": "FAQ රීති",
+    "faq_rules": "දැනුම් පදනම (Knowledge Base)",
     "analytics": "Finance",
     "finance": "Finance",
     "settings": "සැකසුම්",
@@ -159,7 +159,7 @@
     "no_customers": "ගනුදෙනුකරුවන් නැත"
   },
   "rules": {
-    "title": "FAQ රීති",
+    "title": "දැනුම් පදනම (Knowledge Base)",
     "subtitle": "AI bot එකතු කරන්න සාමාන්‍ය සැපත්තියක විට පිලිතුල කරන්න.",
     "add_rule": "රීතිය එකතු කරන්න",
     "create_rule": "ාන්‍ය රීතිය සාදන්න",

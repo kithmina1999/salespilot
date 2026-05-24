@@ -46,7 +46,7 @@ func TestMain(m *testing.M) {
 	if err := database.DB.AutoMigrate(
 		&models.Business{},
 		&models.Rule{},
-		&models.UnmatchedMessage{},
+		&models.KnowledgeGap{},
 		&models.Cart{},
 		&models.Order{},
 		&models.Customer{},

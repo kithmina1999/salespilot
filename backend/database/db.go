@@ -47,7 +47,7 @@ func Init(dsn string) {
 		DB.Migrator().DropTable(
 			&models.Product{}, &models.Order{}, &models.Customer{},
 			&models.Business{}, &models.Rule{}, &models.Message{},
-			&models.UnmatchedMessage{}, &models.User{}, &models.AuditLog{},
+			&models.KnowledgeGap{}, &models.User{}, &models.AuditLog{},
 			&models.BlacklistedNumber{}, &models.ActivationCode{},
 			&models.Cart{}, &models.SavedAddress{},
 			&models.SuperAdminUser{}, &models.SuperAdminSession{},
@@ -62,7 +62,7 @@ func Init(dsn string) {
 	err = DB.AutoMigrate(
 		&models.Business{}, &models.User{}, &models.Product{}, &models.Order{},
 		&models.Customer{}, &models.Rule{}, &models.RuleTemplate{}, &models.Message{},
-		&models.UnmatchedMessage{}, &models.AuditLog{},
+		&models.KnowledgeGap{}, &models.AuditLog{},
 		&models.BlacklistedNumber{}, &models.ActivationCode{},
 		&models.PasswordResetToken{}, // WhatsApp OTP password reset
 		&models.EmailVerificationToken{},

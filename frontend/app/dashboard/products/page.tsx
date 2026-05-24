@@ -19,15 +19,16 @@ interface Product {
   price: number;
   stock: number;
   active: boolean;
-  description: string;
-  image_url: string;
-  retailer_id: string; // Meta Commerce Catalog Retailer ID
-}
+	  description: string;
+	  image_url: string;
+	  retailer_id: string; // Meta Commerce Catalog Retailer ID
+	  aliases?: string;
+	}
 
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
+// â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function ProductsPage() {
-  // SWR-backed data — optimistic toggle & delete built in
+  // SWR-backed data â€” optimistic toggle & delete built in
   const { products, isLoading: loading, toggleProductActive, deleteProduct, revalidate } = useProducts();
 
   const [search,   setSearch]       = useState('');
@@ -46,14 +47,46 @@ export default function ProductsPage() {
 
   const [form, setForm] = useState({
     name: '', category: '', price: '', stock: '',
-    description: '', active: true, retailer_id: '',
+    description: '', active: true, retailer_id: '', aliases: '',
   });
+
+  function aliasesFromJSON(raw?: string) {
+    if (!raw) return '';
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.join(', ') : '';
+    } catch {
+      return '';
+    }
+  }
+
+  function aliasesToJSON(raw: string) {
+    const aliases = raw
+      .split(',')
+      .map(alias => alias.trim())
+      .filter(Boolean);
+    return aliases.length > 0 ? JSON.stringify(aliases) : '';
+  }
+
+  function productKeywordPreview() {
+    const name = form.name.trim().toLowerCase();
+    const category = form.category.trim().toLowerCase();
+    const nameWords = name.split(/\s+/).filter(word => word.length > 2);
+    const aliases = form.aliases.split(',').map(alias => alias.trim().toLowerCase()).filter(Boolean);
+    const terms = [
+      name,
+      ...aliases,
+      ...nameWords,
+      ...nameWords.slice(0, 4).map(word => category ? `${category}+${word}` : ''),
+    ].filter(Boolean);
+    return Array.from(new Set(terms)).slice(0, 10);
+  }
 
 
 
   function openCreate() {
     setEditTargetId(null);
-    setForm({ name: '', category: '', price: '', stock: '', description: '', active: true, retailer_id: '' });
+    setForm({ name: '', category: '', price: '', stock: '', description: '', active: true, retailer_id: '', aliases: '' });
     setImageFile(null);
     setImagePreview(null);
     setModalMode('create');
@@ -66,6 +99,7 @@ export default function ProductsPage() {
       price: p.price.toString(), stock: p.stock.toString(),
       description: p.description || '', active: p.active,
       retailer_id: p.retailer_id || '',
+      aliases: aliasesFromJSON(p.aliases),
     });
     setImageFile(null);
     setImagePreview(p.image_url || null);
@@ -89,16 +123,24 @@ export default function ProductsPage() {
     // Store product ID to chain upload if needed
     let createdProductId: number | null = null;
     const isEdit = modalMode === 'edit';
-    const url = !isEdit
+    let url = !isEdit
       ? `${API_URL}/api/v1/products`
       : `${API_URL}/api/v1/products/${editTargetId}`;
+
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const gapId = params.get('gap_id');
+      if (gapId) {
+        url += `?gap_id=${gapId}`;
+      }
+    }
 
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(url, {
         method: !isEdit ? 'POST' : 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ ...form, price, stock })
+        body: JSON.stringify({ ...form, aliases: aliasesToJSON(form.aliases), price, stock })
       });
       if (res.ok) {
         const data = await res.json();
@@ -152,7 +194,7 @@ export default function ProductsPage() {
       const file = e.target.files[0];
       setImageFile(file);
       setImagePreview(URL.createObjectURL(file));
-      
+
       // If editing, auto-upload
       if (modalMode === 'edit' && editTargetId) {
         uploadImage(editTargetId, file);
@@ -170,7 +212,7 @@ export default function ProductsPage() {
 
   return (
     <div className="max-w-7xl mx-auto w-full pb-12">
-      {/* ── Header ── */}
+      {/* â”€â”€ Header â”€â”€ */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white">{t('products.title')}</h1>
@@ -186,16 +228,16 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {/* ── Search bar ── */}
+      {/* â”€â”€ Search bar â”€â”€ */}
       <ToolbarSearch
         label="Search products"
-        placeholder={t('common.search') + ' ' + t('products.title').toLowerCase() + '…'}
+        placeholder={t('common.search') + ' ' + t('products.title').toLowerCase() + 'â€¦'}
         value={search}
         onChange={setSearch}
         className="max-w-sm mb-5"
       />
 
-      {/* ── Table ── */}
+      {/* â”€â”€ Table â”€â”€ */}
       <div className="border border-zinc-800 rounded-2xl overflow-hidden bg-zinc-900/50 overflow-x-auto">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead>
@@ -260,7 +302,7 @@ export default function ProductsPage() {
                           : 'text-zinc-500 bg-zinc-800/50 border-zinc-700 hover:bg-zinc-800'
                       }`}
                     >
-                      {p.active ? '● ' + t('common.active') : '○ ' + t('products.draft')}
+                      {p.active ? 'â— ' + t('common.active') : 'â—‹ ' + t('products.draft')}
                     </button>
                   </td>
                   {/* Actions */}
@@ -279,7 +321,7 @@ export default function ProductsPage() {
         </table>
       </div>
 
-      {/* ── Create / Edit Modal ── */}
+      {/* â”€â”€ Create / Edit Modal â”€â”€ */}
       {modalMode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-lg rounded-2xl bg-zinc-900 border border-zinc-800 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
@@ -354,14 +396,30 @@ export default function ProductsPage() {
               <div>
                 <label className="text-xs font-semibold text-zinc-400 block mb-1.5">Category</label>
                 <input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
-                  placeholder="e.g. Skincare, Clothing…"
+                  placeholder="e.g. Skincare, Clothingâ€¦"
                   className="w-full px-3 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm outline-none focus:border-zinc-600 text-white transition-colors" />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-zinc-400 block mb-1.5">Product Keywords / Aliases</label>
+                <input value={form.aliases} onChange={e => setForm({ ...form, aliases: e.target.value })}
+                  placeholder="Comma-separated names customers use"
+                  className="w-full px-3 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm outline-none focus:border-zinc-600 text-white transition-colors" />
+                {productKeywordPreview().length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {productKeywordPreview().map(term => (
+                      <span key={term} className="text-[10px] px-2 py-1 rounded-md bg-zinc-800 border border-zinc-700 text-zinc-400 font-mono">
+                        {term}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>
                 <label className="text-xs font-semibold text-zinc-400 block mb-1.5">Description</label>
                 <textarea rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
-                  placeholder="Short product description…"
+                  placeholder="Short product descriptionâ€¦"
                   className="w-full px-3 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm outline-none focus:border-zinc-600 text-white transition-colors resize-none leading-relaxed" />
               </div>
 

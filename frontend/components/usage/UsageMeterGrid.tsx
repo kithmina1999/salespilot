@@ -161,7 +161,7 @@ export default function UsageMeterGrid() {
     },
     {
       icon: <BookOpen size={12} />,
-      label: 'FAQ Rules',
+      label: 'Knowledge Base',
       tooltip: 'Total active FAQ rules in your knowledge base.',
       used: usage.rules_used,
       limit: usage.rules_limit,

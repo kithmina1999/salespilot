@@ -7,8 +7,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
+	"github.com/kithmina1999/salespilot/knowledge"
 	"github.com/kithmina1999/salespilot/models"
 	"github.com/kithmina1999/salespilot/services"
+	"github.com/kithmina1999/salespilot/whatsapp"
 )
 
 type SettingsUpdateRequest struct {
@@ -21,7 +23,7 @@ type SettingsUpdateRequest struct {
 	// Language settings (new multi-language fields)
 	BotReplyLanguage  *string `json:"bot_reply_language"`  // ISO 639-1 fallback lang
 	BotSupportedLangs *string `json:"bot_supported_langs"` // comma-separated ISO codes
-	// Deprecated — kept for existing frontend compatibility
+	// Deprecated â€” kept for existing frontend compatibility
 	ResponseLanguage *string `json:"response_language"`
 	// Payment configuration (Slice 1)
 	AllowCOD      *bool   `json:"allow_cod"`      // pointer so false is distinguishable from omitted
@@ -82,7 +84,7 @@ func GetBusinessSettings(c *gin.Context) {
 		// Language settings
 		"bot_reply_language":  biz.BotReplyLanguage,
 		"bot_supported_langs": biz.BotSupportedLangs,
-		// Deprecated — still returned for legacy frontend
+		// Deprecated â€” still returned for legacy frontend
 		"response_language": biz.ResponseLanguage,
 		// Payment configuration
 		"allow_cod":      biz.AllowCOD,
@@ -130,7 +132,7 @@ func UpdateBusinessSettings(c *gin.Context) {
 		biz.MetaCatalogID = *req.MetaCatalogID
 	}
 
-	// Language fields — new multi-language engine
+	// Language fields â€” new multi-language engine
 	if req.BotReplyLanguage != nil && *req.BotReplyLanguage != "" {
 		biz.BotReplyLanguage = *req.BotReplyLanguage
 	}
@@ -145,7 +147,7 @@ func UpdateBusinessSettings(c *gin.Context) {
 		}
 	}
 
-	// Payment configuration — use pointer fields so explicit false is honoured
+	// Payment configuration â€” use pointer fields so explicit false is honoured
 	if req.AllowCOD != nil {
 		biz.AllowCOD = *req.AllowCOD
 	}
@@ -162,10 +164,30 @@ func UpdateBusinessSettings(c *gin.Context) {
 	}
 
 	if err := database.DB.Save(&biz).Error; err != nil {
-		log.Printf("❌ Failed to update settings for business %d: %v", biz.ID, err)
+		log.Printf("âŒ Failed to update settings for business %d: %v", biz.ID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update settings"})
 		return
 	}
+
+	// Trigger dynamic settings knowledge sync and auto-resolve gaps
+	go func() {
+		var reloaded models.Business
+		if err := database.DB.First(&reloaded, businessID).Error; err == nil {
+			knowledge.EnsureDynamicSettingKnowledge(database.DB, reloaded)
+
+			// If payment settings were changed
+			if req.AllowCOD != nil || req.AllowTransfer != nil || req.BankDetails != nil {
+				knowledge.AutoResolveGaps(database.DB, reloaded.ID, "update_payment_settings")
+			}
+
+			// If delivery settings were changed
+			if req.DeliveryPolicy != nil || req.OperatingHours != nil {
+				knowledge.AutoResolveGaps(database.DB, reloaded.ID, "update_delivery_settings")
+			}
+
+			whatsapp.Cache.LoadRules()
+		}
+	}()
 
 	LogActivity(
 		biz.ID, "user", c.GetUint("user_id"),
@@ -215,7 +237,7 @@ func UpdateLanguageSettings(c *gin.Context) {
 		}
 		if err := database.DB.Model(&models.User{}).Where("id = ?", userID).
 			Update("dashboard_language", req.DashboardLanguage).Error; err != nil {
-			log.Printf("⚠️ Failed to update dashboard_language for user %d: %v", userID, err)
+			log.Printf("âš ï¸ Failed to update dashboard_language for user %d: %v", userID, err)
 		}
 	}
 
@@ -236,14 +258,14 @@ func UpdateLanguageSettings(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":             "Language settings saved ✅",
+		"message":             "Language settings saved âœ…",
 		"dashboard_language":  req.DashboardLanguage,
 		"bot_reply_language":  req.BotReplyLanguage,
 		"bot_supported_langs": req.BotSupportedLangs,
 	})
 }
 
-// ── Monthly Report Settings ────────────────────────────────────────────────────
+// â”€â”€ Monthly Report Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // GetReportSettings returns the monthly report opt-in settings for the business
 func GetReportSettings(c *gin.Context) {
@@ -290,7 +312,7 @@ func UpdateReportSettings(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":                "Report settings saved ✅",
+		"message":                "Report settings saved âœ…",
 		"monthly_report_enabled": req.MonthlyReportEnabled,
 		"report_phone":           req.ReportPhone,
 	})
@@ -302,12 +324,12 @@ func SendTestReport(c *gin.Context) {
 
 	go func() {
 		if err := services.GenerateAndSendTestReport(businessID); err != nil {
-			log.Printf("❌ Test report failed for business %d: %v", businessID, err)
+			log.Printf("âŒ Test report failed for business %d: %v", businessID, err)
 		}
 	}()
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Test report is being generated and will be sent to your WhatsApp shortly 📊",
+		"message": "Test report is being generated and will be sent to your WhatsApp shortly ðŸ“Š",
 	})
 }
 

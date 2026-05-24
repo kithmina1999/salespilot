@@ -20,10 +20,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Edit2, Trash2, Search, Power, PowerOff, Bot } from 'lucide-react';
+import { Edit2, Trash2, Search, Power, PowerOff, Bot, ExternalLink, Eye } from 'lucide-react';
+import Link from 'next/link';
 
 interface RulesDataTableProps {
   data: RuleEntry[];
+  onView: (rule: RuleEntry) => void;
   onEdit: (rule: RuleEntry) => void;
   onDelete: (id: number) => void;
   onToggleStatus: (rule: RuleEntry) => void;
@@ -32,7 +34,7 @@ interface RulesDataTableProps {
   onOpenSimulator?: () => void;
 }
 
-export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selectedCategory, botReplyLang = 'en', onOpenSimulator }: RulesDataTableProps) {
+export function RulesDataTable({ data, onView, onEdit, onDelete, onToggleStatus, selectedCategory, botReplyLang = 'en', onOpenSimulator }: RulesDataTableProps) {
   const [globalFilter, setGlobalFilter] = useState('');
 
   const filteredData = useMemo(() => {
@@ -42,12 +44,45 @@ export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selecte
 
   const columns: ColumnDef<RuleEntry>[] = [
     {
+      accessorKey: 'knowledge_type',
+      header: 'Type',
+      cell: ({ row }) => {
+        const rule = row.original;
+        let badgeColor = 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20';
+        let label = 'FAQ';
+
+        if (rule.knowledge_type === 'product_catalog') {
+          badgeColor = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+          label = 'Product';
+        } else if (rule.source_type === 'payment_settings') {
+          badgeColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+          label = 'Payment';
+        } else if (rule.source_type === 'delivery_settings') {
+          badgeColor = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+          label = 'Delivery';
+        }
+
+        return (
+          <div className="flex items-center gap-1.5">
+            <Badge variant="outline" className={`text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 ${badgeColor}`}>
+              {label}
+            </Badge>
+            {rule.system_managed && (
+              <Badge variant="outline" className="text-[9px] px-1 py-0 bg-zinc-800 text-zinc-400 border-zinc-700 font-mono">
+                System
+              </Badge>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       accessorKey: 'keywords',
       header: 'Trigger Keywords',
       cell: ({ row }) => {
         const kws = (row.getValue('keywords') as string).split(',').map(k => k.trim());
         return (
-          <div className="flex flex-wrap gap-1 max-w-[300px]">
+	          <div className="flex flex-wrap gap-1 max-w-[360px]">
             {kws.slice(0, 3).map((kw, i) => (
               <Badge key={i} variant="outline" className="text-xs font-mono bg-muted border-border text-muted-foreground">
                 {kw}
@@ -71,14 +106,14 @@ export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selecte
         try {
           parsed = JSON.parse(rule.responses || '{}');
         } catch {}
-        
+
         const hasEn = !!parsed['en'] || !!rule.response;
         const hasSi = !!parsed['si'] || !!rule.sinhala_response;
         const previewText = parsed[botReplyLang] || parsed['en'] || rule.response || rule.sinhala_response || 'No response configured';
-        
+
         return (
           <div className="flex items-center gap-2">
-            <div className="max-w-[350px] truncate text-sm text-muted-foreground">
+	            <div className="max-w-[460px] truncate text-sm text-muted-foreground">
               {previewText}
             </div>
             <div className="flex gap-1 shrink-0">
@@ -111,9 +146,76 @@ export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selecte
       header: 'Actions',
       cell: ({ row }) => {
         const rule = row.original;
-        return (
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => onToggleStatus(rule)} className="h-8 w-8 text-muted-foreground hover:text-foreground" title={rule.is_active ? 'Pause Rule' : 'Activate Rule'}>
+
+        if (rule.system_managed) {
+          let sourceLink = '/dashboard';
+          let sourceLabel = 'Edit Source';
+	          if (rule.source_type === 'product') {
+	            sourceLink = '/dashboard/products';
+	            sourceLabel = 'Products';
+	          } else if (rule.source_type === 'payment_settings') {
+	            sourceLink = '/dashboard/settings?tab=payments';
+	            sourceLabel = 'Payments';
+	          } else if (rule.source_type === 'delivery_settings') {
+	            sourceLink = '/dashboard/settings?tab=general';
+	            sourceLabel = 'Delivery';
+	          }
+
+	          return (
+	            <div className="flex items-center gap-2">
+	              <Button
+	                variant="ghost"
+	                size="icon"
+	                onClick={() => onView(rule)}
+	                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+	                title="View Rule"
+	              >
+	                <Eye size={14} />
+	              </Button>
+	              <Button
+                variant="ghost"
+                size="icon"
+                disabled
+                className="h-8 w-8 text-muted-foreground/30 cursor-not-allowed"
+                title="System-managed â€” edit source directly"
+              >
+                {rule.is_active ? <PowerOff size={14} /> : <Power size={14} />}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled
+                className="h-8 w-8 text-muted-foreground/30 cursor-not-allowed"
+                title="System-managed â€” edit source directly"
+              >
+                <Edit2 size={14} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled
+                className="h-8 w-8 text-red-400/20 cursor-not-allowed"
+                title="System-managed â€” edit source directly"
+              >
+                <Trash2 size={14} />
+              </Button>
+	              <Link
+	                href={sourceLink}
+	                className="inline-flex h-7 items-center gap-1 rounded-md border border-zinc-700 bg-zinc-900 px-2 text-xs font-medium text-zinc-300 hover:bg-zinc-800"
+	              >
+	                <ExternalLink size={12} className="text-zinc-500" />
+	                {sourceLabel}
+	              </Link>
+            </div>
+          );
+        }
+
+	        return (
+	          <div className="flex items-center gap-2">
+	            <Button variant="ghost" size="icon" onClick={() => onView(rule)} className="h-8 w-8 text-muted-foreground hover:text-foreground" title="View Rule">
+	              <Eye size={14} />
+	            </Button>
+	            <Button variant="ghost" size="icon" onClick={() => onToggleStatus(rule)} className="h-8 w-8 text-muted-foreground hover:text-foreground" title={rule.is_active ? 'Pause Rule' : 'Activate Rule'}>
               {rule.is_active ? <PowerOff size={14} /> : <Power size={14} />}
             </Button>
             <Button variant="ghost" size="icon" onClick={() => onEdit(rule)} className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Edit Rule">
@@ -155,8 +257,8 @@ export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selecte
             />
           </div>
           {onOpenSimulator && (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={onOpenSimulator}
               className="border-border bg-muted hover:bg-secondary text-muted-foreground w-full sm:w-auto h-9"
             >
@@ -166,9 +268,9 @@ export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selecte
           )}
         </div>
       </div>
-      
-      <div className="rounded-xl border border-border bg-background overflow-hidden">
-        <Table>
+
+	      <div className="rounded-xl border border-border bg-background overflow-x-auto">
+	        <Table className="min-w-[1180px]">
           <TableHeader className="bg-card">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="border-border hover:bg-transparent">
@@ -212,7 +314,7 @@ export function RulesDataTable({ data, onEdit, onDelete, onToggleStatus, selecte
           </TableBody>
         </Table>
       </div>
-      
+
       <div className="flex items-center justify-between">
         <div className="text-xs text-muted-foreground">
           Showing {table.getRowModel().rows.length} rules
