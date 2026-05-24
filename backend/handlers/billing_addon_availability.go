@@ -108,10 +108,11 @@ func billingAddonDisabledReason(addon models.BillingAddon, biz models.Business, 
 		}
 	}
 
-	if addon.RequiresWAStatus == models.AddonWAStatusConnected && biz.WAStatus != "connected" {
+	waStatus := effectiveWAStatus(biz)
+	if addon.RequiresWAStatus == models.AddonWAStatusConnected && waStatus != waStatusConnected {
 		return "Requires WhatsApp to be connected"
 	}
-	if addon.RequiresWAStatus == models.AddonWAStatusNotConnected && biz.WAStatus == "connected" {
+	if addon.RequiresWAStatus == models.AddonWAStatusNotConnected && waStatus == waStatusConnected {
 		return "WhatsApp is already connected"
 	}
 

@@ -19,6 +19,7 @@ type ViewState = 'not_connected' | 'setup' | 'connected';
 interface WAState {
   status: WAStatus;
   is_connected: boolean;
+  has_credentials?: boolean;
   phone_number_id: string;
   waba_id: string;
 }
@@ -164,7 +165,7 @@ export default function ConnectPage() {
     apiFetch<WAState>('/api/v1/whatsapp/status')
       .then(data => {
         setWaState(data);
-        setView(data.is_connected ? 'connected' : 'not_connected');
+        setView(data.status === 'connected' ? 'connected' : 'not_connected');
       })
       .catch(() => { })
       .finally(() => setLoadingStatus(false));
@@ -187,8 +188,8 @@ export default function ConnectPage() {
       // Reload status
       const data = await apiFetch<WAState>('/api/v1/whatsapp/status');
       setWaState(data);
-      setView('connected');
-      fetchBusiness(); // Sync global store
+      setView(data.status === 'connected' ? 'connected' : 'not_connected');
+      await fetchBusiness(); // Sync global store
       // Clear form
       setPhoneNumberId(''); setWabaId(''); setAccessToken('');
     } catch (err: unknown) {
@@ -206,14 +207,14 @@ export default function ConnectPage() {
     try {
       const data = await apiFetch<WAState>('/api/v1/whatsapp/test', { method: 'POST' });
       setWaState(data);
-      setView('connected');
+      setView(data.status === 'connected' ? 'connected' : 'not_connected');
       setTestResult('ok');
       toast.success('Credentials verified — connection is healthy!');
-      fetchBusiness(); // Sync global store
+      await fetchBusiness(); // Sync global store
     } catch {
       setTestResult('fail');
       toast.error('Credentials are invalid or token has expired. Please reconnect.');
-      fetchBusiness(); // Sync global store
+      await fetchBusiness(); // Sync global store
     } finally {
       setTesting(false);
     }
@@ -229,7 +230,7 @@ export default function ConnectPage() {
       setWaState(null);
       setTestResult(null);
       setView('not_connected');
-      fetchBusiness(); // Sync global store
+      await fetchBusiness(); // Sync global store
     } catch {
       toast.error('Failed to disconnect. Try again.');
     } finally {

@@ -87,11 +87,12 @@ func GetWhatsAppStatus(c *gin.Context) {
 		return
 	}
 
-	isConnected := biz.WAPhoneNumberID != "" && biz.WAAccessToken != ""
+	status := effectiveWAStatus(biz)
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":          biz.WAStatus,
-		"is_connected":    isConnected,
+		"status":          status,
+		"is_connected":    status == waStatusConnected,
+		"has_credentials": hasWhatsAppCredentials(biz),
 		"phone_number_id": biz.WAPhoneNumberID,
 		"waba_id":         biz.WABAID,
 	})

@@ -43,7 +43,7 @@ func businessSettingsPayload(biz models.Business) gin.H {
 		"operating_hours":     biz.OperatingHours,
 		"delivery_policy":     biz.DeliveryPolicy,
 		"onboarding_complete": biz.OnboardingComplete,
-		"wa_status":           biz.WAStatus,
+		"wa_status":           effectiveWAStatus(biz),
 		"meta_catalog_id":     biz.MetaCatalogID,
 		"bot_reply_language":  biz.BotReplyLanguage,
 		"bot_supported_langs": biz.BotSupportedLangs,
@@ -79,7 +79,7 @@ func GetBusinessSettings(c *gin.Context) {
 		"operating_hours":     biz.OperatingHours,
 		"delivery_policy":     biz.DeliveryPolicy,
 		"onboarding_complete": biz.OnboardingComplete,
-		"wa_status":           biz.WAStatus,
+		"wa_status":           effectiveWAStatus(biz),
 		"meta_catalog_id":     biz.MetaCatalogID,
 		// Language settings
 		"bot_reply_language":  biz.BotReplyLanguage,
