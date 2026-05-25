@@ -25,10 +25,22 @@ func GetSystemMetrics(c *gin.Context) {
 	database.DB.Model(&models.Business{}).Where("trial_expires_at > ?", time.Now()).Count(&activeTrials)
 	database.DB.Model(&models.Business{}).Where("plan != ? AND plan_expires_at < ?", models.PlanFree, time.Now()).Count(&expiredPlans)
 
-	// WhatsApp Status
-	database.DB.Model(&models.Business{}).Where("wa_status = ?", "connected").Count(&waConnected)
-	database.DB.Model(&models.Business{}).Where("wa_status = ?", "disconnected").Count(&waDisconnected)
-	database.DB.Model(&models.Business{}).Where("wa_status = ?", "not_connected").Count(&waNotConnected)
+	// WhatsApp status must use the same effective rules as tenant-facing UI.
+	var waBusinesses []models.Business
+	if err := database.DB.Select("wa_status", "wa_phone_number_id", "wa_access_token").Find(&waBusinesses).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load WhatsApp status metrics"})
+		return
+	}
+	for _, business := range waBusinesses {
+		switch effectiveWAStatus(business) {
+		case waStatusConnected:
+			waConnected++
+		case waStatusDisconnected:
+			waDisconnected++
+		default:
+			waNotConnected++
+		}
+	}
 
 	// Global Usage
 	type UsageSum struct {

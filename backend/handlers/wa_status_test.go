@@ -74,3 +74,14 @@ func TestEffectiveWAStatus(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildSystemBusinessResponseNormalizesWAStatus(t *testing.T) {
+	response := buildSystemBusinessResponse(models.Business{
+		WAStatus:        waStatusConnected,
+		WAPhoneNumberID: "123",
+	})
+
+	if response.WAStatus != waStatusNotConnected {
+		t.Fatalf("WAStatus = %q, want %q", response.WAStatus, waStatusNotConnected)
+	}
+}

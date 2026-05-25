@@ -424,7 +424,7 @@ func GetBillingOptions(c *gin.Context) {
 	businessID := c.GetUint("business_id")
 
 	var biz models.Business
-	if err := database.DB.Select("id", "wa_status", "connected_at", "wa_phone_number_id", "waba_id").First(&biz, businessID).Error; err != nil {
+	if err := database.DB.Select("id", "wa_status", "connected_at", "wa_phone_number_id", "waba_id", "wa_access_token").First(&biz, businessID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load business details"})
 		return
 	}
@@ -515,7 +515,7 @@ func GetBillingOptions(c *gin.Context) {
 		"addons":           addons,
 		"purchased_addons": purchasedAddons,
 		"business_connection_status": gin.H{
-			"wa_status":    biz.WAStatus,
+			"wa_status":    effectiveWAStatus(biz),
 			"connected_at": biz.ConnectedAt,
 		},
 	})

@@ -44,6 +44,7 @@ func buildSystemBusinessResponse(b models.Business) systemBusinessResponse {
 	if active {
 		remaining = int64(b.DebugModeUntil.Sub(now).Seconds())
 	}
+	b.WAStatus = effectiveWAStatus(b)
 	return systemBusinessResponse{
 		Business:              b,
 		DebugActive:           active,
@@ -87,8 +88,10 @@ func GetSystemBusiness(c *gin.Context) {
 	database.DB.Model(&models.Rule{}).Where("business_id = ?", id).Count(&counts.RulesTotal)
 	database.DB.Model(&models.Customer{}).Where("business_id = ?", id).Count(&counts.Customers)
 	database.DB.Model(&models.Order{}).Where("business_id = ?", id).Count(&counts.Orders)
-	
-	type Result struct { Total float64 }
+
+	type Result struct {
+		Total float64
+	}
 	var result Result
 	database.DB.Model(&models.Order{}).Select("coalesce(sum(total_price), 0) as total").Where("business_id = ?", id).Scan(&result)
 	counts.TotalRevenue = result.Total

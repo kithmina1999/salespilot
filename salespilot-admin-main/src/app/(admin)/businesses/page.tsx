@@ -92,6 +92,17 @@ function getDebugError(err: unknown) {
   return "Failed to update debugging"
 }
 
+function waStatusTone(status: string) {
+  if (status === "connected") return "success"
+  if (status === "disconnected") return "warning"
+  return "muted"
+}
+
+function formatWAStatus(status: string) {
+  if (!status || status === "not_connected") return "Not Connected"
+  return status.replace("_", " ")
+}
+
 export default function BusinessesPage() {
   const [search, setSearch] = useState("")
   const [debugTargetId, setDebugTargetId] = useState<number | null>(null)
@@ -213,8 +224,8 @@ export default function BusinessesPage() {
               <PlanBadge plan={business.plan} />
             </TableCell>
             <TableCell className="px-4 py-3">
-              <StatusBadge tone={business.wa_status === "connected" ? "success" : "muted"}>
-                {business.wa_status ? business.wa_status.replace("_", " ") : "Not Connected"}
+              <StatusBadge tone={waStatusTone(business.wa_status)}>
+                {formatWAStatus(business.wa_status)}
               </StatusBadge>
             </TableCell>
             <TableCell className="px-4 py-3 text-sm font-semibold text-foreground">
