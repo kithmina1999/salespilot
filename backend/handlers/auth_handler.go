@@ -114,7 +114,7 @@ func Login(c *gin.Context) {
 			"id":                  biz.ID,
 			"name":                biz.Name,
 			"plan":                biz.Plan,
-			"wa_status":           biz.WAStatus,
+			"wa_status":           effectiveWAStatus(biz),
 			"onboarding_complete": biz.OnboardingComplete,
 		},
 	})

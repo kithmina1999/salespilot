@@ -15,9 +15,17 @@ type DailyStat struct {
 	UserMessages int    `json:"user_messages"`
 }
 
-type TopUnmatched struct {
-	Message string `json:"message"`
-	Count   int    `json:"count"`
+type TopKnowledgeGap struct {
+	ID                     uint      `json:"id"`
+	Message                string    `json:"message"` // mapped from raw_message for backward compatibility
+	NormalizedMessage      string    `json:"normalized_message"`
+	Count                  int       `json:"count"` // mapped from hit_count for backward compatibility
+	RouterIntent           string    `json:"router_intent"`
+	SuggestedKnowledgeType string    `json:"suggested_knowledge_type"`
+	SuggestedAction        string    `json:"suggested_action"`
+	SelectedProductID      *uint     `json:"selected_product_id"`
+	AIReplyText            string    `json:"ai_reply_text"`
+	LastSeenAt             time.Time `json:"last_seen_at"`
 }
 
 type DailyRevenue struct {
@@ -63,12 +71,11 @@ func GetDashboardStats(c *gin.Context) {
 	var biz models.Business
 	database.DB.First(&biz, businessID)
 
-	// ── 3. Top Unmatched Messages ─────────────────────────────────────────────
-	var unmatched []TopUnmatched
-	database.DB.Model(&models.UnmatchedMessage{}).
-		Select("MAX(message) as message, count(*) as count").
+	// ── 3. Top Unmatched Messages (Knowledge Gaps) ────────────────────────────
+	var unmatched []TopKnowledgeGap
+	database.DB.Model(&models.KnowledgeGap{}).
+		Select("id, raw_message as message, normalized_message, hit_count as count, router_intent, suggested_knowledge_type, suggested_action, selected_product_id, ai_reply_text, last_seen_at").
 		Where("business_id = ? AND resolved = ?", businessID, false).
-		Group("intent_cluster").
 		Order("count DESC").
 		Limit(8).
 		Scan(&unmatched)
@@ -87,7 +94,7 @@ func GetDashboardStats(c *gin.Context) {
 	database.DB.Model(&models.Product{}).Where("business_id = ?", businessID).Count(&totalProducts)
 	database.DB.Model(&models.Rule{}).Where("business_id = ?", businessID).Count(&totalRules)
 	database.DB.Model(&models.Rule{}).
-		Where("business_id = ? AND is_active = ? AND (sinhala_response IS NULL OR sinhala_response = ?)", businessID, true, "").
+		Where("business_id = ? AND is_active = ? AND system_managed = ? AND (sinhala_response IS NULL OR sinhala_response = ?)", businessID, true, false, "").
 		Count(&noSinhalaCount)
 
 	// ── 6. Revenue: this month vs last month ──────────────────────────────────
@@ -185,10 +192,10 @@ func GetDashboardStats(c *gin.Context) {
 		Count(&totalUserMsgsPrev)
 
 	var unmatchedNow, unmatchedPrev int64
-	database.DB.Model(&models.UnmatchedMessage{}).
+	database.DB.Model(&models.KnowledgeGap{}).
 		Where("business_id = ? AND created_at >= ?", businessID, thisMonthStart).
 		Count(&unmatchedNow)
-	database.DB.Model(&models.UnmatchedMessage{}).
+	database.DB.Model(&models.KnowledgeGap{}).
 		Where("business_id = ? AND created_at >= ? AND created_at < ?", businessID, lastMonthStart, thisMonthStart).
 		Count(&unmatchedPrev)
 

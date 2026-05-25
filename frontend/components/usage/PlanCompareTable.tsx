@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, X, ChevronRight, Zap, Infinity } from 'lucide-react';
+import { Check, X, ChevronRight, Zap } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
 
@@ -22,7 +22,7 @@ function formatPrice(n?: number) {
 
 /** Format a plan limit value for display. -1 = unlimited, 0 = locked. */
 function fmtLimit(n: number, unit = '/mo'): React.ReactNode {
-  if (n === -1) return <Infinity size={13} className="inline mx-auto" />;
+  if (n === -1) return <span className="text-[11px] font-black">Unlimited</span>;
   if (n === 0)  return <X size={13} className="text-zinc-700 mx-auto" />;
   return `${n.toLocaleString()}${unit}`;
 }
@@ -74,16 +74,31 @@ function FeatureRow({
 
 // ── CTA button ────────────────────────────────────────────────────────────────
 
-function PlanCTA({ label, onClick, variant }: { label: string; onClick: () => void; variant: 'emerald' | 'purple' }) {
-  const styles = variant === 'emerald'
-    ? 'bg-emerald-500 hover:bg-emerald-400 shadow-emerald-500/20 text-black'
-    : 'bg-purple-500 hover:bg-purple-400 shadow-purple-500/20 text-foreground';
+function PlanCTA({
+  label,
+  onClick,
+  variant,
+  disabled = false,
+  current = false,
+}: {
+  label: string;
+  onClick: () => void;
+  variant: 'emerald' | 'purple';
+  disabled?: boolean;
+  current?: boolean;
+}) {
+  const styles = disabled
+    ? 'border border-border bg-muted/60 text-muted-foreground shadow-none cursor-default'
+    : variant === 'emerald'
+      ? 'bg-emerald-500 hover:bg-emerald-400 shadow-emerald-500/20 text-black'
+      : 'bg-purple-500 hover:bg-purple-400 shadow-purple-500/20 text-foreground';
   return (
     <button
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
       className={`w-full py-2.5 rounded-xl font-black text-sm flex items-center justify-center gap-1.5 transition-all shadow-lg active:scale-95 ${styles}`}
     >
-      {variant === 'purple' && <Zap size={14} />}
+      {current ? <Check size={14} /> : variant === 'purple' && !disabled ? <Zap size={14} /> : null}
       {label}
     </button>
   );
@@ -98,7 +113,8 @@ export default function PlanCompareTable({ onUpgrade }: Props) {
   const business = useAppStore((s) => s.business);
 
   const plan = business?.plan ?? 'free';
-  if (plan === 'pro') return null;
+  const isStarter = plan === 'starter';
+  const isPro = plan === 'pro';
 
   // ── Pricing (from store, not hardcoded) ─────────────────────────────────────
   const starterMonthly = pricing?.starter?.monthly;
@@ -140,7 +156,7 @@ export default function PlanCompareTable({ onUpgrade }: Props) {
         pro={<span className="text-purple-400">{fmtMaybeLimit(pro?.ai_messages)}</span>}
       />
       <FeatureRow
-        label="FAQ Rules"
+        label="Knowledge Base"
         free={typeof free?.rules === 'number' ? `${free.rules} max` : '—'}
         starter={<span className="text-emerald-400">{fmtMaybeLimit(starter?.rules)}</span>}
         pro={<span className="text-purple-400">{fmtMaybeLimit(pro?.rules)}</span>}
@@ -205,8 +221,20 @@ export default function PlanCompareTable({ onUpgrade }: Props) {
       {/* CTA buttons */}
       <div className="grid grid-cols-[2fr_1fr_1.5fr_1.5fr] mt-5 gap-3">
         <div /><div />
-        <PlanCTA label="Get Starter" onClick={() => onUpgrade('starter')} variant="emerald" />
-        <PlanCTA label="Get Pro"     onClick={() => onUpgrade('pro')}     variant="purple" />
+        <PlanCTA
+          label={isStarter ? 'Current Plan' : isPro ? 'Included' : 'Get Starter'}
+          onClick={() => onUpgrade('starter')}
+          variant="emerald"
+          disabled={isStarter || isPro}
+          current={isStarter}
+        />
+        <PlanCTA
+          label={isPro ? 'Current Plan' : 'Get Pro'}
+          onClick={() => onUpgrade('pro')}
+          variant="purple"
+          disabled={isPro}
+          current={isPro}
+        />
       </div>
 
       {/* Learn more */}

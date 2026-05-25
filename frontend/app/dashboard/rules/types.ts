@@ -8,6 +8,10 @@ export interface Rule {
   sinhala_response: string; // legacy fallback
   is_active: boolean;
   usage_count: number;
+  knowledge_type?: string;
+  source_type?: string;
+  source_id?: number | null;
+  system_managed?: boolean;
 }
 
 export interface LangMeta {

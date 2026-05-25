@@ -32,7 +32,7 @@
     "orders": "ஆர்டர்கள்",
     "products": "பொருட்கள்",
     "customers": "வாடிக்கையாளர்கள்",
-    "faq_rules": "FAQ விதிகள்",
+    "faq_rules": "அறிவுத் தளம் (Knowledge Base)",
     "analytics": "Finance",
     "finance": "Finance",
     "settings": "அமைப்புகள்",
@@ -159,7 +159,7 @@
     "no_customers": "வாடிக்கையாளர்கள் இல்லை"
   },
   "rules": {
-    "title": "FAQ விதிகள்",
+    "title": "அறிவுத் தளம் (Knowledge Base)",
     "subtitle": "AI bot-அில் போதுமான கேள்விகள் பயிற்றுக்குங்கள்.",
     "add_rule": "விதி சேர்",
     "create_rule": "ஜ்ஞானத்திட விதி உருவாக்கு",

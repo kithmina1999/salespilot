@@ -9,7 +9,7 @@ import Link from 'next/link';
 const FEATURES = [
   { icon: <Bot size={16} className="text-indigo-400" />,    label: 'AI Fallback Replies',     desc: 'Gemini AI answers questions when no FAQ matches' },
   { icon: <Sparkles size={16} className="text-amber-400" />, label: 'AI Rule Generator',       desc: 'Generate complete FAQ rules from plain language' },
-  { icon: <Zap size={16} className="text-green-400" />,      label: 'Unlimited FAQ Rules',     desc: 'No cap on your knowledge base size' },
+  { icon: <Zap size={16} className="text-green-400" />,      label: 'Unlimited Knowledge Base',     desc: 'No cap on your knowledge base size' },
   { icon: <MessageCircle size={16} className="text-blue-400" />, label: 'Unlimited FAQ Replies', desc: 'Serve unlimited customers per month' },
 ];
 
