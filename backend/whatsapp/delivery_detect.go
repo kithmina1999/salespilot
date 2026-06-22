@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/kithmina1999/salespilot/database"
+	"github.com/kithmina1999/salespilot/httpclient"
 	"github.com/kithmina1999/salespilot/models"
 )
 
@@ -114,7 +115,7 @@ func sendDeliveryInteractive(phoneNumberID, accessToken string, payload map[stri
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpclient.Do(req)
 	if err != nil {
 		log.Printf("❌ [DeliveryCheck] HTTP send error: %v", err)
 		return

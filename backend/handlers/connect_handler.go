@@ -37,7 +37,7 @@ func SaveMetaCredentials(c *gin.Context) {
 	}
 
 	// Quick liveness test before saving
-	phoneInfo, err := whatsapp.TestCredentialsWithInfo(req.PhoneNumberID, req.AccessToken)
+	phoneInfo, err := whatsapp.TestCredentialsWithInfoContext(c.Request.Context(), req.PhoneNumberID, req.AccessToken)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":  "Could not verify credentials with Meta. Check your Phone Number ID and Access Token.",
@@ -57,7 +57,7 @@ func SaveMetaCredentials(c *gin.Context) {
 
 	// Subscribe the business's WABA to our platform webhook so Meta sends events to us
 	// Non-fatal: log failure but don't block the UI — operator can retry via Test
-	if err := whatsapp.SubscribeWABAWebhook(req.WABAID, req.AccessToken); err != nil {
+	if err := whatsapp.SubscribeWABAWebhookContext(c.Request.Context(), req.WABAID, req.AccessToken); err != nil {
 		log.Printf("⚠️  WABA %s webhook subscription failed: %v (credentials saved, retry via Test)", req.WABAID, err)
 	}
 
@@ -116,7 +116,7 @@ func TestMetaConnection(c *gin.Context) {
 		return
 	}
 
-	if err := whatsapp.TestCredentials(biz.WAPhoneNumberID, biz.WAAccessToken); err != nil {
+	if err := whatsapp.TestCredentialsContext(c.Request.Context(), biz.WAPhoneNumberID, biz.WAAccessToken); err != nil {
 		// Mark as disconnected in DB
 		database.DB.Model(&biz).Update("wa_status", "disconnected")
 		// Alert the team — this tenant's bot is now silent

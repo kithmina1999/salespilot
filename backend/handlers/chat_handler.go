@@ -20,12 +20,12 @@ func ListChats(c *gin.Context) {
 	// We can use a raw SQL query with row_number() or simply fetch distinct phones and then their latest message.
 
 	type ChatSummary struct {
-		Phone          string `json:"phone"`
-		LatestMessage  string `json:"latest_message"`
-		MessageTime    string `json:"message_time"`
-		Status         string `json:"status"`
-		CustomerName   string `json:"customer_name"`
-		UnreadCount    int    `json:"unread_count"`
+		Phone         string `json:"phone"`
+		LatestMessage string `json:"latest_message"`
+		MessageTime   string `json:"message_time"`
+		Status        string `json:"status"`
+		CustomerName  string `json:"customer_name"`
+		UnreadCount   int    `json:"unread_count"`
 	}
 
 	var summaries []ChatSummary
@@ -255,7 +255,7 @@ func SendManualReply(c *gin.Context) {
 	cleanPhone := strings.TrimPrefix(phone, "+")
 
 	// 3. Send Message
-	err := whatsapp.SendText(biz.WAPhoneNumberID, biz.WAAccessToken, cleanPhone, req.Message)
+	err := whatsapp.SendTextContext(c.Request.Context(), biz.WAPhoneNumberID, biz.WAAccessToken, cleanPhone, req.Message)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send WhatsApp message: " + err.Error()})
 		return
@@ -281,8 +281,6 @@ func SendManualReply(c *gin.Context) {
 	db.Model(&models.Message{}).
 		Where("phone = ? AND status = 'needs_attention'", phone).
 		Update("status", "resolved")
-
-
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Manual reply sent",

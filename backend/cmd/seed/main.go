@@ -75,8 +75,7 @@ func main() {
 	}
 
 	log.Println("Demo seed complete.")
-	log.Printf("Busy tenant login: owner@ceylonglow.lk / %s", demoPassword)
-	log.Printf("Busy tenant API key: %s (business ID %d)", richBiz.APIKey, richBiz.ID)
+	log.Printf("Busy tenant seeded (business ID %d); credentials are not written to logs", richBiz.ID)
 }
 
 func cleanupSeedBusinesses(db *gorm.DB) {

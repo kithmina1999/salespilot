@@ -1,6 +1,7 @@
 package whatsapp
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -17,6 +18,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
+	"github.com/kithmina1999/salespilot/observability"
 	"github.com/kithmina1999/salespilot/utils"
 )
 
@@ -53,7 +55,7 @@ func VerifyWebhook(c *gin.Context) {
 		return
 	}
 
-	log.Printf("❌ Meta webhook verification failed: mode=%s token=%s", mode, token)
+	log.Printf("Meta webhook verification failed: mode=%s", mode)
 	c.JSON(http.StatusForbidden, gin.H{"error": "Verification failed"})
 }
 
@@ -85,9 +87,12 @@ func HandleWebhook(c *gin.Context) {
 		return
 	}
 
+	jobCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 2*time.Minute)
 	if ok := utils.EnqueueWebhook(func() {
-		processWebhookPayload(payload)
+		defer cancel()
+		processWebhookPayload(jobCtx, payload)
 	}); !ok {
+		cancel()
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Webhook queue full"})
 		return
 	}
@@ -171,8 +176,8 @@ type MetaListReply struct {
 	Description string `json:"description"`
 }
 
-func processWebhookPayload(payload MetaWebhookPayload) {
-	pipeline := NewPipeline()
+func processWebhookPayload(ctx context.Context, payload MetaWebhookPayload) {
+	pipeline := NewPipeline(ctx)
 
 	for _, entry := range payload.Entry {
 		for _, change := range entry.Changes {
@@ -205,14 +210,13 @@ func processWebhookPayload(payload MetaWebhookPayload) {
 				if ts, err := strconv.ParseInt(msg.Timestamp, 10, 64); err == nil {
 					msgTime := time.Unix(ts, 0)
 					if time.Since(msgTime) > staleThreshold {
-						log.Printf("⏱️ [Webhook] Stale message from %s (age=%v) — dropping",
-							msg.From, time.Since(msgTime).Round(time.Second))
+						log.Printf("[Webhook] Stale message dropped (age=%v)", time.Since(msgTime).Round(time.Second))
 						continue
 					}
 				}
 
 				if msg.Type == "image" && isAlreadyProcessed(msg.ID) {
-					log.Printf("⚡ [Webhook] Duplicate msg.ID=%s from %s — skipping", msg.ID, msg.From)
+					log.Printf("[Webhook] Duplicate message skipped (message_id=%s)", msg.ID)
 					continue
 				}
 
@@ -231,18 +235,12 @@ func processWebhookPayload(payload MetaWebhookPayload) {
 						case "button_reply":
 							if msg.Interactive.ButtonReply != nil {
 								text = msg.Interactive.ButtonReply.ID
-								log.Printf("🔘 [%s] Button tap from %s: id=%q title=%q",
-									business.Name, msg.From,
-									msg.Interactive.ButtonReply.ID,
-									msg.Interactive.ButtonReply.Title)
+								log.Printf("[%s] Interactive button received", business.Name)
 							}
 						case "list_reply":
 							if msg.Interactive.ListReply != nil {
 								text = msg.Interactive.ListReply.ID
-								log.Printf("📋 [%s] List selection from %s: id=%q title=%q",
-									business.Name, msg.From,
-									msg.Interactive.ListReply.ID,
-									msg.Interactive.ListReply.Title)
+								log.Printf("[%s] Interactive list selection received", business.Name)
 							}
 						}
 					}
@@ -251,22 +249,25 @@ func processWebhookPayload(payload MetaWebhookPayload) {
 					// 1. ACK immediately with a localized "processing" message
 					// 2. Enqueue Vision AI classification in the worker pool
 					if msg.Image != nil {
-						log.Printf("🖼️ [%s] Image received from %s (media_id=%s)", business.Name, msg.From, msg.Image.ID)
+						log.Printf("[%s] Image message received (message_id=%s)", business.Name, msg.ID)
 						normalizedFrom := utils.NormalizePhone(msg.From)
 						pushName := nameMap[msg.From]
 						bizCopy := business
 						msgCopy := msg
 						waitMsg := localizedWaitMessage(&bizCopy)
 						SendText(bizCopy.WAPhoneNumberID, bizCopy.WAAccessToken, normalizedFrom, waitMsg)
+						imageCtx, imageCancel := context.WithTimeout(context.WithoutCancel(ctx), 90*time.Second)
 						if ok := utils.EnqueueWebhook(func() {
-							HandleImageWebhook(&bizCopy, normalizedFrom, msgCopy.From, msgCopy.Image.ID, pushName)
+							defer imageCancel()
+							HandleImageWebhookContext(imageCtx, &bizCopy, normalizedFrom, msgCopy.From, msgCopy.Image.ID, pushName)
 						}); !ok {
-							log.Printf("⚠️ [Webhook] Worker queue full while routing image msg.ID=%s from %s", msg.ID, msg.From)
+							imageCancel()
+							log.Printf("[Webhook] Worker queue full while routing image (message_id=%s)", msg.ID)
 						}
 					}
 					continue
 				default:
-					log.Printf("📥 [%s] Unsupported message type=%s from %s — skipping", business.Name, msg.Type, msg.From)
+					log.Printf("[%s] Unsupported message type=%s skipped", business.Name, msg.Type)
 					continue
 				}
 
@@ -283,8 +284,7 @@ func processWebhookPayload(payload MetaWebhookPayload) {
 				if ts, err := strconv.ParseInt(msg.Timestamp, 10, 64); err == nil {
 					msgTime := time.Unix(ts, 0)
 					if time.Since(msgTime) > secondaryStaleThreshold {
-						log.Printf("⏱️ [Webhook] Stale message from %s (age=%v) — dropping",
-							msg.From, time.Since(msgTime).Round(time.Second))
+						log.Printf("[Webhook] Stale message dropped (age=%v)", time.Since(msgTime).Round(time.Second))
 						continue
 					}
 				}
@@ -292,18 +292,20 @@ func processWebhookPayload(payload MetaWebhookPayload) {
 				// Dedup guard: Meta retries the same payload when delivery is
 				// uncertain. Drop duplicates within the 5-minute window.
 				if isAlreadyProcessed(msg.ID) {
-					log.Printf("⚡ [Webhook] Duplicate msg.ID=%s from %s — skipping", msg.ID, msg.From)
+					log.Printf("[Webhook] Duplicate message skipped (message_id=%s)", msg.ID)
 					continue
 				}
 
 				incoming := IncomingMessage{
-					From:      utils.NormalizePhone(msg.From),
-					Text:      text,
-					PushName:  nameMap[msg.From],
-					Timestamp: msg.Timestamp,
+					From:              utils.NormalizePhone(msg.From),
+					Text:              text,
+					PushName:          nameMap[msg.From],
+					Timestamp:         msg.Timestamp,
+					RequestID:         observability.RequestID(ctx),
+					ProviderMessageID: msg.ID,
 				}
 
-				log.Printf("📥 [%s] Incoming from %s: %q", business.Name, incoming.From, incoming.Text)
+				log.Printf("[%s] Incoming message accepted for processing", business.Name)
 
 				// Per-customer mutex: serialize concurrent requests from the same phone.
 				// Rapid button taps (e.g. "M" and "L" size at once) are queued here so

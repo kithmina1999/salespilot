@@ -4,8 +4,17 @@
 *.sqlite
 *.db
 
+# Environment files contain credentials. Commit templates only.
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!.env.*.example
+!**/.env.example
+!**/.env.*.example
+
 # Backend ignores
-backend/.env
 backend/*.exe
 backend/out.*
 backend/whatsapp_sessions.db

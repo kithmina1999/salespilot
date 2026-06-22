@@ -7,6 +7,8 @@ import "time"
 type PipelineLog struct {
 	ID                    uint    `gorm:"primaryKey" json:"id"`
 	BusinessID            uint    `gorm:"index" json:"business_id"`
+	RequestID             string  `gorm:"index;size:64" json:"request_id"`
+	ProviderMessageID     string  `gorm:"index;size:255" json:"provider_message_id"`
 	Phone                 string  `gorm:"index" json:"phone"`
 	RawMessage            string  `gorm:"type:text" json:"raw_message"`
 	CleanMessage          string  `gorm:"type:text" json:"clean_message"`

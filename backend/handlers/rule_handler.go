@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
+	"github.com/kithmina1999/salespilot/httpclient"
 	"github.com/kithmina1999/salespilot/knowledge"
 	"github.com/kithmina1999/salespilot/models"
 	"github.com/kithmina1999/salespilot/whatsapp"
@@ -124,7 +124,7 @@ Text:
 	}
 
 	importBytes, _ := json.Marshal(body)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(importBytes))
+	resp, err := httpclient.PostJSONContext(c.Request.Context(), httpclient.DependencyGemini, "translate_rule", url, importBytes, httpclient.RetryTransient)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to call Gemini API"})
 		return
@@ -567,7 +567,7 @@ Return ONLY a raw JSON object (no markdown, no code fences):
 	}
 
 	importBytes, _ := json.Marshal(body)
-	resp, err := http.Post(apiURL, "application/json", bytes.NewBuffer(importBytes))
+	resp, err := httpclient.PostJSONContext(c.Request.Context(), httpclient.DependencyGemini, "draft_faq", apiURL, importBytes, httpclient.RetryTransient)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to call Gemini API"})
 		return
@@ -777,7 +777,7 @@ Return ONLY a raw JSON object (no markdown, no code fences):
 	}
 
 	importBytes, _ := json.Marshal(body)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(importBytes))
+	resp, err := httpclient.PostJSONContext(c.Request.Context(), httpclient.DependencyGemini, "generate_rule", url, importBytes, httpclient.RetryTransient)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to call Gemini API"})
 		return

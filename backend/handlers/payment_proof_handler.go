@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
+	"github.com/kithmina1999/salespilot/httpclient"
 	"github.com/kithmina1999/salespilot/models"
 	"github.com/kithmina1999/salespilot/platform"
 	"github.com/kithmina1999/salespilot/utils"
@@ -21,6 +23,22 @@ import (
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 	"github.com/kithmina1999/salespilot/services"
 )
+
+const maxPaymentProofBytes = 5 * 1024 * 1024
+
+func safeImageExtension(contentType string) string {
+	contentType = strings.ToLower(contentType)
+	switch {
+	case strings.Contains(contentType, "png"):
+		return ".png"
+	case strings.Contains(contentType, "gif"):
+		return ".gif"
+	case strings.Contains(contentType, "webp"):
+		return ".webp"
+	default:
+		return ".jpg"
+	}
+}
 
 // ─────────────────────────────────────────────────────────────────
 // POST /api/v1/billing/submit-proof  (Tenant JWT)
@@ -177,22 +195,57 @@ func SubmitPaymentProof(c *gin.Context) {
 	}
 
 	// Limit to 5MB
-	if file.Size > 5*1024*1024 {
+	if file.Size > maxPaymentProofBytes {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Image must be under 5MB"})
+		return
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open uploaded file"})
+		return
+	}
+	defer src.Close()
+
+	sample := make([]byte, 512)
+	n, readErr := src.Read(sample)
+	if readErr != nil && readErr != io.EOF {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read uploaded image"})
+		return
+	}
+	if _, err := src.Seek(0, io.SeekStart); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to prepare uploaded image"})
+		return
+	}
+	if !isAllowedImageFile(contentType, sample[:n]) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Only JPG, PNG, GIF, or WebP images are accepted"})
 		return
 	}
 
 	// Save locally first
 	uploadDir := "uploads/receipts"
-	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
+	if err := os.MkdirAll(uploadDir, 0700); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload directory"})
 		return
 	}
 
-	filename := fmt.Sprintf("proof_%d_%d_%s", businessID, time.Now().Unix(), file.Filename)
+	filename := fmt.Sprintf("proof_%d_%d%s", businessID, time.Now().UnixNano(), safeImageExtension(contentType))
 	localPath := fmt.Sprintf("%s/%s", uploadDir, filename)
-	if err := c.SaveUploadedFile(file, localPath); err != nil {
+	dst, err := os.OpenFile(localPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file locally"})
+		return
+	}
+	written, copyErr := io.Copy(dst, io.LimitReader(src, maxPaymentProofBytes+1))
+	closeErr := dst.Close()
+	if copyErr != nil || closeErr != nil {
+		_ = os.Remove(localPath)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file locally"})
+		return
+	}
+	if written > maxPaymentProofBytes {
+		_ = os.Remove(localPath)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Image must be under 5MB"})
 		return
 	}
 
@@ -204,7 +257,7 @@ func SubmitPaymentProof(c *gin.Context) {
 	}
 
 	// Run AI Scanner
-	analysis := services.AnalyzePaymentReceipt(imageBytes, contentType)
+	analysis := services.AnalyzePaymentReceiptContext(c.Request.Context(), imageBytes, contentType)
 
 	status := models.PaymentStatusPending
 	if !analysis.IsValid {
@@ -417,8 +470,12 @@ func ApprovePayment(c *gin.Context) {
 		}
 
 		// Send email asynchronously
+		baseCtx := context.WithoutCancel(c.Request.Context())
 		go func() {
-			if err := utils.SendActivationCodeEmail(
+			ctx, cancel := context.WithTimeout(baseCtx, 15*time.Second)
+			defer cancel()
+			if err := utils.SendActivationCodeEmailContext(
+				ctx,
 				proof.BusinessEmail,
 				proof.BusinessName,
 				code,
@@ -426,7 +483,7 @@ func ApprovePayment(c *gin.Context) {
 				proof.BillingCycle,
 				durationDays,
 			); err != nil {
-				log.Printf("⚠️ Failed to send activation code email to %s: %v", proof.BusinessEmail, err)
+				log.Printf("Failed to send activation code email: %v", err)
 			}
 		}()
 	} else {
@@ -445,7 +502,9 @@ func ApprovePayment(c *gin.Context) {
 		cld, err := cloudinary.NewFromURL(cloudinaryURL)
 		if err == nil {
 			localPath := strings.TrimPrefix(proof.ScreenshotURL, "/")
-			resp, err := cld.Upload.Upload(context.Background(), localPath, uploader.UploadParams{
+			ctx, cancel := context.WithTimeout(context.Background(), httpclient.ExternalAPITimeout)
+			defer cancel()
+			resp, err := cld.Upload.Upload(ctx, localPath, uploader.UploadParams{
 				Folder:   "salespilot/payments",
 				PublicID: fmt.Sprintf("proof-%d-%d", proof.BusinessID, time.Now().Unix()),
 			})

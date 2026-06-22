@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"crypto/md5"
+	"crypto/subtle"
 	"fmt"
 	"log"
 	"math/rand"
@@ -81,6 +82,15 @@ func payhereHash(merchantID, orderID string, amount float64, currency, merchantS
 	secretHash := fmt.Sprintf("%X", md5.Sum([]byte(merchantSecret)))
 	raw := fmt.Sprintf("%s%s%.2f%s%s", merchantID, orderID, amount, currency, secretHash)
 	return fmt.Sprintf("%X", md5.Sum([]byte(raw)))
+}
+
+func billingFrontendURL(raw string) string {
+	for _, origin := range strings.Split(raw, ",") {
+		if origin = strings.TrimSpace(origin); origin != "" {
+			return strings.TrimRight(origin, "/")
+		}
+	}
+	return "http://localhost:3000"
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -211,10 +221,7 @@ func BillingInitiate(c *gin.Context) {
 	if serverURL == "" {
 		serverURL = "http://localhost:8080"
 	}
-	frontendURL := os.Getenv("FRONTEND_URL")
-	if frontendURL == "" {
-		frontendURL = "http://localhost:3000"
-	}
+	frontendURL := billingFrontendURL(os.Getenv("FRONTEND_URL"))
 
 	// Use PayHere sandbox in development
 	isSandbox := os.Getenv("PAYHERE_SANDBOX") != "false"
@@ -282,7 +289,7 @@ func BillingNotify(c *gin.Context) {
 	var amount float64
 	fmt.Sscanf(amountStr, "%f", &amount)
 	expectedHash := payhereHash(merchantID, orderID, amount, currency, merchantSecret)
-	if receivedHash != expectedHash {
+	if subtle.ConstantTimeCompare([]byte(receivedHash), []byte(expectedHash)) != 1 {
 		log.Printf("❌ PayHere notify: INVALID HASH for order %s — possible fraud attempt", orderID)
 		c.String(http.StatusForbidden, "Invalid hash")
 		return

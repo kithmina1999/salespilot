@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"regexp"
@@ -124,7 +125,7 @@ type RegisterInput struct {
 	BusinessName string `json:"business_name" binding:"required"`
 	Email        string `json:"email" binding:"required,email"`
 	Phone        string `json:"phone" binding:"required"`
-	Password     string `json:"password" binding:"required,min=6"`
+	Password     string `json:"password" binding:"required,min=8"`
 }
 
 func Register(c *gin.Context) {
@@ -137,6 +138,10 @@ func Register(c *gin.Context) {
 	// Validate E.164 phone number before anything else
 	if !e164Re.MatchString(input.Phone) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid phone number format. Please use E.164 format (e.g. +94771234567)"})
+		return
+	}
+	if err := validatePasswordComplexity(input.Password); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -207,9 +212,12 @@ func Register(c *gin.Context) {
 	database.DB.Create(&record)
 
 	// Fire email asynchronously so we don't block the frontend response
+	baseCtx := context.WithoutCancel(c.Request.Context())
 	go func(email, code string) {
-		if err := utils.SendVerificationEmail(email, code); err != nil {
-			log.Printf("❌ Failed to send verification email to %s: %v", email, err)
+		ctx, cancel := context.WithTimeout(baseCtx, 15*time.Second)
+		defer cancel()
+		if err := utils.SendVerificationEmailContext(ctx, email, code); err != nil {
+			log.Printf("Failed to send verification email: %v", err)
 		}
 	}(user.Email, otp)
 

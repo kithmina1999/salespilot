@@ -1,0 +1,272 @@
+name: salespilot
+
+# Copy .env.production.example to .env.production, fill the secrets, then run:
+# docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+#
+# PostgreSQL runs in this stack by default. Keep DATABASE_URL in
+# .env.production pointed at postgres:5432 unless you deliberately move to a
+# managed database later.
+# Redis is included here for the backend state store. Leave REDIS_URL empty to
+# use the bundled Redis service, or set REDIS_URL in .env.production to use a
+# managed Redis/Valkey service.
+#
+# Published ports are bound to 127.0.0.1 so nginx/Caddy on the VPS can terminate
+# TLS and proxy to these services without exposing raw app ports publicly.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  backend:
+    image: salespilot/backend:${IMAGE_TAG:-latest}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    env_file:
+      - path: ./.env.production
+        required: false
+    environment:
+      GIN_MODE: release
+      PORT: "8080"
+      REDIS_ADDR: redis:6379
+      STATE_STORE: redis
+      WA_SESSIONS_DB_PATH: /app/data/whatsapp_sessions.db
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    init: true
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    stop_grace_period: 30s
+    logging: *default-logging
+    networks:
+      - salespilot
+
+  frontend:
+    image: salespilot/frontend:${IMAGE_TAG:-latest}
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        BACKEND_URL: http://backend:8080
+        NEXT_PUBLIC_API_URL: ${SERVER_URL:-https://api.salespilot.lk}
+        NEXT_PUBLIC_SENTRY_ENABLED: ${NEXT_PUBLIC_SENTRY_ENABLED:-false}
+        NEXT_PUBLIC_SENTRY_FRONTEND_DSN: ${NEXT_PUBLIC_SENTRY_FRONTEND_DSN:-}
+        NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${NEXT_PUBLIC_SENTRY_ENVIRONMENT:-production}
+        NEXT_PUBLIC_SENTRY_RELEASE: ${NEXT_PUBLIC_SENTRY_RELEASE:-}
+        NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: ${NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE:-0}
+        SENTRY_AUTH_TOKEN: ${SENTRY_AUTH_TOKEN:-}
+        SENTRY_ORG: ${SENTRY_ORG:-salespilot-5b}
+        SENTRY_FRONTEND_PROJECT: ${SENTRY_FRONTEND_PROJECT:-frontend-salespilot}
+    environment:
+      BACKEND_URL: http://backend:8080
+      NEXT_PUBLIC_API_URL: ${SERVER_URL:-https://api.salespilot.lk}
+      NEXT_PUBLIC_SENTRY_ENABLED: ${NEXT_PUBLIC_SENTRY_ENABLED:-false}
+      NEXT_PUBLIC_SENTRY_FRONTEND_DSN: ${NEXT_PUBLIC_SENTRY_FRONTEND_DSN:-}
+      NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${NEXT_PUBLIC_SENTRY_ENVIRONMENT:-production}
+      NEXT_PUBLIC_SENTRY_RELEASE: ${NEXT_PUBLIC_SENTRY_RELEASE:-}
+      NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: ${NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE:-0}
+      SENTRY_ENABLED: ${SENTRY_ENABLED:-false}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+      SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0}
+      SENTRY_FRONTEND_DSN: ${SENTRY_FRONTEND_DSN:-}
+      NEXT_TELEMETRY_DISABLED: "1"
+      NODE_ENV: production
+    depends_on:
+      backend:
+        condition: service_healthy
+    init: true
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - salespilot
+
+  admin:
+    image: salespilot/admin:${IMAGE_TAG:-latest}
+    build:
+      context: ./salespilot-admin-main
+      dockerfile: Dockerfile.prod
+      args:
+        NEXT_PUBLIC_API_URL: ${SERVER_URL:-https://api.salespilot.lk}
+    environment:
+      NEXT_PUBLIC_API_URL: ${SERVER_URL:-https://api.salespilot.lk}
+      NEXT_TELEMETRY_DISABLED: "1"
+      NODE_ENV: production
+    depends_on:
+      backend:
+        condition: service_healthy
+    init: true
+    ports:
+      - "127.0.0.1:${ADMIN_PORT:-3001}:3001"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - salespilot
+
+  landing:
+    image: salespilot/landing:${IMAGE_TAG:-latest}
+    build:
+      context: ./landing
+      dockerfile: Dockerfile.prod
+      args:
+        NEXT_APPLICATION_URL: ${NEXT_PUBLIC_APP_URL:-https://app.salespilot.lk}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://app.salespilot.lk}
+        NEXT_PUBLIC_COMPANY_ADDRESS: ${NEXT_PUBLIC_COMPANY_ADDRESS:-Sri Lanka}
+        NEXT_PUBLIC_COMPANY_NAME: ${NEXT_PUBLIC_COMPANY_NAME:-SalesPilot}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://salespilot.lk}
+        NEXT_PUBLIC_SUPPORT_EMAIL: ${NEXT_PUBLIC_SUPPORT_EMAIL:-support@salespilot.lk}
+        NEXT_PUBLIC_SUPPORT_PHONE_NUMBER: ${NEXT_PUBLIC_SUPPORT_PHONE_NUMBER:-+94 77 123 4567}
+    environment:
+      NEXT_APPLICATION_URL: ${NEXT_PUBLIC_APP_URL:-https://app.salespilot.lk}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://app.salespilot.lk}
+      NEXT_PUBLIC_COMPANY_ADDRESS: ${NEXT_PUBLIC_COMPANY_ADDRESS:-Sri Lanka}
+      NEXT_PUBLIC_COMPANY_NAME: ${NEXT_PUBLIC_COMPANY_NAME:-SalesPilot}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://salespilot.lk}
+      NEXT_PUBLIC_SUPPORT_EMAIL: ${NEXT_PUBLIC_SUPPORT_EMAIL:-support@salespilot.lk}
+      NEXT_PUBLIC_SUPPORT_PHONE_NUMBER: ${NEXT_PUBLIC_SUPPORT_PHONE_NUMBER:-+94 77 123 4567}
+      NEXT_TELEMETRY_DISABLED: "1"
+      NODE_ENV: production
+    init: true
+    ports:
+      - "127.0.0.1:${LANDING_PORT:-3002}:3002"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - salespilot
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - salespilot
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-salespilot}
+      POSTGRES_USER: ${POSTGRES_USER:-salespilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    stop_grace_period: 60s
+    logging: *default-logging
+    networks:
+      - salespilot
+
+  loki:
+    image: grafana/loki:${LOKI_IMAGE_TAG:-3.7.0}
+    command: ["-config.file=/etc/loki/config.yml"]
+    volumes:
+      - ./deploy/observability/loki-config.yml:/etc/loki/config.yml:ro
+      - loki_data:/loki
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - salespilot
+
+  alloy:
+    image: grafana/alloy:${ALLOY_IMAGE_TAG:-v1.17.0}
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+    volumes:
+      - ./deploy/observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - alloy_data:/var/lib/alloy/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      loki:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${ALLOY_PORT:-12345}:12345"
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - salespilot
+
+  grafana:
+    image: grafana/grafana:${GRAFANA_IMAGE_TAG:-13.0.0}
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env.production}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3003}
+    depends_on:
+      loki:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3003}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./deploy/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - salespilot
+
+networks:
+  salespilot:
+    driver: bridge
+
+volumes:
+  backend_data:
+  backend_uploads:
+  postgres_data:
+  redis_data:
+  loki_data:
+  alloy_data:
+  grafana_data:

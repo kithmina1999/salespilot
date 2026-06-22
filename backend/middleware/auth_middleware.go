@@ -73,7 +73,7 @@ func AuthRequired() gin.HandlerFunc {
 			if err := database.DB.
 				Where("session_token = ? AND revoked_at IS NULL", claims.SessionID).
 				First(&session).Error; err != nil {
-				log.Printf("[AuthRequired] 401: Session %s not found or revoked for user %d", claims.SessionID, claims.UserID)
+				log.Printf("[AuthRequired] 401: Session not found or revoked for user %d", claims.UserID)
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "This session has been revoked. Please log in again."})
 				c.Abort()
 				return

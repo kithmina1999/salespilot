@@ -1,0 +1,13 @@
+.env
+.env.*
+.git
+.gitignore
+.next
+AGENTS.md
+CLAUDE.md
+Dockerfile*
+README.md
+build.log
+node_modules
+npm-debug.log*
+tsconfig.tsbuildinfo

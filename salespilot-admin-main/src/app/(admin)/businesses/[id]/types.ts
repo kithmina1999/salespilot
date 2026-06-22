@@ -31,6 +31,8 @@ export type BusinessDetail = {
   wa_phone_number_id?: string;
   waba_id?: string;
   wa_access_token?: string;
+  has_wa_access_token?: boolean;
+  has_api_key?: boolean;
   meta_catalog_id?: string;
   connected_at?: string | null;
 };

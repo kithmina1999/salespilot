@@ -1,0 +1,3 @@
+[submodule "landing"]
+	path = landing
+	url = https://github.com/kithmina1999/salespilot-landing.git

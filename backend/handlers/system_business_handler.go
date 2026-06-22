@@ -12,6 +12,8 @@ import (
 
 type systemBusinessResponse struct {
 	models.Business
+	HasAPIKey             bool       `json:"has_api_key"`
+	HasWAAccessToken      bool       `json:"has_wa_access_token"`
 	DebugActive           bool       `json:"debug_active"`
 	DebugExpiresAt        *time.Time `json:"debug_expires_at"`
 	DebugRemainingSeconds int64      `json:"debug_remaining_seconds"`
@@ -44,9 +46,18 @@ func buildSystemBusinessResponse(b models.Business) systemBusinessResponse {
 	if active {
 		remaining = int64(b.DebugModeUntil.Sub(now).Seconds())
 	}
+	hasAPIKey := b.APIKey != ""
+	hasWAAccessToken := b.WAAccessToken != ""
+
+	// Do not serialize tenant secrets into system-admin list/detail payloads.
+	// If a reveal workflow is ever needed, gate it behind PermSensitiveReveal.
+	b.APIKey = ""
+	b.WAAccessToken = ""
 	b.WAStatus = effectiveWAStatus(b)
 	return systemBusinessResponse{
 		Business:              b,
+		HasAPIKey:             hasAPIKey,
+		HasWAAccessToken:      hasWAAccessToken,
 		DebugActive:           active,
 		DebugExpiresAt:        b.DebugModeUntil,
 		DebugRemainingSeconds: remaining,

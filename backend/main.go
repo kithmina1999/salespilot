@@ -15,15 +15,22 @@ import (
 	"github.com/kithmina1999/salespilot/cache"
 	"github.com/kithmina1999/salespilot/config"
 	"github.com/kithmina1999/salespilot/database"
+	"github.com/kithmina1999/salespilot/errorreporting"
 	"github.com/kithmina1999/salespilot/handlers"
 	"github.com/kithmina1999/salespilot/knowledge"
 	"github.com/kithmina1999/salespilot/middleware"
+	"github.com/kithmina1999/salespilot/observability"
 	"github.com/kithmina1999/salespilot/services"
 	"github.com/kithmina1999/salespilot/utils"
 	"github.com/kithmina1999/salespilot/whatsapp"
 )
 
 func main() {
+	observability.ConfigureFromEnv("salespilot-backend")
+	reporter := errorreporting.NewDiscordReporter(100)
+	observability.SetErrorReporter(reporter)
+	defer reporter.Close()
+
 	// Load config
 	cfg := config.Load()
 
@@ -65,7 +72,8 @@ func main() {
 	os.MkdirAll("uploads/receipts", 0755)
 
 	// Setup Gin
-	r := gin.Default()
+	r := gin.New()
+	r.Use(middleware.RequestContext(), middleware.Recovery())
 
 	// Fix: Only trust the local reverse proxy (nginx on same host), not all proxies
 	if err := r.SetTrustedProxies([]string{"127.0.0.1", "::1"}); err != nil {
@@ -180,13 +188,13 @@ func main() {
 	auth := r.Group("/api/v1/auth")
 	{
 		auth.POST("/login", middleware.RateLimit(20), handlers.Login)
-		auth.POST("/register", handlers.Register)
-		auth.POST("/verify-email", handlers.VerifyEmailOTP)
-		auth.POST("/resend-verification", handlers.ResendEmailOTP)
+		auth.POST("/register", middleware.RateLimit(20), handlers.Register)
+		auth.POST("/verify-email", middleware.RateLimit(30), handlers.VerifyEmailOTP)
+		auth.POST("/resend-verification", middleware.RateLimit(10), handlers.ResendEmailOTP)
 		// Password reset via WhatsApp OTP — 3-step flow
-		auth.POST("/forgot-password", handlers.ForgotPassword) // Step 1: send OTP
-		auth.POST("/verify-otp", handlers.VerifyOTP)           // Step 2: verify OTP → get reset token
-		auth.POST("/reset-password", handlers.ResetPassword)   // Step 3: set new password
+		auth.POST("/forgot-password", middleware.RateLimit(10), handlers.ForgotPassword) // Step 1: send OTP
+		auth.POST("/verify-otp", middleware.RateLimit(30), handlers.VerifyOTP)           // Step 2: verify OTP → get reset token
+		auth.POST("/reset-password", middleware.RateLimit(20), handlers.ResetPassword)   // Step 3: set new password
 	}
 
 	// Dashboard Secured API (JWT)
@@ -339,8 +347,13 @@ func main() {
 	log.Printf("📁 Uploads served at %s/uploads/", cfg.ServerURL)
 
 	srv := &http.Server{
-		Addr:    ":" + cfg.Port,
-		Handler: r,
+		Addr:              ":" + cfg.Port,
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      180 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
 
 	go func() {

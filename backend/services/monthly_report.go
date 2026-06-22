@@ -1,17 +1,17 @@
 package services
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/kithmina1999/salespilot/database"
+	"github.com/kithmina1999/salespilot/httpclient"
 	"github.com/kithmina1999/salespilot/models"
 	"github.com/kithmina1999/salespilot/whatsapp"
 )
@@ -96,6 +96,8 @@ func GenerateAndSendTestReport(businessID uint) error {
 // ── Core Report Generator ─────────────────────────────────────────────────────
 
 func generateAndSendReport(biz models.Business, monthKey string, refDate time.Time) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
 	stats, err := collectStats(biz, monthKey, refDate)
 	if err != nil {
 		return fmt.Errorf("stats collection failed: %v", err)
@@ -117,7 +119,7 @@ func generateAndSendReport(biz models.Business, monthKey string, refDate time.Ti
 	}
 
 	// Build the full WhatsApp message
-	reportText, err := buildFullReport(stats, model)
+	reportText, err := buildFullReport(ctx, stats, model)
 	if err != nil {
 		return fmt.Errorf("AI generation failed: %v", err)
 	}
@@ -276,7 +278,7 @@ func collectStats(biz models.Business, monthKey string, refDate time.Time) (*rep
 
 // ── Report Building with Gemini AI ───────────────────────────────────────────
 
-func buildFullReport(stats *reportStats, model string) (string, error) {
+func buildFullReport(ctx context.Context, stats *reportStats, model string) (string, error) {
 	// 1. Build raw stats section (always included, plain text)
 	revPct := ""
 	if stats.RevenuePrevMonth > 0 {
@@ -325,7 +327,7 @@ TOP KNOWLEDGE GAPS (unanswered questions):
 	)
 
 	// 2. Build AI analysis via Gemini
-	aiAnalysis, err := callGeminiForAnalysis(stats, rawStats, model)
+	aiAnalysis, err := callGeminiForAnalysis(ctx, stats, rawStats, model)
 	if err != nil {
 		log.Printf("⚠️ Gemini analysis failed, using raw stats only: %v", err)
 		aiAnalysis = "AI analysis unavailable this month. Please check your Gemini API key."
@@ -387,7 +389,7 @@ salespilot.lk`,
 
 // ── Gemini AI Analysis Call ───────────────────────────────────────────────────
 
-func callGeminiForAnalysis(stats *reportStats, rawStats string, model string) (string, error) {
+func callGeminiForAnalysis(ctx context.Context, stats *reportStats, rawStats string, model string) (string, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
 		return "", fmt.Errorf("GEMINI_API_KEY not set")
@@ -466,7 +468,7 @@ Write the AI analysis section now. Do NOT repeat the raw statistics. Do NOT add 
 	}
 
 	bodyBytes, _ := json.Marshal(body)
-	resp, err := http.Post(apiURL, "application/json", bytes.NewBuffer(bodyBytes))
+	resp, err := httpclient.PostJSONContext(ctx, httpclient.DependencyGemini, "generate_monthly_report", apiURL, bodyBytes, httpclient.RetryTransient)
 	if err != nil {
 		return "", err
 	}

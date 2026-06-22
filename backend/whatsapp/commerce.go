@@ -14,6 +14,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/kithmina1999/salespilot/httpclient"
 )
 
 const waAPIBase = "https://graph.facebook.com/v20.0"
@@ -126,13 +128,6 @@ func sendInteractive(phoneNumberID, accessToken string, payload map[string]inter
 		return fmt.Errorf("commerce: marshal payload: %w", err)
 	}
 
-	// DEBUG: print token prefix + phone number ID so we can verify DB has the right token
-	tokenPreview := accessToken
-	if len(tokenPreview) > 25 {
-		tokenPreview = tokenPreview[:25] + "..."
-	}
-	log.Printf("🔑 [sendInteractive] phoneNumberID=%s token=%s", phoneNumberID, tokenPreview)
-
 	url := fmt.Sprintf("%s/%s/messages", waAPIBase, phoneNumberID)
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
@@ -141,7 +136,7 @@ func sendInteractive(phoneNumberID, accessToken string, payload map[string]inter
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpclient.Do(req)
 	if err != nil {
 		return fmt.Errorf("commerce: http: %w", err)
 	}

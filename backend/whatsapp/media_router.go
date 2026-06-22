@@ -16,6 +16,7 @@ import (
 	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 	"github.com/kithmina1999/salespilot/database"
+	"github.com/kithmina1999/salespilot/httpclient"
 	"github.com/kithmina1999/salespilot/models"
 )
 
@@ -35,9 +36,13 @@ type ImageAnalysis struct {
 // Vision (intent + description), then routes to the correct handler using only
 // the text description — no second image upload needed.
 func HandleImageWebhook(business *models.Business, fromNormalized, fromRaw, mediaID, pushName string) {
-	log.Printf("🔍 [MediaRouter] Processing image from %s (biz=%d)", fromNormalized, business.ID)
+	HandleImageWebhookContext(context.Background(), business, fromNormalized, fromRaw, mediaID, pushName)
+}
 
-	mediaURL, err := fetchMetaMediaURL(mediaID, business.WAAccessToken)
+func HandleImageWebhookContext(ctx context.Context, business *models.Business, fromNormalized, fromRaw, mediaID, pushName string) {
+	log.Printf("[MediaRouter] Processing image (business_id=%d)", business.ID)
+
+	mediaURL, err := fetchMetaMediaURL(ctx, mediaID, business.WAAccessToken)
 	if err != nil {
 		log.Printf("❌ [MediaRouter] Failed to get media URL: %v", err)
 		botSendText(business, fromRaw, "Sorry, I couldn't process your image. Please try again!")
@@ -45,7 +50,7 @@ func HandleImageWebhook(business *models.Business, fromNormalized, fromRaw, medi
 	}
 
 	// NOTE: Meta media URLs are short-lived — download immediately.
-	imageBytes, mimeType, err := downloadMetaMedia(mediaURL, business.WAAccessToken)
+	imageBytes, mimeType, err := downloadMetaMedia(ctx, mediaURL, business.WAAccessToken)
 	if err != nil {
 		log.Printf("❌ [MediaRouter] Failed to download media: %v", err)
 		botSendText(business, fromRaw, "Sorry, I couldn't process your image. Please try again!")
@@ -55,14 +60,14 @@ func HandleImageWebhook(business *models.Business, fromNormalized, fromRaw, medi
 	// Single Vision call: get intent AND description together.
 	// All downstream handlers receive the text description — image bytes are
 	// no longer needed after this point.
-	analysis := analyzeImageWithVision(imageBytes, mimeType)
-	log.Printf("🏷️  [MediaRouter] intent=%s desc=%q for %s", analysis.Intent, analysis.Description, fromNormalized)
+	analysis := analyzeImageWithVision(ctx, imageBytes, mimeType)
+	log.Printf("[MediaRouter] Image classified (business_id=%d intent=%s)", business.ID, analysis.Intent)
 
 	switch analysis.Intent {
 	case "product_inquiry":
-		handleProductImageInquiry(business, fromNormalized, fromRaw, analysis.Description)
+		handleProductImageInquiry(ctx, business, fromNormalized, fromRaw, analysis.Description)
 	case "payment_proof":
-		screenshotURL := uploadPaymentProofImageToCloudinary(business.ID, imageBytes, mimeType)
+		screenshotURL := uploadPaymentProofImageToCloudinary(ctx, business.ID, imageBytes, mimeType)
 		handlePaymentProofImage(business, fromNormalized, fromRaw, analysis.Description, screenshotURL)
 	case "review":
 		// Route to media_bridge.go: creates IsUnmatched merchant alert if shipped order
@@ -79,7 +84,7 @@ func HandleImageWebhook(business *models.Business, fromNormalized, fromRaw, medi
 // routing intent and a human-readable description of the image content.
 // The description is used by all downstream handlers so the image is never
 // re-uploaded to Gemini.
-func analyzeImageWithVision(imageBytes []byte, mimeType string) ImageAnalysis {
+func analyzeImageWithVision(ctx context.Context, imageBytes []byte, mimeType string) ImageAnalysis {
 	fallback := ImageAnalysis{Intent: "other", Description: ""}
 
 	apiKey := os.Getenv("GEMINI_API_KEY")
@@ -125,7 +130,7 @@ The description must capture enough detail for follow-up questions (colour, item
 	jsonBody, _ := json.Marshal(body)
 	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey
 
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonBody))
+	resp, err := httpclient.PostJSONContext(ctx, httpclient.DependencyGemini, "analyze_whatsapp_image", url, jsonBody, httpclient.RetryTransient)
 	if err != nil {
 		log.Printf("❌ [MediaRouter] Vision call failed: %v", err)
 		return fallback
@@ -150,7 +155,7 @@ The description must capture enough detail for follow-up questions (colour, item
 		Description string `json:"description"`
 	}
 	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
-		log.Printf("⚠️ [MediaRouter] Could not parse JSON from Vision: %q — fallback to 'other'", raw)
+		log.Printf("[MediaRouter] Invalid Vision response JSON; using fallback")
 		return fallback
 	}
 
@@ -169,7 +174,7 @@ The description must capture enough detail for follow-up questions (colour, item
 // handleProductImageInquiry does a DB keyword search against the description first.
 // If matching products are found, it formats them as a list and sends directly.
 // Only calls Gemini for a natural-language response when no DB match exists.
-func handleProductImageInquiry(business *models.Business, fromNormalized, fromRaw, description string) {
+func handleProductImageInquiry(ctx context.Context, business *models.Business, fromNormalized, fromRaw, description string) {
 	// Step 1: search the catalog using words from the description
 	var matchedProducts []models.Product
 	words := strings.Fields(strings.ToLower(description))
@@ -245,7 +250,7 @@ func handleProductImageInquiry(business *models.Business, fromNormalized, fromRa
 	jsonBody, _ := json.Marshal(body)
 	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey
 
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonBody))
+	resp, err := httpclient.PostJSONContext(ctx, httpclient.DependencyGemini, "match_product_image", url, jsonBody, httpclient.RetryTransient)
 	if err != nil {
 		botSendText(business, fromRaw, "We couldn't find a match right now. Could you describe what you're looking for?")
 		return
@@ -266,7 +271,7 @@ func handleProductImageInquiry(business *models.Business, fromNormalized, fromRa
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-func uploadPaymentProofImageToCloudinary(businessID uint, imageBytes []byte, mimeType string) string {
+func uploadPaymentProofImageToCloudinary(parent context.Context, businessID uint, imageBytes []byte, mimeType string) string {
 	cloudinaryURL := os.Getenv("CLOUDINARY_URL")
 	if cloudinaryURL == "" {
 		log.Println("⚠️ [MediaRouter] CLOUDINARY_URL not set; storing payment proof without screenshot URL")
@@ -279,7 +284,10 @@ func uploadPaymentProofImageToCloudinary(businessID uint, imageBytes []byte, mim
 		return ""
 	}
 
-	resp, err := cld.Upload.Upload(context.Background(), bytes.NewReader(imageBytes), uploader.UploadParams{
+	ctx, cancel := context.WithTimeout(parent, httpclient.ExternalAPITimeout)
+	defer cancel()
+
+	resp, err := cld.Upload.Upload(ctx, bytes.NewReader(imageBytes), uploader.UploadParams{
 		Folder:   "salespilot/order-proofs",
 		PublicID: fmt.Sprintf("proof-%d-%d", businessID, time.Now().UnixNano()),
 	})
@@ -303,12 +311,12 @@ func localizedWaitMessage(business *models.Business) string {
 }
 
 // fetchMetaMediaURL resolves a Meta media ID to a short-lived download URL.
-func fetchMetaMediaURL(mediaID, accessToken string) (string, error) {
+func fetchMetaMediaURL(ctx context.Context, mediaID, accessToken string) (string, error) {
 	url := fmt.Sprintf("https://graph.facebook.com/v19.0/%s", mediaID)
-	req, _ := http.NewRequest("GET", url, nil)
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpclient.DoContext(ctx, httpclient.DependencyMeta, "resolve_media_url", req, httpclient.RetryTransient)
 	if err != nil {
 		return "", err
 	}
@@ -327,11 +335,11 @@ func fetchMetaMediaURL(mediaID, accessToken string) (string, error) {
 }
 
 // downloadMetaMedia downloads image bytes from a Meta media URL using Bearer auth.
-func downloadMetaMedia(mediaURL, accessToken string) ([]byte, string, error) {
-	req, _ := http.NewRequest("GET", mediaURL, nil)
+func downloadMetaMedia(ctx context.Context, mediaURL, accessToken string) ([]byte, string, error) {
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, mediaURL, nil)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpclient.DoContext(ctx, httpclient.DependencyMeta, "download_media", req, httpclient.RetryTransient)
 	if err != nil {
 		return nil, "", err
 	}

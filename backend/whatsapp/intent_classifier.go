@@ -240,7 +240,7 @@ func ClassifyMessageIntent(msg string) string {
 					bestCat = anchor.category
 				}
 			}
-			log.Printf("🧠 [IntentClassifier] intent=%s score=%.3f msg=%q", bestCat, bestScore, msg)
+			log.Printf("[IntentClassifier] intent=%s score=%.3f", bestCat, bestScore)
 
 			// Confident classification
 			if bestScore >= 0.70 {
@@ -375,8 +375,8 @@ func IsLikelyAddress(addr string) (bool, float64) {
 			invalidScore := CosineSimilarity(vec, invalidC)
 			confidence := validScore - invalidScore
 
-			log.Printf("🏠 [AddrValidator] valid=%.3f invalid=%.3f diff=%.3f addr=%q",
-				validScore, invalidScore, confidence, addr)
+			log.Printf("[AddrValidator] valid=%.3f invalid=%.3f diff=%.3f",
+				validScore, invalidScore, confidence)
 
 			// If the input is more similar to valid addresses → accept
 			// Threshold: diff < -0.02 means clearly more similar to garbage

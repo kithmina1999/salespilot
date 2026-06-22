@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -152,8 +153,11 @@ func ResendEmailOTP(c *gin.Context) {
 	}
 	database.DB.Create(&record)
 
+	baseCtx := context.WithoutCancel(c.Request.Context())
 	go func(e, code string) {
-		utils.SendVerificationEmail(e, code)
+		ctx, cancel := context.WithTimeout(baseCtx, 15*time.Second)
+		defer cancel()
+		utils.SendVerificationEmailContext(ctx, e, code)
 	}(user.Email, otp)
 
 	c.JSON(http.StatusOK, gin.H{

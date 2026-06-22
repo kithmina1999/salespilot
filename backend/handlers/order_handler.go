@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -20,6 +22,21 @@ type CreateOrderRequest struct {
 	TotalPrice    float64 `json:"total_price" binding:"required"`
 	Address       string  `json:"address"`
 	Notes         string  `json:"notes"`
+}
+
+type orderPagination struct {
+	Page       int   `json:"page"`
+	Limit      int   `json:"limit"`
+	Total      int64 `json:"total"`
+	TotalPages int   `json:"total_pages"`
+}
+
+type orderSummary struct {
+	NeedsAttention int64 `json:"needs_attention"`
+	Active         int64 `json:"active"`
+	Completed      int64 `json:"completed"`
+	Cancelled      int64 `json:"cancelled"`
+	All            int64 `json:"all"`
 }
 
 // CreateOrder creates a new order
@@ -58,15 +75,90 @@ func CreateOrder(c *gin.Context) {
 	})
 }
 
-// ListOrders returns orders filtered by status and/or date range.
-// Supports: ?status=X  ?date=YYYY-MM-DD  ?from=YYYY-MM-DD&to=YYYY-MM-DD
+// ListOrders returns paginated orders filtered by queue, status, payment, search,
+// and date range. Backward-compatible response fields: orders and count.
+// Supports: ?queue=X ?status=X ?payment_status=X ?payment_method=X ?q=X
+// ?date=YYYY-MM-DD ?from=YYYY-MM-DD&to=YYYY-MM-DD ?page=1 ?limit=25 ?sort=newest
 func ListOrders(c *gin.Context) {
-	db := c.MustGet("db").(*gorm.DB)
 	var orders []models.Order
-	query := db.Order("created_at DESC")
+	page := parsePositiveInt(c.Query("page"), 1)
+	limit := parsePositiveInt(c.Query("limit"), 25)
+	if limit > 100 {
+		limit = 100
+	}
+	offset := (page - 1) * limit
 
-	if status := c.Query("status"); status != "" {
+	base := applyOrderFilters(orderBaseQuery(c), c, true, true)
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count orders"})
+		return
+	}
+
+	query := applyOrderFilters(orderBaseQuery(c), c, true, true).
+		Order(orderSortClause(c.Query("sort"))).
+		Offset(offset).
+		Limit(limit)
+
+	if err := query.Find(&orders).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch orders"})
+		return
+	}
+
+	totalPages := 0
+	if total > 0 {
+		totalPages = int(math.Ceil(float64(total) / float64(limit)))
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"orders": orders,
+		"count":  len(orders),
+		"pagination": orderPagination{
+			Page:       page,
+			Limit:      limit,
+			Total:      total,
+			TotalPages: totalPages,
+		},
+		"summary": buildOrderSummary(c),
+	})
+}
+
+func orderBaseQuery(c *gin.Context) *gorm.DB {
+	db := c.MustGet("db").(*gorm.DB)
+	query := db.Session(&gorm.Session{NewDB: true}).Model(&models.Order{})
+	if businessID := c.GetUint("business_id"); businessID != 0 {
+		query = query.Where("business_id = ?", businessID)
+	}
+	return query
+}
+
+func parsePositiveInt(raw string, fallback int) int {
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 1 {
+		return fallback
+	}
+	return value
+}
+
+func applyOrderFilters(query *gorm.DB, c *gin.Context, includeQueue bool, includeStatus bool) *gorm.DB {
+	if status := c.Query("status"); includeStatus && status != "" && status != "all" {
 		query = query.Where("status = ?", status)
+	}
+	if paymentStatus := c.Query("payment_status"); paymentStatus != "" && paymentStatus != "all" {
+		query = query.Where("payment_status = ?", paymentStatus)
+	}
+	if paymentMethod := c.Query("payment_method"); paymentMethod != "" && paymentMethod != "all" {
+		query = query.Where("payment_method = ?", paymentMethod)
+	}
+	if q := strings.TrimSpace(c.Query("q")); q != "" {
+		like := "%" + q + "%"
+		query = query.Where(
+			"customer_name ILIKE ? OR customer_phone ILIKE ? OR CAST(business_order_num AS TEXT) ILIKE ? OR CAST(id AS TEXT) ILIKE ?",
+			like, like, like, like,
+		)
 	}
 	if date := c.Query("date"); date != "" {
 		if parsedDate, err := time.Parse("2006-01-02", date); err == nil {
@@ -83,12 +175,64 @@ func ListOrders(c *gin.Context) {
 			query = query.Where("created_at < ?", parsedTo.AddDate(0, 0, 1))
 		}
 	}
-
-	if err := query.Find(&orders).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch orders"})
-		return
+	if queue := c.Query("queue"); includeQueue && queue != "" && queue != "all" {
+		query = applyOrderQueueFilter(query, queue)
 	}
-	c.JSON(http.StatusOK, gin.H{"orders": orders, "count": len(orders)})
+	return query
+}
+
+func applyOrderQueueFilter(query *gorm.DB, queue string) *gorm.DB {
+	switch queue {
+	case "needs_attention":
+		return query.Where(
+			"(payment_method = ? AND payment_status = ?) OR payment_status = ? OR (status = ? AND updated_at <= ?)",
+			"bank_transfer",
+			"awaiting_verification",
+			"rejected",
+			models.OrderStatusShipped,
+			time.Now().AddDate(0, 0, -5),
+		)
+	case "active":
+		return query.Where("status IN ?", []string{
+			models.OrderStatusNew,
+			models.OrderStatusConfirmed,
+			models.OrderStatusShipped,
+		})
+	case "completed":
+		return query.Where("status = ?", models.OrderStatusDelivered)
+	case "cancelled":
+		return query.Where("status = ?", models.OrderStatusCancelled)
+	default:
+		return query
+	}
+}
+
+func orderSortClause(sort string) string {
+	switch sort {
+	case "oldest":
+		return "created_at ASC"
+	case "updated_desc":
+		return "updated_at DESC"
+	case "updated_asc":
+		return "updated_at ASC"
+	case "total_desc":
+		return "total_price DESC"
+	case "total_asc":
+		return "total_price ASC"
+	default:
+		return "created_at DESC"
+	}
+}
+
+func buildOrderSummary(c *gin.Context) orderSummary {
+	summaryBase := func() *gorm.DB { return applyOrderFilters(orderBaseQuery(c), c, false, false) }
+	summary := orderSummary{}
+	summaryBase().Count(&summary.All)
+	applyOrderQueueFilter(summaryBase(), "needs_attention").Count(&summary.NeedsAttention)
+	applyOrderQueueFilter(summaryBase(), "active").Count(&summary.Active)
+	applyOrderQueueFilter(summaryBase(), "completed").Count(&summary.Completed)
+	applyOrderQueueFilter(summaryBase(), "cancelled").Count(&summary.Cancelled)
+	return summary
 }
 
 // GetOrdersByCustomer returns all orders for a specific customer phone

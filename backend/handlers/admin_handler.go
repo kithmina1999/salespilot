@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
+	"github.com/kithmina1999/salespilot/httpclient"
 	"github.com/kithmina1999/salespilot/knowledge"
 	"github.com/kithmina1999/salespilot/models"
 	"github.com/kithmina1999/salespilot/whatsapp"
@@ -524,7 +525,9 @@ func AdminUploadImage(serverURL string) gin.HandlerFunc {
 		publicID := fmt.Sprintf("product-%d-%d", id, time.Now().Unix())
 
 		// Upload stream to Cloudinary
-		resp, err := cld.Upload.Upload(context.Background(), src, uploader.UploadParams{
+		ctx, cancel := context.WithTimeout(context.Background(), httpclient.ExternalAPITimeout)
+		defer cancel()
+		resp, err := cld.Upload.Upload(ctx, src, uploader.UploadParams{
 			Folder:   "salespilot/products",
 			PublicID: publicID,
 		})

@@ -66,3 +66,24 @@ func TestGetBillingTimeRemainingExpiredTrialFallsBackToFree(t *testing.T) {
 		t.Fatalf("EffectivePlan = %q, want free", remaining.EffectivePlan)
 	}
 }
+
+func TestBillingFrontendURL(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{name: "first allowed origin", raw: "https://app.example.com,https://admin.example.com", want: "https://app.example.com"},
+		{name: "trims whitespace and slash", raw: "  https://app.example.com/ , https://admin.example.com", want: "https://app.example.com"},
+		{name: "skips empty origin", raw: ", https://app.example.com", want: "https://app.example.com"},
+		{name: "local fallback", raw: "", want: "http://localhost:3000"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := billingFrontendURL(tt.raw); got != tt.want {
+				t.Fatalf("billingFrontendURL(%q) = %q, want %q", tt.raw, got, tt.want)
+			}
+		})
+	}
+}

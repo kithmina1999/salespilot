@@ -1,9 +1,61 @@
 package whatsapp
 
 import (
+	"reflect"
 	"sync"
 	"testing"
+
+	"github.com/kithmina1999/salespilot/models"
 )
+
+func TestAggregateCartItemQuantities(t *testing.T) {
+	got, productIDs, err := aggregateCartItemQuantities([]models.CartItem{
+		{ProductID: 3, Qty: 2},
+		{ProductID: 1, Qty: 4},
+		{ProductID: 3, Qty: 5},
+	})
+	if err != nil {
+		t.Fatalf("aggregateCartItemQuantities returned error: %v", err)
+	}
+
+	want := map[uint]int{1: 4, 3: 7}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected quantities %v, got %v", want, got)
+	}
+
+	wantProductIDs := []uint{1, 3}
+	if !reflect.DeepEqual(productIDs, wantProductIDs) {
+		t.Fatalf("expected product IDs %v, got %v", wantProductIDs, productIDs)
+	}
+}
+
+func TestAggregateCartItemQuantitiesRejectsInvalidItems(t *testing.T) {
+	tests := []struct {
+		name  string
+		items []models.CartItem
+	}{
+		{
+			name:  "missing product id",
+			items: []models.CartItem{{Qty: 1}},
+		},
+		{
+			name:  "zero quantity",
+			items: []models.CartItem{{ProductID: 1, Qty: 0}},
+		},
+		{
+			name:  "negative quantity",
+			items: []models.CartItem{{ProductID: 1, Qty: -1}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, _, err := aggregateCartItemQuantities(tt.items); err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}
 
 // TestFinalizeOrderConcurrency verifies that concurrent calls to finalizeOrder
 // produce unique, sequential order numbers and never corrupt shared state.

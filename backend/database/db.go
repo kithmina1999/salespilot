@@ -92,6 +92,10 @@ func Init(dsn string) {
 		log.Fatalf("❌ Failed to migrate database: %v", err)
 	}
 
+	if err := EnsureProductionIndexes(DB); err != nil {
+		log.Fatalf("❌ Failed to ensure production indexes: %v", err)
+	}
+
 	log.Println("✅ PostgreSQL connected and migrated successfully")
 
 	if err := platform.EnsureBillingDefaults(DB); err != nil {
@@ -150,7 +154,7 @@ func seedDemoData() {
 			Role:            "admin",
 			IsEmailVerified: true, // skip email verification for demo account
 		})
-		log.Println("🔑 Demo admin — email: admin@byteshift.lk | password: admin123")
+		log.Println("Demo admin seeded; credentials are not written to logs")
 
 		// ── 20 PRODUCTION GLOBAL FAQ RULES (BusinessID = NULL) ─────────────────────
 		globalRules := []models.Rule{
