@@ -20,16 +20,17 @@ package whatsapp
 // escape   → abandon cart, show main menu
 
 import (
-	"fmt"
 	"log"
 	"strings"
 	"sync"
+
+	"github.com/kithmina1999/salespilot/database"
 )
 
 // ─── Anchor Phrases ─────────────────────────────────────────────────────────────
 // Representative sentences per intent class.
 // More diverse phrases → better centroid embedding.
-// These are embedded ONCE at startup and cached forever.
+// Their centroids are persisted and reused across server restarts.
 
 var intentAnchorPhrases = map[string][]string{
 	"shopping": {
@@ -125,30 +126,36 @@ var (
 	classifierReady bool
 )
 
-// InitIntentClassifier embeds all anchor phrases in a background goroutine
-// and caches the per-category centroid embeddings.
-// Safe to call multiple times (embedding only happens once).
+// InitIntentClassifier loads persisted centroids or computes missing/stale
+// ones in a background goroutine, then caches them in memory.
 func InitIntentClassifier() {
 	go func() {
-		log.Println("🧠 [IntentClassifier] Computing intent anchor embeddings...")
+		log.Println("🧠 [IntentClassifier] Loading intent anchor embeddings...")
 
 		var entries []anchorEntry
 		for category, phrases := range intentAnchorPhrases {
-			centroid, err := computeIntentCentroid(phrases)
+			centroid, err := loadOrComputeCentroid(
+				database.DB,
+				embeddingArtifactIntentPrefix+category,
+				embeddingModel,
+				phrases,
+				EmbedText,
+			)
 			if err != nil {
 				log.Printf("⚠️ [IntentClassifier] Failed to embed %s anchors: %v", category, err)
 				continue
 			}
 			entries = append(entries, anchorEntry{category: category, embedding: centroid})
-			log.Printf("✅ [IntentClassifier] %s anchor ready (%d phrases embedded)", category, len(phrases))
+			log.Printf("✅ [IntentClassifier] %s anchor ready (%d reference phrases)", category, len(phrases))
 		}
 
 		classifierMu.Lock()
 		anchorEmbeds = entries
-		classifierReady = len(entries) == len(intentAnchorPhrases) // all 3 ready
+		ready := len(entries) == len(intentAnchorPhrases) // all 3 ready
+		classifierReady = ready
 		classifierMu.Unlock()
 
-		if classifierReady {
+		if ready {
 			log.Printf("🎯 [IntentClassifier] Ready — %d intent categories loaded", len(entries))
 		} else {
 			log.Printf("⚠️ [IntentClassifier] Partial init — only %d/%d categories ready", len(entries), len(intentAnchorPhrases))
@@ -161,33 +168,7 @@ func InitIntentClassifier() {
 
 // computeIntentCentroid embeds all phrases and returns their mean embedding vector.
 func computeIntentCentroid(phrases []string) ([]float64, error) {
-	var sum []float64
-	count := 0
-
-	for _, phrase := range phrases {
-		vec, err := EmbedText(phrase)
-		if err != nil {
-			log.Printf("⚠️ [IntentClassifier] Skipping phrase %q: %v", phrase, err)
-			continue
-		}
-		if len(sum) == 0 {
-			sum = make([]float64, len(vec))
-		}
-		for i, v := range vec {
-			sum[i] += v
-		}
-		count++
-	}
-
-	if count == 0 {
-		return nil, fmt.Errorf("all phrase embeddings failed")
-	}
-
-	centroid := make([]float64, len(sum))
-	for i := range sum {
-		centroid[i] = sum[i] / float64(count)
-	}
-	return centroid, nil
+	return computeCentroid(phrases, EmbedText)
 }
 
 // ─── Public Classification Entry Point ──────────────────────────────────────────
@@ -300,7 +281,7 @@ func ClassifyMessageIntent(msg string) string {
 // Cost: ~$0.000001 per validation (1 embedding call vs ~$0.000075 for Gemini Flash).
 // Fallback: looksLikeAddress() heuristic if embeddings aren't ready yet.
 //
-// Pre-computed centroids (computed once at startup, cached forever):
+// Pre-computed centroids (persisted and reused across restarts):
 //   addrValidCentroid   — average embedding of valid delivery address examples
 //   addrInvalidCentroid — average embedding of garbage/inability input examples
 
@@ -341,12 +322,24 @@ var invalidAddressExamples = []string{
 // initAddressValidator is called from InitIntentClassifier.
 // Runs in the same background goroutine — no extra startup overhead.
 func initAddressValidator() {
-	validCentroid, err := computeIntentCentroid(validAddressExamples)
+	validCentroid, err := loadOrComputeCentroid(
+		database.DB,
+		embeddingArtifactAddressValid,
+		embeddingModel,
+		validAddressExamples,
+		EmbedText,
+	)
 	if err != nil {
 		log.Printf("⚠️ [AddrValidator] Failed to embed valid address anchors: %v", err)
 		return
 	}
-	invalidCentroid, err := computeIntentCentroid(invalidAddressExamples)
+	invalidCentroid, err := loadOrComputeCentroid(
+		database.DB,
+		embeddingArtifactAddressInvalid,
+		embeddingModel,
+		invalidAddressExamples,
+		EmbedText,
+	)
 	if err != nil {
 		log.Printf("⚠️ [AddrValidator] Failed to embed invalid address anchors: %v", err)
 		return

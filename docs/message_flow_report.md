@@ -332,11 +332,11 @@ At server start, these run asynchronously:
 
 | Task | Function | What it does | Cost |
 |---|---|---|---|
-| FAQ embedding | `EmbedAllMissingRules()` | Embeds all rules without embeddings | ~$0.000001 × N rules |
-| Intent classifier | `InitIntentClassifier()` | Embeds 30 anchor phrases (3 categories × 10) → centroids | ~$0.000001 × 30 |
-| Address validator | `initAddressValidator()` | Embeds 20 anchor phrases (10 valid + 10 garbage) → centroids | ~$0.000001 × 20 |
+| FAQ embedding | `EmbedAllMissingRules()` | Embeds semantic rules without stored embeddings; excludes payment/delivery settings | Only missing rules |
+| Intent classifier | `InitIntentClassifier()` | Loads 3 persisted centroids; computes 63 reference phrases only when missing, changed, or using a new model | Warm restart: 0 calls |
+| Address validator | `initAddressValidator()` | Loads 2 persisted centroids; computes 20 reference phrases only when missing, changed, or using a new model | Warm restart: 0 calls |
 
-> Ready in ~10–15 seconds. Falls back to keyword heuristics until ready.
+> Warm restarts load five centroid rows from the database. A first boot or changed model/reference set computes them in the background and uses keyword heuristics until ready.
 
 ---
 
@@ -500,7 +500,7 @@ webhook → pipeline
 | 1 | Duplicate replies (Meta webhook retry ~60s) | 🔴 High | No message-ID deduplication |
 | 2 | Custom GreetingMessage never sent directly | 🟡 Medium | FAQ Rule #1 fires before it's used |
 | 3 | "continue" saved as order notes | 🟡 Medium | Notes step accepts any text |
-| 4 | Intent classifier not ready for first ~15s | 🟢 Low | Background init; keywords used as fallback |
+| 4 | Intent classifier briefly unavailable on first boot or centroid invalidation | 🟢 Low | Background recomputation; keywords used as fallback |
 | 5 | `add_more` state not exempt from rate limit | 🟢 Low | inCheckoutFlow only checks pinned states |
 | 6 | Gibberish check uses vowel-only test | 🟢 Low | Consonant-only English words pass (rare) |
 | 7 | Gemini history includes model messages with "[List]" prefix | 🟢 Low | Bot-sent lists logged as "[List] ..." |

@@ -56,6 +56,20 @@ func validateProductArrayField(raw, field string) (string, error) {
 	return string(out), nil
 }
 
+func syncProductKnowledgeAndEmbedding(db *gorm.DB, product models.Product) {
+	rule, needsEmbedding, err := knowledge.SyncProductKnowledgeWithEmbeddingState(db, product)
+	if err != nil {
+		return
+	}
+
+	// Publish the updated rule immediately. If embedding generation fails, the
+	// cache keeps the new keywords without retaining a stale semantic vector.
+	whatsapp.Cache.LoadRules()
+	if needsEmbedding {
+		whatsapp.EmbedAndStoreRule(rule)
+	}
+}
+
 func validateCreateProductRequest(req *AdminCreateProductRequest) error {
 	req.Name = strings.TrimSpace(req.Name)
 	req.Category = strings.TrimSpace(req.Category)
@@ -271,11 +285,7 @@ func AdminCreateProduct(c *gin.Context) {
 	}
 
 	// Sync product knowledge rule then reload cache
-	go func() {
-		if err := knowledge.SyncProductKnowledge(database.DB, product); err == nil {
-			whatsapp.Cache.LoadRules()
-		}
-	}()
+	go syncProductKnowledgeAndEmbedding(database.DB, product)
 
 	// Auto-resolve gap if gap_id is provided
 	var gapID uint
@@ -336,11 +346,7 @@ func AdminUpdateProduct(c *gin.Context) {
 
 	database.DB.Where("id = ? AND business_id = ?", id, businessID).First(&product)
 
-	go func() {
-		if err := knowledge.SyncProductKnowledge(database.DB, product); err == nil {
-			whatsapp.Cache.LoadRules()
-		}
-	}()
+	go syncProductKnowledgeAndEmbedding(database.DB, product)
 
 	// Auto-resolve gap if gap_id is provided
 	var gapID uint
@@ -392,11 +398,7 @@ func AdminUpdateStock(c *gin.Context) {
 
 	var product models.Product
 	db.First(&product, id)
-	go func() {
-		if err := knowledge.SyncProductKnowledge(db, product); err == nil {
-			whatsapp.Cache.LoadRules()
-		}
-	}()
+	go syncProductKnowledgeAndEmbedding(db, product)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Stock updated ✅", "product_id": id, "new_stock": *req.Stock})
 }

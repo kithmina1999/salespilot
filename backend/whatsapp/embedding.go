@@ -12,6 +12,7 @@ import (
 
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
+	"gorm.io/gorm"
 )
 
 // ─── Embedding API ─────────────────────────────────────────────────────────────
@@ -165,8 +166,8 @@ func EmbedAndStoreRule(r *models.Rule) {
 // EmbedAllMissingRules scans all active rules with no embedding and embeds them.
 // Called once on server startup to migrate existing rules created before this feature.
 func EmbedAllMissingRules() {
-	var rules []models.Rule
-	if err := database.DB.Where("is_active = ? AND (embedding IS NULL OR embedding = ?)", true, "").Find(&rules).Error; err != nil {
+	rules, err := findRulesNeedingEmbeddings(database.DB)
+	if err != nil {
 		log.Printf("❌ EmbedAllMissingRules: DB query failed: %v", err)
 		return
 	}
@@ -183,4 +184,23 @@ func EmbedAllMissingRules() {
 		}
 		log.Printf("✅ EmbedAllMissingRules: batch embedding complete")
 	}()
+}
+
+// semanticRulesQuery is shared by cache loading and embedding backfill so
+// settings-only knowledge can never trigger unused embedding work.
+func semanticRulesQuery(db *gorm.DB) *gorm.DB {
+	return db.Where(
+		"is_active = ? AND (source_type IS NULL OR source_type = ? OR source_type NOT IN ?)",
+		true,
+		"",
+		[]string{models.SourceTypePaymentSettings, models.SourceTypeDeliverySettings},
+	)
+}
+
+func findRulesNeedingEmbeddings(db *gorm.DB) ([]models.Rule, error) {
+	var rules []models.Rule
+	err := semanticRulesQuery(db).
+		Where("(embedding IS NULL OR embedding = ?)", "").
+		Find(&rules).Error
+	return rules, err
 }

@@ -101,6 +101,47 @@ func TestSyncProductKnowledgeUsesLiveTemplateJSON(t *testing.T) {
 	}
 }
 
+func TestSyncProductKnowledgeInvalidatesOnlyChangedEmbeddingText(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:product_embedding_%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.AutoMigrate(&models.Rule{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	product := models.Product{BusinessID: 7, ID: 12, Name: "Blue Mug", Active: true}
+	rule, needsEmbedding, err := SyncProductKnowledgeWithEmbeddingState(db, product)
+	if err != nil {
+		t.Fatalf("initial sync: %v", err)
+	}
+	if !needsEmbedding {
+		t.Fatal("new product rule should need an embedding")
+	}
+
+	rule.Embedding = []byte(`[1,2]`)
+	if err := db.Save(rule).Error; err != nil {
+		t.Fatalf("store embedding: %v", err)
+	}
+
+	unchanged, needsEmbedding, err := SyncProductKnowledgeWithEmbeddingState(db, product)
+	if err != nil {
+		t.Fatalf("unchanged sync: %v", err)
+	}
+	if needsEmbedding || len(unchanged.Embedding) == 0 {
+		t.Fatal("unchanged semantic text should retain its embedding")
+	}
+
+	product.Name = "Red Mug"
+	changed, needsEmbedding, err := SyncProductKnowledgeWithEmbeddingState(db, product)
+	if err != nil {
+		t.Fatalf("changed sync: %v", err)
+	}
+	if !needsEmbedding || len(changed.Embedding) != 0 {
+		t.Fatal("changed semantic text should clear and regenerate its embedding")
+	}
+}
+
 func TestSyncAllSystemKnowledgeBackfillsExistingData(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:system_knowledge_%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
 	if err != nil {

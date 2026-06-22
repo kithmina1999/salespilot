@@ -40,12 +40,7 @@ func (c *FAQCache) LoadRules() {
 	defer c.mu.Unlock()
 
 	var rules []models.Rule
-	if err := database.DB.Where(
-		"is_active = ? AND (source_type IS NULL OR source_type = ? OR source_type NOT IN ?)",
-		true,
-		"",
-		[]string{models.SourceTypePaymentSettings, models.SourceTypeDeliverySettings},
-	).Find(&rules).Error; err != nil {
+	if err := semanticRulesQuery(database.DB).Find(&rules).Error; err != nil {
 		log.Printf("❌ Failed to load FAQ rules: %v", err)
 		return
 	}

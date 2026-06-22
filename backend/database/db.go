@@ -55,6 +55,7 @@ func Init(dsn string) {
 			&models.PlatformBillingSettings{}, &models.SubscriptionPlan{},
 			&models.BillingPaymentAttempt{}, &models.BillingAddon{},
 			&models.PaymentProofLineItem{}, &models.BillingServicePurchase{},
+			&models.EmbeddingArtifact{},
 		)
 	}
 
@@ -85,6 +86,7 @@ func Init(dsn string) {
 		&models.BillingAddon{},
 		&models.PaymentProofLineItem{},
 		&models.BillingServicePurchase{},
+		&models.EmbeddingArtifact{},
 	)
 	if err != nil {
 		log.Fatalf("❌ Failed to migrate database: %v", err)
