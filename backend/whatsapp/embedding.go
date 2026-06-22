@@ -2,6 +2,7 @@ package whatsapp
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -11,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/kithmina1999/salespilot/database"
+	"github.com/kithmina1999/salespilot/httpclient"
 	"github.com/kithmina1999/salespilot/models"
 	"gorm.io/gorm"
 )
@@ -24,6 +26,10 @@ const embeddingModel = "gemini-embedding-001"
 // EmbedText calls the Gemini Embedding API and returns a []float64 vector.
 // Uses text-embedding-004 which is multilingual and handles Sinhala natively.
 func EmbedText(text string) ([]float64, error) {
+	return EmbedTextContext(context.Background(), text)
+}
+
+func EmbedTextContext(ctx context.Context, text string) ([]float64, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("GEMINI_API_KEY not set")
@@ -48,7 +54,7 @@ func EmbedText(text string) ([]float64, error) {
 		return nil, fmt.Errorf("embedding: marshal failed: %w", err)
 	}
 
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonBody))
+	resp, err := httpclient.PostJSONContext(ctx, httpclient.DependencyGemini, "embed_text", url, jsonBody, httpclient.RetryTransient)
 	if err != nil {
 		return nil, fmt.Errorf("embedding: http request failed: %w", err)
 	}
