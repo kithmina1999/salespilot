@@ -6,6 +6,7 @@ import (
 
 	"github.com/kithmina1999/salespilot/models"
 	"github.com/kithmina1999/salespilot/platform"
+	"github.com/kithmina1999/salespilot/providersecrets"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -97,6 +98,12 @@ func Init(dsn string) {
 	}
 
 	log.Println("✅ PostgreSQL connected and migrated successfully")
+
+	if count, err := providersecrets.BackfillBusinessWAAccessTokens(DB); err != nil {
+		log.Fatalf("failed to encrypt tenant provider tokens: %v", err)
+	} else if count > 0 {
+		log.Printf("encrypted %d existing tenant provider token(s)", count)
+	}
 
 	if err := platform.EnsureBillingDefaults(DB); err != nil {
 		log.Fatalf("Failed to seed billing catalog defaults: %v", err)

@@ -4,8 +4,10 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
+	"github.com/kithmina1999/salespilot/providersecrets"
 )
 
 type Config struct {
@@ -32,6 +34,7 @@ type Config struct {
 	RedisPassword       string
 	RedisDB             int
 	RedisKeyPrefix      string
+	ProviderTokenKeys   string // PROVIDER_TOKEN_ENCRYPTION_KEYS, key-id:base64-32-byte-key[,old-id:...]
 }
 
 // dangerousWeakDefaults lists known unsafe placeholder values that must never
@@ -72,6 +75,7 @@ func Load() *Config {
 		RedisPassword:       os.Getenv("REDIS_PASSWORD"),
 		RedisDB:             getEnvInt("REDIS_DB", 0),
 		RedisKeyPrefix:      getEnv("REDIS_KEY_PREFIX", "salespilot"),
+		ProviderTokenKeys:   os.Getenv(providersecrets.ProviderTokenEnvVar),
 	}
 
 	// ── Critical key validation — crash fast, not silently ────────────────────
@@ -86,6 +90,12 @@ func Load() *Config {
 	}
 	if len(cfg.MasterAPIKey) < 32 {
 		log.Fatal("❌ FATAL: MASTER_API_KEY is too short (minimum 32 characters required).")
+	}
+
+	if strings.EqualFold(cfg.GinMode, "release") {
+		if _, err := providersecrets.ParseKeyring(cfg.ProviderTokenKeys); err != nil {
+			log.Fatalf("âŒ FATAL: %s is invalid or missing: %v", providersecrets.ProviderTokenEnvVar, err)
+		}
 	}
 
 	return cfg

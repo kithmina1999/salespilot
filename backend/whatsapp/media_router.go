@@ -42,7 +42,14 @@ func HandleImageWebhook(business *models.Business, fromNormalized, fromRaw, medi
 func HandleImageWebhookContext(ctx context.Context, business *models.Business, fromNormalized, fromRaw, mediaID, pushName string) {
 	log.Printf("[MediaRouter] Processing image (business_id=%d)", business.ID)
 
-	mediaURL, err := fetchMetaMediaURL(ctx, mediaID, business.WAAccessToken)
+	accessToken, err := whatsappAccessTokenForBusiness(business)
+	if err != nil {
+		log.Printf("âŒ [MediaRouter] Failed to decrypt Meta access token: %v", err)
+		botSendText(business, fromRaw, "Sorry, I couldn't process your image. Please try again!")
+		return
+	}
+
+	mediaURL, err := fetchMetaMediaURL(ctx, mediaID, accessToken)
 	if err != nil {
 		log.Printf("❌ [MediaRouter] Failed to get media URL: %v", err)
 		botSendText(business, fromRaw, "Sorry, I couldn't process your image. Please try again!")
@@ -50,7 +57,7 @@ func HandleImageWebhookContext(ctx context.Context, business *models.Business, f
 	}
 
 	// NOTE: Meta media URLs are short-lived — download immediately.
-	imageBytes, mimeType, err := downloadMetaMedia(ctx, mediaURL, business.WAAccessToken)
+	imageBytes, mimeType, err := downloadMetaMedia(ctx, mediaURL, accessToken)
 	if err != nil {
 		log.Printf("❌ [MediaRouter] Failed to download media: %v", err)
 		botSendText(business, fromRaw, "Sorry, I couldn't process your image. Please try again!")

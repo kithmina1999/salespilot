@@ -16,7 +16,7 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 | Component | Status | Evidence |
 |-----------|--------|----------|
 | **Core Features** | ✅ Implemented | Multi-tenant WhatsApp/AI order bot, dashboard, billing, rules engine |
-| **Multi-Tenant Isolation** | ⚠️ Partial | DB scoping present; tenant tokens still plain-text; see SA-001 |
+| **Multi-Tenant Isolation** | ✅ | DB scoping present; tenant provider tokens are envelope-encrypted at rest |
 | **Graceful Shutdown** | ✅ Implemented | `main.go:365–380` – signal handling, worker pool drain via `utils.DrainAndWait()` |
 | **Worker Pool** | ✅ Implemented | `main.go:52` – `utils.InitWorkerPool(10)` initialized |
 | **Connection Pooling** | ✅ Implemented | PostgreSQL connection pool via GORM; Redis Valkey support |
@@ -164,9 +164,9 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 
 | ID | Severity | Status | OWASP | Issue | Required Fix | Target |
 |----|----|--------|-------|-------|------------|--------|
-| **SA-001** | 🔴 High | Open | A04 + A03 | Tenant Meta/WhatsApp tokens stored plaintext | Envelope encryption at application layer | Before production |
+| **SA-001** | ✅ High | Fixed | A04 + A03 | Tenant Meta/WhatsApp tokens stored plaintext | Envelope encryption at application layer with startup backfill | Complete |
 | **SA-002** | 🔴 High | Open | A07 | Tenant JWT in localStorage + client-set cookie | Move to HttpOnly backend-set cookie or OAuth flow | Before production |
-| **SA-003** | 🟠 Medium | Open | A07 + A02 | Credentials accepted in query strings | Remove `?token=`, `?api_key=`, `?master_key=` | Before staging |
+| **SA-003** | ✅ Medium | Fixed | A07 + A02 | Credentials accepted in query strings | Removed `?token=`, `?api_key=`, `?master_key=` fallbacks; header-only auth regression tests added | Complete |
 | **SA-004** | 🟠 Medium | Partial | A02 + A03 | Payment receipt uploads locally readable | Private storage or signed S3 URLs | Before production |
 | **SA-005** | 🟠 Medium | Partial | A07 + API4 | In-memory rate limiting only | Add Redis-backed and Nginx `limit_req` | Before production |
 | **SA-006** | 🟠 Medium | Open | A02 | CSP not enforced (report-only) | Add CSP, tune for Sentry/Cloudinary, enforce | Before production |
@@ -292,7 +292,7 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 
 | # | Category | Issue | Effort | Timeline |
 |---|----------|-------|--------|----------|
-| **1** | Security | SA-001: Encrypt tenant provider tokens at rest | 4h (envelope, decryption paths) | 1 sprint |
+| **1** | Security | SA-001: Encrypt tenant provider tokens at rest | Complete | Done |
 | **2** | Security | SA-002: Move tenant JWT out of localStorage to HttpOnly cookies | 8h (backend changes, frontend refactor) | 1 sprint |
 | **3** | Compliance | Vendor due diligence: Data handling, retention, subprocessors not documented | 6h (policy writing) | Before sales |
 | **4** | Operations | Passphrase rotation procedure not documented; backup encryption key at risk | 2h (docs + script) | 1 week |
@@ -302,7 +302,7 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 
 | # | Category | Issue | Effort | Timeline |
 |---|----------|-------|--------|----------|
-| **6** | Security | SA-003: Remove query-string credential acceptance | 1h | 1 day |
+| **6** | Security | SA-003: Remove query-string credential acceptance | Complete | Done |
 | **7** | Security | SA-004: Implement private receipt storage or signed S3 URLs | 6h | 1 sprint |
 | **8** | Security | SA-005: Replace in-memory rate limiter with Redis + Nginx `limit_req` | 8h | 1 sprint |
 | **9** | Security | SA-006: Add and enforce CSP headers after tuning | 4h | 1 sprint |
@@ -323,12 +323,13 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 
 ### 7.4 Deployment Readiness Checklist
 
-- [ ] 🔴 **SA-001:** Tenant token encryption implemented and tested
+- [x] 🔴 **SA-001:** Tenant token encryption implemented and tested
 - [ ] 🔴 **SA-002:** JWT moved to HttpOnly cookies; XSS attack surface reduced
 - [ ] 🔴 **Compliance:** Vendor due diligence doc completed and signed
 - [ ] 🔴 **Passphrase rotation:** Procedure written and tested
 - [ ] 🔴 **Staging proven:** Manual test run on staging VPS completed
-- [ ] 🟠 **SA-003 through SA-006:** All security findings addressed
+- [x] 🟠 **SA-003:** Query-string credential acceptance removed
+- [ ] 🟠 **SA-004 through SA-006:** Remaining security findings addressed
 - [ ] 🟠 **Alert rules:** Deployed and tested with synthetics
 - [ ] 🟠 **Dependency scanning:** CI pipeline running and passing
 - [ ] 🟠 **Database migrations:** Formalized strategy in place
@@ -373,13 +374,13 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 
 ### Immediate (This Week)
 
-1. **Fix SA-001 & SA-002** – These are the highest customer-data risks. Envelope encryption + HttpOnly cookies take ~12h combined.
+1. **Fix SA-002** – Browser-readable tenant JWTs are now the highest remaining customer-data risk.
 2. **Write passphrase rotation** – Backup integrity depends on this.
 3. **Deploy to staging** – Validate the full stack with real URLs and SSL.
 
 ### Short-Term (1–2 Sprints)
 
-1. Implement SA-003 through SA-006 security findings.
+1. Implement SA-004 through SA-006 security findings.
 2. Add alert rules and test with synthetics.
 3. Formalize database migration strategy.
 4. Add `npm audit` + `govulncheck` to CI.

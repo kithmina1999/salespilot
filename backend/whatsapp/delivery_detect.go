@@ -213,7 +213,12 @@ func ScheduleDeliveryCheck(business *models.Business, from, fromRaw string) {
 		},
 	}
 
-	sendDeliveryInteractive(business.WAPhoneNumberID, business.WAAccessToken, payload)
+	accessToken, err := whatsappAccessTokenForBusiness(business)
+	if err != nil {
+		log.Printf("failed to decrypt delivery-check WhatsApp token: %v", err)
+		return
+	}
+	sendDeliveryInteractive(business.WAPhoneNumberID, accessToken, payload)
 	log.Printf("📩 [DeliveryCheck] Sent delivery check to %s for order #%s", from, orderNum)
 }
 

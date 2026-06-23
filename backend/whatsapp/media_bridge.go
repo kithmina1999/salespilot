@@ -155,7 +155,12 @@ func handleReviewImage(business *models.Business, fromNormalized, fromRaw string
 				"Open your dashboard to mark as Delivered if appropriate.",
 			fromNormalized, shippedOrder.BusinessOrderNum, description,
 		)
-		SendText(business.WAPhoneNumberID, business.WAAccessToken, reportPhone, alert)
+		accessToken, err := whatsappAccessTokenForBusiness(business)
+		if err != nil {
+			log.Printf("failed to decrypt review alert WhatsApp token: %v", err)
+			return
+		}
+		SendText(business.WAPhoneNumberID, accessToken, reportPhone, alert)
 	}()
 
 	log.Printf("✅ [MediaBridge] Review bridge: IsUnmatched message created for Order #%d", shippedOrder.BusinessOrderNum)
@@ -366,5 +371,10 @@ func notifyMerchantPaymentProof(business *models.Business, order models.Order, d
 		order.TotalPrice,
 		description,
 	)
-	SendText(business.WAPhoneNumberID, business.WAAccessToken, reportPhone, alert)
+	accessToken, err := whatsappAccessTokenForBusiness(business)
+	if err != nil {
+		log.Printf("failed to decrypt payment proof alert WhatsApp token: %v", err)
+		return
+	}
+	SendText(business.WAPhoneNumberID, accessToken, reportPhone, alert)
 }

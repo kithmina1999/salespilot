@@ -49,7 +49,14 @@ func (p *Pipeline) handleContextBridge(business *models.Business, from, fromRaw 
 	if strings.Contains(lastBotMsg.Content, "?") {
 		nudge := "Just to confirm — " + lastBotMsg.Content
 		log.Printf("🔄 [%s] Context bridge — re-prompting %s with last question", business.Name, from)
-		SendText(business.WAPhoneNumberID, business.WAAccessToken, fromRaw, nudge)
+		accessToken, err := whatsappAccessTokenForBusiness(business)
+		if err != nil {
+			log.Printf("failed to decrypt context bridge WhatsApp token: %v", err)
+			return
+		}
+		if err := SendText(business.WAPhoneNumberID, accessToken, fromRaw, nudge); err != nil {
+			log.Printf("failed to send context bridge nudge: %v", err)
+		}
 	} else {
 		log.Printf("🔇 [%s] Context bridge — prior msg had no question, silently dropping", business.Name)
 	}
@@ -115,22 +122,22 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 		)
 
 		pLog = &models.PipelineLog{
-			BusinessID:       business.ID,
-			RequestID:        msg.RequestID,
+			BusinessID:        business.ID,
+			RequestID:         msg.RequestID,
 			ProviderMessageID: msg.ProviderMessageID,
-			Phone:            from,
-			RawMessage:       text,
-			IsSandbox:        isSandbox,
-			DebugMode:        business.DebugMode,
-			StateBefore:      cartBefore.State,
-			IntentClassified: string(routerDecision.Intent),
-			LegacyIntent:     legacyIntent,
-			RouterIntent:     string(routerDecision.Intent),
-			RouterRoute:      string(routerDecision.Route),
-			RouterConfidence: routerDecision.Confidence,
-			RouterCartPolicy: string(routerDecision.CartPolicy),
-			RouterUsageClass: string(routerDecision.UsageClass),
-			RouterReasons:    strings.Join(routerDecision.Reasons, "\n"),
+			Phone:             from,
+			RawMessage:        text,
+			IsSandbox:         isSandbox,
+			DebugMode:         business.DebugMode,
+			StateBefore:       cartBefore.State,
+			IntentClassified:  string(routerDecision.Intent),
+			LegacyIntent:      legacyIntent,
+			RouterIntent:      string(routerDecision.Intent),
+			RouterRoute:       string(routerDecision.Route),
+			RouterConfidence:  routerDecision.Confidence,
+			RouterCartPolicy:  string(routerDecision.CartPolicy),
+			RouterUsageClass:  string(routerDecision.UsageClass),
+			RouterReasons:     strings.Join(routerDecision.Reasons, "\n"),
 		}
 
 		defer func() {
@@ -1120,13 +1127,21 @@ func tryNativeCatalog(business *models.Business, to, text string) error {
 		if strings.Contains(normalized, strings.ToLower(NormalizeMessage(p.Name))) {
 			// Specific product match → send Product Card (PDP)
 			log.Printf("🛒 Sending product card for: %s (retailer_id=%s)", p.Name, p.RetailerID)
-			return SendProductCard(business.WAPhoneNumberID, business.WAAccessToken, to, business.MetaCatalogID, p.RetailerID)
+			accessToken, err := whatsappAccessTokenForBusiness(business)
+			if err != nil {
+				return err
+			}
+			return SendProductCard(business.WAPhoneNumberID, accessToken, to, business.MetaCatalogID, p.RetailerID)
 		}
 	}
 
 	// No specific product → send full Catalog message
 	log.Printf("🛒 Sending full catalog message (catalog_id=%s)", business.MetaCatalogID)
-	return SendCatalogMessage(business.WAPhoneNumberID, business.WAAccessToken, to, business.MetaCatalogID, "")
+	accessToken, err := whatsappAccessTokenForBusiness(business)
+	if err != nil {
+		return err
+	}
+	return SendCatalogMessage(business.WAPhoneNumberID, accessToken, to, business.MetaCatalogID, "")
 }
 
 func populatePipelineSignals(pLog *models.PipelineLog, signals []MatchSignal) {

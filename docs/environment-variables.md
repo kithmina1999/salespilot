@@ -44,6 +44,7 @@ must use shell-safe quoting.
 | `JWT_SECRET` | Required | None | Yes | Signs and verifies tenant and admin JWTs. Use at least 32 random bytes and rotate only with an intentional session invalidation. |
 | `MASTER_API_KEY` | Required | None | Yes | Protects master/system API-key routes. The backend exits when missing, known-weak, or shorter than 32 characters. |
 | `GEMINI_API_KEY` | Required | None | Yes | Gemini access for chat, embeddings, rules, image and receipt analysis, and reports. The backend exits when missing. |
+| `PROVIDER_TOKEN_ENCRYPTION_KEYS` | Required in release | None | Yes | Keyring for envelope-encrypting tenant Meta/WhatsApp access tokens at rest. Format: `key-id:base64-32-byte-key[,old-key-id:base64-32-byte-key]`. The first key encrypts new tokens; all listed keys can decrypt existing tokens. |
 | `SERVER_URL` | Required | `http://localhost:8080` | No | Public backend origin with no trailing slash. Used to construct webhook and payment callback URLs. |
 | `FRONTEND_URL` | Required | Local app/admin origins | No | Comma-separated CORS allowlist. Put the tenant app first because billing redirects use the first origin. |
 | `PORT` | Managed in production | `8080` | No | Backend listen port. Production Compose forces `8080`. |
@@ -87,8 +88,15 @@ procedure instead of editing those values in place.
 | `META_APP_SECRET` | Conditional | None | Yes | Verifies Meta webhook signatures. Required before accepting public WhatsApp webhooks. |
 
 Tenant `WA_PHONE_NUMBER_ID` and `WA_ACCESS_TOKEN` values are stored per business
-through the WhatsApp connection flow. The backend does not read global versions
-of those names from the environment.
+through the WhatsApp connection flow. Access tokens are envelope-encrypted with
+`PROVIDER_TOKEN_ENCRYPTION_KEYS`; the backend does not read global versions of
+those names from the environment.
+
+Generate a provider-token key with:
+
+```bash
+openssl rand -base64 32
+```
 
 ## Email, Media, Payments, And Alerts
 

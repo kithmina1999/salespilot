@@ -246,6 +246,11 @@ func SendManualReply(c *gin.Context) {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "WhatsApp bot is offline. Reconnect from the dashboard."})
 		return
 	}
+	accessToken, err := whatsappAccessTokenForBusiness(biz)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "WhatsApp credentials cannot be decrypted. Check server encryption configuration."})
+		return
+	}
 
 	// 2. Format Phone Number
 	var customer models.Customer
@@ -255,7 +260,7 @@ func SendManualReply(c *gin.Context) {
 	cleanPhone := strings.TrimPrefix(phone, "+")
 
 	// 3. Send Message
-	err := whatsapp.SendTextContext(c.Request.Context(), biz.WAPhoneNumberID, biz.WAAccessToken, cleanPhone, req.Message)
+	err = whatsapp.SendTextContext(c.Request.Context(), biz.WAPhoneNumberID, accessToken, cleanPhone, req.Message)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send WhatsApp message: " + err.Error()})
 		return

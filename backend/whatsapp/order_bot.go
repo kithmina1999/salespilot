@@ -42,7 +42,11 @@ var errCartAlreadyPlaced = errors.New("cart already placed")
 // ─── DB Tracking Wrappers ───────────────────────────────────────────────────────
 
 func botSendText(business *models.Business, phone, body string) error {
-	err := SendText(business.WAPhoneNumberID, business.WAAccessToken, phone, body)
+	accessToken, err := whatsappAccessTokenForBusiness(business)
+	if err != nil {
+		return err
+	}
+	err = SendText(business.WAPhoneNumberID, accessToken, phone, body)
 	if err == nil {
 		database.DB.Create(&models.Message{BusinessID: business.ID, Phone: phone, Role: "model", Content: body})
 	}
@@ -50,7 +54,11 @@ func botSendText(business *models.Business, phone, body string) error {
 }
 
 func botSendButtons(business *models.Business, phone, body string, buttons []Button) error {
-	err := SendButtons(business.WAPhoneNumberID, business.WAAccessToken, phone, body, buttons)
+	accessToken, err := whatsappAccessTokenForBusiness(business)
+	if err != nil {
+		return err
+	}
+	err = SendButtons(business.WAPhoneNumberID, accessToken, phone, body, buttons)
 	if err == nil {
 		database.DB.Create(&models.Message{BusinessID: business.ID, Phone: phone, Role: "model", Content: "[Buttons] " + body})
 	}
@@ -58,7 +66,11 @@ func botSendButtons(business *models.Business, phone, body string, buttons []But
 }
 
 func botSendList(business *models.Business, phone, body, label string, sections []ListSection) error {
-	err := SendList(business.WAPhoneNumberID, business.WAAccessToken, phone, body, label, sections)
+	accessToken, err := whatsappAccessTokenForBusiness(business)
+	if err != nil {
+		return err
+	}
+	err = SendList(business.WAPhoneNumberID, accessToken, phone, body, label, sections)
 	if err == nil {
 		database.DB.Create(&models.Message{BusinessID: business.ID, Phone: phone, Role: "model", Content: "[List] " + body})
 	}
@@ -1236,8 +1248,13 @@ func showCustomerOrders(business *models.Business, phone, fromRaw string) {
 		}
 	}
 
+	accessToken, err := whatsappAccessTokenForBusiness(business)
+	if err != nil {
+		log.Printf("failed to decrypt recent-orders WhatsApp token: %v", err)
+		return
+	}
 	SendList(
-		business.WAPhoneNumberID, business.WAAccessToken, fromRaw,
+		business.WAPhoneNumberID, accessToken, fromRaw,
 		"📦 *Your Recent Orders*\n\nTap any order to view details:",
 		"View Orders",
 		[]ListSection{{Title: "Recent Orders", Rows: rows}},

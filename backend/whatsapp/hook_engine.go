@@ -57,10 +57,15 @@ func enrichAndSend(
 			fromRaw, result.Text, result.Buttons,
 		)
 	} else {
-		sendErr = SendText(
-			business.WAPhoneNumberID, business.WAAccessToken,
-			fromRaw, result.Text,
-		)
+		accessToken, tokenErr := whatsappAccessTokenForBusiness(business)
+		if tokenErr != nil {
+			sendErr = tokenErr
+		} else {
+			sendErr = SendText(
+				business.WAPhoneNumberID, accessToken,
+				fromRaw, result.Text,
+			)
+		}
 		if sendErr == nil {
 			// Plain-text path: log once here (buttons path already logged)
 			database.DB.Create(&models.Message{

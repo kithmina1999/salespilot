@@ -338,7 +338,7 @@ func UpdateOrderStatus(c *gin.Context) {
 	// Fetch business for WhatsApp notifications
 	var business models.Business
 	if err := database.DB.First(&business, businessID).Error; err == nil {
-		if business.WAPhoneNumberID != "" && business.WAAccessToken != "" {
+		if accessToken, tokenErr := whatsappAccessTokenForBusiness(business); tokenErr == nil {
 			msgText := ""
 			switch req.Status {
 			case models.OrderStatusConfirmed:
@@ -363,7 +363,7 @@ func UpdateOrderStatus(c *gin.Context) {
 				if len(cleanPhone) > 0 && cleanPhone[0] == '+' {
 					cleanPhone = cleanPhone[1:]
 				}
-				go whatsapp.SendText(business.WAPhoneNumberID, business.WAAccessToken, cleanPhone, msgText)
+				go whatsapp.SendText(business.WAPhoneNumberID, accessToken, cleanPhone, msgText)
 			}
 		}
 	}

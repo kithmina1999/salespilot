@@ -87,6 +87,11 @@ func notifyStaleOrderCancelled(order *models.Order) {
 	if business.WAPhoneNumberID == "" || business.WAAccessToken == "" {
 		return // business not connected to WhatsApp
 	}
+	accessToken, err := whatsappAccessTokenForBusiness(business)
+	if err != nil {
+		log.Printf("failed to decrypt stale-payment WhatsApp token for business %d: %v", business.ID, err)
+		return
+	}
 
 	name := order.CustomerName
 	if name == "" {
@@ -106,7 +111,7 @@ func notifyStaleOrderCancelled(order *models.Order) {
 		customerPhone = customerPhone[1:]
 	}
 
-	if err := whatsapp.SendText(business.WAPhoneNumberID, business.WAAccessToken, customerPhone, msg); err != nil {
+	if err := whatsapp.SendText(business.WAPhoneNumberID, accessToken, customerPhone, msg); err != nil {
 		log.Printf("⚠️ [PaymentCleanup] Failed to notify customer %s: %v", order.CustomerPhone, err)
 	}
 }

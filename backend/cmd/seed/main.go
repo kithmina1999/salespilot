@@ -12,6 +12,7 @@ import (
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/knowledge"
 	"github.com/kithmina1999/salespilot/models"
+	"github.com/kithmina1999/salespilot/providersecrets"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -89,6 +90,15 @@ func cleanupSeedBusinesses(db *gorm.DB) {
 	}
 }
 
+func encryptedSeedWAAccessToken(token string) (string, bool) {
+	encrypted, err := providersecrets.EncryptProviderToken(token)
+	if err != nil {
+		log.Printf("warning: demo WhatsApp credentials skipped because %s is not configured: %v", providersecrets.ProviderTokenEnvVar, err)
+		return "", false
+	}
+	return encrypted, true
+}
+
 func deleteBusinessData(db *gorm.DB, businessID uint) {
 	var proofIDs []uint
 	db.Model(&models.PaymentProof{}).Where("business_id = ?", businessID).Pluck("id", &proofIDs)
@@ -127,6 +137,13 @@ func seedBusyBusiness(db *gorm.DB, rng *rand.Rand, passwordHash string) models.B
 	createdAt := now.AddDate(0, -3, -12)
 	planExpires := now.AddDate(1, 0, 0)
 	connectedAt := createdAt.Add(12 * time.Hour)
+	waAccessToken, waConnected := encryptedSeedWAAccessToken("EAA_demo_ceylon_glow_permanent_token")
+	waStatus := "not_connected"
+	var connectedAtPtr *time.Time
+	if waConnected {
+		waStatus = "connected"
+		connectedAtPtr = &connectedAt
+	}
 
 	biz := models.Business{
 		Name:                 "Ceylon Glow Boutique",
@@ -134,13 +151,13 @@ func seedBusyBusiness(db *gorm.DB, rng *rand.Rand, passwordHash string) models.B
 		APIKey:               "demo_api_key_ceylon_glow_busy",
 		WAPhoneNumberID:      "109876543210001",
 		WABAID:               "223344556677889",
-		WAAccessToken:        "EAA_demo_ceylon_glow_permanent_token",
+		WAAccessToken:        waAccessToken,
 		BotName:              "Glow Assistant",
 		BotPersonality:       "You are a warm, concise WhatsApp sales assistant for Ceylon Glow Boutique. Help customers choose skincare and beauty products, answer delivery and payment questions, and guide checkout without sounding robotic.",
 		OperatingHours:       "Mon-Sat 9:00 AM-7:30 PM. Sunday WhatsApp support only.",
 		DeliveryPolicy:       "Island-wide delivery in 1-3 working days. Colombo same-day delivery before 2 PM. Standard delivery fee starts from Rs. 350. Free delivery above Rs. 8,000.",
-		ConnectedAt:          &connectedAt,
-		WAStatus:             "connected",
+		ConnectedAt:          connectedAtPtr,
+		WAStatus:             waStatus,
 		MetaCatalogID:        "catalog_ceylon_glow_demo",
 		Plan:                 models.PlanPro,
 		BillingCycle:         models.BillingAnnual,
@@ -652,10 +669,14 @@ func seedLightBusiness(db *gorm.DB, passwordHash, name, email, phone, apiKey, wa
 		UpdatedAt:            now.Add(-3 * time.Hour),
 	}
 	if waStatus != "not_connected" {
-		biz.WAPhoneNumberID = "wa_" + strings.ReplaceAll(apiKey, "demo_api_key_", "")
-		biz.WABAID = "waba_" + strings.ReplaceAll(apiKey, "demo_api_key_", "")
-		biz.WAAccessToken = "EAA_light_demo_token"
-		biz.ConnectedAt = &connectedAt
+		if encryptedToken, ok := encryptedSeedWAAccessToken("EAA_light_demo_token"); ok {
+			biz.WAPhoneNumberID = "wa_" + strings.ReplaceAll(apiKey, "demo_api_key_", "")
+			biz.WABAID = "waba_" + strings.ReplaceAll(apiKey, "demo_api_key_", "")
+			biz.WAAccessToken = encryptedToken
+			biz.ConnectedAt = &connectedAt
+		} else {
+			biz.WAStatus = "not_connected"
+		}
 	}
 	mustCreate(db, &biz)
 

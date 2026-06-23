@@ -43,6 +43,11 @@ func sendOTPViaWhatsApp(ctx context.Context, phone string, otp string) error {
 	if biz.WAPhoneNumberID == "" || biz.WAAccessToken == "" {
 		return fmt.Errorf("Meta API credentials missing for OTP sender")
 	}
+	accessToken, err := whatsappAccessTokenForBusiness(biz)
+	if err != nil {
+		log.Printf("failed to decrypt OTP sender token: %v", err)
+		return fmt.Errorf("Meta API credentials unavailable for OTP sender")
+	}
 
 	cleanPhone := phone
 	if len(cleanPhone) > 0 && cleanPhone[0] == '+' {
@@ -50,7 +55,7 @@ func sendOTPViaWhatsApp(ctx context.Context, phone string, otp string) error {
 	}
 
 	// Call the generic SendAuthTemplate handler to bypass the 24h window
-	err = whatsapp.SendAuthTemplateContext(ctx, biz.WAPhoneNumberID, biz.WAAccessToken, cleanPhone, cfg.WhatsAppOTPTemplate, otp)
+	err = whatsapp.SendAuthTemplateContext(ctx, biz.WAPhoneNumberID, accessToken, cleanPhone, cfg.WhatsAppOTPTemplate, otp)
 	if err != nil {
 		log.Printf("Failed to send OTP template: %v", err)
 		return fmt.Errorf("failed to send WhatsApp message")

@@ -134,7 +134,10 @@ func generateAndSendReport(biz models.Business, monthKey string, refDate time.Ti
 
 	// Send via WhatsApp
 	if biz.WAPhoneNumberID != "" && biz.WAAccessToken != "" {
-		if err := whatsapp.SendText(biz.WAPhoneNumberID, biz.WAAccessToken, cleanPhone, reportText); err != nil {
+		accessToken, tokenErr := whatsappAccessTokenForBusiness(biz)
+		if tokenErr != nil {
+			log.Printf("failed to decrypt WhatsApp report token for business %d: %v", biz.ID, tokenErr)
+		} else if err := whatsapp.SendText(biz.WAPhoneNumberID, accessToken, cleanPhone, reportText); err != nil {
 			log.Printf("⚠️ Failed to send WhatsApp report to %s: %v", cleanPhone, err)
 		}
 	}

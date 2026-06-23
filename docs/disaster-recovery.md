@@ -376,10 +376,11 @@ Immediate actions:
 1. Preserve logs and current backups.
 2. Rotate `MASTER_API_KEY`.
 3. Rotate `JWT_SECRET` if session compromise is suspected.
-4. Rotate Meta, Gemini, Resend, Cloudinary, PayHere, Sentry, Discord, and S3 keys as needed.
-5. Rebuild and redeploy containers.
-6. Review admin users and tenant access.
-7. Review payment proof/order status changes.
+4. Rotate `PROVIDER_TOKEN_ENCRYPTION_KEYS` if the backend environment or database may be compromised.
+5. Rotate Meta, Gemini, Resend, Cloudinary, PayHere, Sentry, Discord, and S3 keys as needed.
+6. Rebuild and redeploy containers.
+7. Review admin users and tenant access.
+8. Review payment proof/order status changes.
 
 Commands:
 
@@ -394,6 +395,14 @@ After key rotation:
 ```bash
 sudo /bin/bash deploy/scripts/deploy-production.sh
 ```
+
+Provider-token key rotation procedure:
+
+1. Generate a new 32-byte key: `openssl rand -base64 32`.
+2. Prepend it to `PROVIDER_TOKEN_ENCRYPTION_KEYS`, for example `2026-06:NEW_KEY,2026-03:OLD_KEY`.
+3. Redeploy the backend; startup backfill encrypts legacy plaintext rows and new WhatsApp reconnects use the first key.
+4. To re-encrypt existing envelope rows with the new primary key, reconnect each tenant WhatsApp account or run a one-off maintenance script that decrypts and re-saves each token.
+5. Remove the old key only after confirming no stored `wa_access_token` envelope references the old key ID.
 
 If database tampering is confirmed, restore from a known-good backup and preserve
 the compromised database backup separately for investigation.

@@ -49,6 +49,11 @@ func RunAbandonedCartReminders() {
 		if business.WAPhoneNumberID == "" || business.WAAccessToken == "" {
 			continue
 		}
+		accessToken, err := whatsappAccessTokenForBusiness(business)
+		if err != nil {
+			log.Printf("failed to decrypt abandoned-cart WhatsApp token for business %d: %v", business.ID, err)
+			continue
+		}
 
 		// Build a context-aware nudge based on cart state
 		msg := buildCartReminderMsg(&business, &cart)
@@ -57,7 +62,7 @@ func RunAbandonedCartReminders() {
 		}
 
 		// Send the reminder
-		whatsapp.SendText(business.WAPhoneNumberID, business.WAAccessToken, cart.Phone, msg)
+		whatsapp.SendText(business.WAPhoneNumberID, accessToken, cart.Phone, msg)
 		log.Printf("📩 [AbandonedCart] Sent reminder to %s (cart %d, state=%s)", cart.Phone, cart.ID, cart.State)
 
 		// Mark reminder sent + abandon the cart

@@ -25,11 +25,6 @@ func AuthRequired() gin.HandlerFunc {
 			}
 		}
 
-		// Fallback to URL query for EventSource (SSE) which cannot send custom headers
-		if tokenStr == "" {
-			tokenStr = c.Query("token")
-		}
-
 		if tokenStr == "" {
 			log.Printf("[AuthRequired] 401: Token is completely empty")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization token required"})

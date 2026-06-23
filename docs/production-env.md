@@ -182,6 +182,7 @@ VPN are in place.
 | --- | --- | --- | --- |
 | `JWT_SECRET` | Backend | Yes | Generate with `openssl rand -hex 32`. |
 | `MASTER_API_KEY` | Backend | Yes | Generate with `openssl rand -hex 24`. |
+| `PROVIDER_TOKEN_ENCRYPTION_KEYS` | Backend | Yes | Encrypts tenant Meta/WhatsApp access tokens at rest. Format: `primary:$(openssl rand -base64 32)`. Keep old key IDs during rotation until all rows have been re-encrypted. |
 | `SUPER_ADMIN_EMAIL` | Backend startup | Optional | If no super admin exists, creates an owner account when this and `SUPER_ADMIN_INITIAL_PASSWORD` are set. |
 | `SUPER_ADMIN_INITIAL_PASSWORD` | Backend startup | Optional | Use only for first boot; remove after login/password rotation. |
 
@@ -195,8 +196,9 @@ VPN are in place.
 | `WHATSAPP_OTP_TEMPLATE` | Backend | Optional | Defaults to `salespilot_otp`. |
 
 WhatsApp phone IDs and access tokens are connected per tenant and stored in
-PostgreSQL. Global `WA_PHONE_NUMBER_ID` and `WA_ACCESS_TOKEN` env variables are
-not read by the backend.
+PostgreSQL. Access tokens are envelope-encrypted with
+`PROVIDER_TOKEN_ENCRYPTION_KEYS`. Global `WA_PHONE_NUMBER_ID` and
+`WA_ACCESS_TOKEN` env variables are not read by the backend.
 
 Meta webhook URL:
 

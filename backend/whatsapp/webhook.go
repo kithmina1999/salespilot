@@ -255,7 +255,12 @@ func processWebhookPayload(ctx context.Context, payload MetaWebhookPayload) {
 						bizCopy := business
 						msgCopy := msg
 						waitMsg := localizedWaitMessage(&bizCopy)
-						SendText(bizCopy.WAPhoneNumberID, bizCopy.WAAccessToken, normalizedFrom, waitMsg)
+						accessToken, tokenErr := whatsappAccessTokenForBusiness(&bizCopy)
+						if tokenErr != nil {
+							log.Printf("[Webhook] Failed to decrypt image processing wait-message token: %v", tokenErr)
+						} else if err := SendText(bizCopy.WAPhoneNumberID, accessToken, normalizedFrom, waitMsg); err != nil {
+							log.Printf("[Webhook] Failed to send image processing wait message: %v", err)
+						}
 						imageCtx, imageCancel := context.WithTimeout(context.WithoutCancel(ctx), 90*time.Second)
 						if ok := utils.EnqueueWebhook(func() {
 							defer imageCancel()
