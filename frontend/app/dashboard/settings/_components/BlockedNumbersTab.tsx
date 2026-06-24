@@ -23,18 +23,17 @@ export default function BlockedNumbersTab() {
   useEffect(() => { fetchList(); }, []);
 
   async function fetchList() {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${API_URL}/api/v1/settings/blacklist`, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(`${API_URL}/api/v1/settings/blacklist`, { credentials: 'include' });
     if (res.ok) { const d = await res.json(); setBlacklist(d.blacklist || []); }
   }
 
   async function handleBlock(e: React.FormEvent) {
     e.preventDefault();
     if (!phone) return;
-    const token = localStorage.getItem('token');
     const res = await fetch(`${API_URL}/api/v1/settings/blacklist`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ phone, reason }),
     });
     if (res.ok) {
@@ -46,9 +45,9 @@ export default function BlockedNumbersTab() {
 
   async function handleUnblock(id: number) {
     if (!confirm('Unblock this number?')) return;
-    const token = localStorage.getItem('token');
     const res = await fetch(`${API_URL}/api/v1/settings/blacklist/${id}`, {
-      method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+      method: 'DELETE',
+      credentials: 'include',
     });
     if (res.ok) { toast.success('Number unblocked.'); fetchList(); }
     else toast.error('Failed to unblock.');

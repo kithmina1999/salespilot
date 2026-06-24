@@ -103,8 +103,9 @@ func Login(c *gin.Context) {
 	var biz models.Business
 	database.DB.Where("id = ?", user.BusinessID).First(&biz)
 
+	setTenantAuthCookie(c, token, expiresAt)
+
 	c.JSON(http.StatusOK, gin.H{
-		"token": token,
 		"user": gin.H{
 			"id":          user.ID,
 			"email":       user.Email,

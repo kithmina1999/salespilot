@@ -3,9 +3,8 @@ import useSWR from 'swr';
 import { Send, Loader2, RefreshCw, Bot, Sparkles, X } from 'lucide-react';
 
 const fetcher = (url: string) => {
-  const token = localStorage.getItem('token');
   return fetch(url, {
-    headers: { Authorization: `Bearer ${token}` }
+    credentials: 'include',
   }).then(res => res.json());
 };
 
@@ -38,10 +37,10 @@ export function SandboxSimulator({ onClose }: { onClose?: () => void }) {
     // Optimistic UI update could go here
     
     try {
-      const token = localStorage.getItem('token');
       await fetch('/api/v1/business/simulate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ message: text })
       });
       mutate(); // Trigger a refetch immediately
@@ -54,10 +53,9 @@ export function SandboxSimulator({ onClose }: { onClose?: () => void }) {
 
   const clearChat = async () => {
     try {
-      const token = localStorage.getItem('token');
       await fetch('/api/v1/business/simulate', {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+        credentials: 'include',
       });
       mutate();
     } catch (err) {

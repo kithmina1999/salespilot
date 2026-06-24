@@ -38,7 +38,7 @@ func ListOrderProofs(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"proofs": proofs,
+		"proofs": orderPaymentProofResponses(proofs),
 		"count":  len(proofs),
 	})
 }
@@ -63,9 +63,29 @@ func GetOrderProofs(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"proofs": proofs,
+		"proofs": orderPaymentProofResponses(proofs),
 		"count":  len(proofs),
 	})
+}
+
+// ServeOrderProofReceipt streams a customer payment proof receipt for the owning tenant.
+// GET /api/v1/order-proofs/:id/receipt
+func ServeOrderProofReceipt(c *gin.Context) {
+	businessID := c.GetUint("business_id")
+	proofID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid proof ID"})
+		return
+	}
+
+	var proof models.OrderPaymentProof
+	if err := database.DB.Where("id = ? AND business_id = ?", proofID, businessID).
+		First(&proof).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Payment proof not found"})
+		return
+	}
+
+	servePaymentReceipt(c, proof.ScreenshotURL, fmt.Sprintf("order-proof-%d", proof.ID))
 }
 
 // ApproveOrderProof approves a customer's payment proof:

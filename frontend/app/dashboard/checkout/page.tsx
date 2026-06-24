@@ -98,7 +98,6 @@ function CheckoutContent() {
     if (!bankConfigured) { toast.error('Bank transfer details are not configured yet'); return; }
     
     setUploading(true);
-    const token = localStorage.getItem('token');
     try {
       const form = new FormData();
       form.append('image', file);
@@ -117,7 +116,7 @@ function CheckoutContent() {
       
       const res = await fetch(`${API_URL}/api/v1/billing/submit-proof`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
         body: form,
       });
       const data = await res.json() as SubmitProofResponse;

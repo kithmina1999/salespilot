@@ -75,15 +75,12 @@ export default function SettingsPage() {
       setActiveTab(tab);
     }
 
-    const token = localStorage.getItem('token');
-    const headers = { Authorization: `Bearer ${token}` };
-
-    fetch(`${API_URL}/api/v1/settings/business`, { headers })
+    fetch(`${API_URL}/api/v1/settings/business`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setSettings(d); })
       .catch(() => {});
 
-    fetch(`${API_URL}/api/v1/billing/status`, { headers })
+    fetch(`${API_URL}/api/v1/billing/status`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setBilling(d); })
       .catch(() => {});

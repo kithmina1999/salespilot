@@ -2,7 +2,7 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import { Loader2, Eye, CheckCircle2, XCircle, BanknoteIcon, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Order, OrderPaymentProof } from './types';
-import { API, fetcher, headers } from './constants';
+import { API, apiAssetURL, fetcher, headers } from './constants';
 
 export function ProofReviewSection({ order, onActionComplete }: { order: Order; onActionComplete: () => void }) {
   const { data, isLoading, mutate } = useSWR<{ proofs: OrderPaymentProof[] }>(
@@ -33,7 +33,7 @@ export function ProofReviewSection({ order, onActionComplete }: { order: Order; 
 
   const handleApprove = async () => {
     setActing('approve');
-    await fetch(`${API}/order-proofs/${pendingProof!.id}/approve`, { method: 'POST', headers: headers() });
+    await fetch(`${API}/order-proofs/${pendingProof!.id}/approve`, { method: 'POST', headers: headers(), credentials: 'include' });
     await mutate();
     onActionComplete();
     setActing(null);
@@ -42,7 +42,7 @@ export function ProofReviewSection({ order, onActionComplete }: { order: Order; 
   const handleReject = async () => {
     setActing('reject');
     await fetch(`${API}/order-proofs/${pendingProof!.id}/reject`, {
-      method: 'POST', headers: headers(),
+      method: 'POST', headers: headers(), credentials: 'include',
       body: JSON.stringify({ note: rejectNote }),
     });
     await mutate();
@@ -89,7 +89,7 @@ export function ProofReviewSection({ order, onActionComplete }: { order: Order; 
 
           {/* Screenshot if available */}
           {proof.screenshot_url && (
-            <a href={proof.screenshot_url} target="_blank" rel="noopener noreferrer"
+            <a href={apiAssetURL(proof.screenshot_url)} target="_blank" rel="noopener noreferrer"
                className="flex items-center gap-2 text-xs text-blue-400 hover:text-blue-300 transition-colors">
               <Eye size={12} /> View Screenshot
             </a>

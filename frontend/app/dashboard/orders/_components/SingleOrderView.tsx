@@ -64,6 +64,7 @@ export function SingleOrderView({
       await fetch(`${API}/orders/${order.id}/late-alert`, {
         method: "PATCH",
         headers: headers(),
+        credentials: "include",
         body: JSON.stringify({ enabled: next }),
       });
     } catch {

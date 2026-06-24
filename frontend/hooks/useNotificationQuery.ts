@@ -13,11 +13,8 @@ export interface NotificationSummary {
 }
 
 const fetcher = async (url: string) => {
-  const token = localStorage.getItem('token');
-  if (!token) throw new Error('No token');
-  
   const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` }
+    credentials: 'include',
   });
   if (!res.ok) throw new Error('Failed to fetch');
   return res.json();

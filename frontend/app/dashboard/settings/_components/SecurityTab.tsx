@@ -160,9 +160,9 @@ export default function SecurityTab() {
 
   async function requestOTP() {
     setStep('sending');
-    const token = localStorage.getItem('token');
     const res = await fetch(`${API_URL}/api/v1/settings/change-password/request`, {
-      method: 'POST', headers: { Authorization: `Bearer ${token}` },
+      method: 'POST',
+      credentials: 'include',
     });
     const data = await res.json();
     if (res.ok) { setMaskedEmail(data.masked_email || ''); setStep('otp'); }
@@ -172,10 +172,10 @@ export default function SecurityTab() {
   async function verifyOTP() {
     if (otp.length < 6) return;
     setStep('verifying'); setOtpError('');
-    const token = localStorage.getItem('token');
     const res = await fetch(`${API_URL}/api/v1/settings/change-password/verify`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ otp }),
     });
     const data = await res.json();
@@ -186,10 +186,10 @@ export default function SecurityTab() {
   async function savePassword() {
     if (!newPass || newPass !== confirmPass) return;
     setStep('saving');
-    const token = localStorage.getItem('token');
     const res = await fetch(`${API_URL}/api/v1/settings/change-password/reset`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ change_token: changeToken, new_password: newPass }),
     });
     const data = await res.json();

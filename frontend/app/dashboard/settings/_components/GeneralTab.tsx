@@ -18,11 +18,11 @@ export default function GeneralTab({ settings, setSettings, billing }: Props) {
 
   async function save() {
     setSaving(true);
-    const token = localStorage.getItem('token');
     try {
       const res = await fetch(`${API_URL}/api/v1/settings/business`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(settings),
       });
       if (res.ok) toast.success('Settings saved successfully!');

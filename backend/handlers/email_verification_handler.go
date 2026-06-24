@@ -54,11 +54,12 @@ func VerifyEmailOTP(c *gin.Context) {
 	// Create a session record so the token is revocable via session management
 	ua := utils.ParseUserAgent(c.GetHeader("User-Agent"))
 	sessionID := uuid.New().String()
+	expiresAt := time.Now().Add(24 * time.Hour * 7)
 	session := models.UserSession{
 		UserID:       user.ID,
 		BusinessID:   user.BusinessID,
 		SessionToken: sessionID,
-		ExpiresAt:    time.Now().Add(24 * time.Hour * 7),
+		ExpiresAt:    expiresAt,
 		IPAddress:    c.ClientIP(),
 		UserAgent:    c.GetHeader("User-Agent"),
 		DeviceType:   ua.DeviceType,
@@ -79,9 +80,10 @@ func VerifyEmailOTP(c *gin.Context) {
 	var biz models.Business
 	database.DB.Where("id = ?", user.BusinessID).First(&biz)
 
+	setTenantAuthCookie(c, token, expiresAt)
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Email verified successfully!",
-		"token":   token,
 		"user": gin.H{
 			"id":          user.ID,
 			"email":       user.Email,

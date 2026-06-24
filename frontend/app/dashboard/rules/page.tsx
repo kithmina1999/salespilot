@@ -134,11 +134,11 @@ function RulesContent() {
 
   const handleBulkApprove = async (updatedRules: Rule[]) => {
     try {
-      const token = localStorage.getItem('token');
       for (const rule of updatedRules) {
         const res = await fetch(`/api/v1/rules/${rule.ID}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({
             responses: JSON.parse(rule.responses || '{}'),
           }),
@@ -155,7 +155,6 @@ function RulesContent() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const token = localStorage.getItem('token');
     const isPost = modalMode === 'create' || modalMode === 'clone_common';
     const url = isPost ? `${API_URL}/api/v1/rules` : `${API_URL}/api/v1/rules/${editTargetId}`;
     const method = isPost ? 'POST' : 'PUT';
@@ -163,7 +162,8 @@ function RulesContent() {
     try {
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           category: form.category,
           keywords: form.keywords,
@@ -191,11 +191,11 @@ function RulesContent() {
     e.preventDefault();
     if (!generateIntent) return;
     setGenerating(true);
-    const token = localStorage.getItem('token');
     try {
       const res = await fetch(`${API_URL}/api/v1/rules/generate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ intent: generateIntent }),
       });
       const data = await res.json();
@@ -232,11 +232,11 @@ function RulesContent() {
       return;
     }
     setDrafting(true);
-    const token = localStorage.getItem('token');
     try {
       const res = await fetch(`${API_URL}/api/v1/faqs/draft`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ message: messageToSend, from_inbox: isInboxMode }),
       });
       if (res.ok) {

@@ -47,6 +47,7 @@ func main() {
 		log.Fatalf("failed to initialize pipeline state store: %v", err)
 	}
 	whatsapp.SetStateStore(appStore)
+	middleware.SetRateLimitStore(appStore)
 
 	// 10 concurrent workers
 	utils.InitWorkerPool(10)
@@ -69,7 +70,7 @@ func main() {
 
 	// Create uploads directory
 	os.MkdirAll("uploads/products", 0755)
-	os.MkdirAll("uploads/receipts", 0755)
+	os.MkdirAll("private_uploads/receipts", 0700)
 
 	// Setup Gin
 	r := gin.New()
@@ -94,8 +95,8 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	// Serve uploaded images as static files
-	r.Static("/uploads", "./uploads")
+	// Product images are public; receipts are served through authenticated handlers.
+	r.Static("/uploads/products", "./uploads/products")
 
 	// Health check with DB ping (no auth)
 	r.GET("/health", func(c *gin.Context) {
@@ -155,6 +156,7 @@ func main() {
 
 		// Payment proof verification queue
 		system.GET("/payments", middleware.RequireSuperPermission(middleware.PermBillingView), handlers.ListPaymentProofs)
+		system.GET("/payments/:id/receipt", middleware.RequireSuperPermission(middleware.PermBillingView), handlers.ServeSystemPaymentProofReceipt)
 		system.POST("/payments/:id/approve", middleware.RequireSuperPermission(middleware.PermBillingManage), middleware.HighRiskRoute("approve_payment"), handlers.ApprovePayment)
 		system.POST("/payments/:id/reject", middleware.RequireSuperPermission(middleware.PermBillingManage), middleware.HighRiskRoute("reject_payment"), handlers.RejectPayment)
 
@@ -187,14 +189,16 @@ func main() {
 	// Dashboard Authentication
 	auth := r.Group("/api/v1/auth")
 	{
-		auth.POST("/login", middleware.RateLimit(20), handlers.Login)
-		auth.POST("/register", middleware.RateLimit(20), handlers.Register)
-		auth.POST("/verify-email", middleware.RateLimit(30), handlers.VerifyEmailOTP)
-		auth.POST("/resend-verification", middleware.RateLimit(10), handlers.ResendEmailOTP)
+		auth.POST("/login", middleware.RateLimitAuth(20, "identifier"), handlers.Login)
+		auth.POST("/logout", handlers.Logout)
+		auth.GET("/session", middleware.AuthRequired(), handlers.AuthSession)
+		auth.POST("/register", middleware.RateLimitAuth(20, "email", "phone"), handlers.Register)
+		auth.POST("/verify-email", middleware.RateLimitAuth(30, "email"), handlers.VerifyEmailOTP)
+		auth.POST("/resend-verification", middleware.RateLimitAuth(10, "email"), handlers.ResendEmailOTP)
 		// Password reset via WhatsApp OTP — 3-step flow
-		auth.POST("/forgot-password", middleware.RateLimit(10), handlers.ForgotPassword) // Step 1: send OTP
-		auth.POST("/verify-otp", middleware.RateLimit(30), handlers.VerifyOTP)           // Step 2: verify OTP → get reset token
-		auth.POST("/reset-password", middleware.RateLimit(20), handlers.ResetPassword)   // Step 3: set new password
+		auth.POST("/forgot-password", middleware.RateLimitAuth(10, "phone"), handlers.ForgotPassword)     // Step 1: send OTP
+		auth.POST("/verify-otp", middleware.RateLimitAuth(30, "phone"), handlers.VerifyOTP)               // Step 2: verify OTP → get reset token
+		auth.POST("/reset-password", middleware.RateLimitAuth(20, "reset_token"), handlers.ResetPassword) // Step 3: set new password
 	}
 
 	// Dashboard Secured API (JWT)
@@ -251,6 +255,7 @@ func main() {
 		// Slice 4: Payment proof review
 		dash.GET("/orders/:id/proofs", handlers.GetOrderProofs)
 		dash.GET("/order-proofs", handlers.ListOrderProofs)
+		dash.GET("/order-proofs/:id/receipt", handlers.ServeOrderProofReceipt)
 		dash.POST("/order-proofs/:id/approve", middleware.RequireBusinessActive(), handlers.ApproveOrderProof)
 		dash.POST("/order-proofs/:id/reject", middleware.RequireBusinessActive(), handlers.RejectOrderProof)
 
@@ -344,7 +349,7 @@ func main() {
 	// Start Background Cron Jobs (e.g., 7-day order follow-ups)
 	services.StartCronJobs()
 
-	log.Printf("📁 Uploads served at %s/uploads/", cfg.ServerURL)
+	log.Printf("📁 Product uploads served at %s/uploads/products/", cfg.ServerURL)
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,

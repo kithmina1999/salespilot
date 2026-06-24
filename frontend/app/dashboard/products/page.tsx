@@ -119,7 +119,6 @@ export default function ProductsPage() {
       return;
     }
 
-    const token = localStorage.getItem('token');
     // Store product ID to chain upload if needed
     let createdProductId: number | null = null;
     const isEdit = modalMode === 'edit';
@@ -136,10 +135,10 @@ export default function ProductsPage() {
     }
 
     try {
-      const token = localStorage.getItem('token');
       const res = await fetch(url, {
         method: !isEdit ? 'POST' : 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ ...form, aliases: aliasesToJSON(form.aliases), price, stock })
       });
       if (res.ok) {
@@ -166,10 +165,9 @@ export default function ProductsPage() {
     try {
       const formData = new FormData();
       formData.append('image', file);
-      const token = localStorage.getItem('token');
       const res = await fetch(`${API_URL}/api/v1/products/${productId}/image`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
         body: formData
       });
       if (res.ok) {

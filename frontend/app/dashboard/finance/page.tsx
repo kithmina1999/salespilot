@@ -24,7 +24,7 @@ interface TopProduct  { name: string; revenue: number; qty: number; }
 
 import { API_URL } from '@/hooks/_shared';
 const API  = `${API_URL}/api/v1`;
-const auth = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token') || ''}` });
+const auth = () => ({ credentials: 'include' as RequestCredentials });
 
 type Range = '7d' | '30d' | '90d';
 const RANGES: { key: Range; label: string }[] = [
@@ -135,9 +135,9 @@ export default function FinancePage() {
     const p = getParams(range);
     try {
       const [sRes, cRes, pRes] = await Promise.all([
-        fetch(`${API}/finance/stats${p}`,        { headers: auth() }),
-        fetch(`${API}/finance/chart${p}`,        { headers: auth() }),
-        fetch(`${API}/finance/top-products${p}`, { headers: auth() }),
+        fetch(`${API}/finance/stats${p}`,        auth()),
+        fetch(`${API}/finance/chart${p}`,        auth()),
+        fetch(`${API}/finance/top-products${p}`, auth()),
       ]);
       if (sRes.ok) setStats(await sRes.json());
       if (cRes.ok) { const d = await cRes.json(); setChart(d.chart || []); }

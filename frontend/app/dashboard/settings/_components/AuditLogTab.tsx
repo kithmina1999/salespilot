@@ -39,15 +39,13 @@ export default function AuditLogTab() {
 
   async function fetchLogs() {
     setLoading(true);
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${API_URL}/api/v1/settings/logs`, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(`${API_URL}/api/v1/settings/logs`, { credentials: 'include' });
     if (res.ok) setLogs(await res.json() || []);
     setLoading(false);
   }
 
   async function downloadLogs() {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${API_URL}/api/v1/settings/logs/download`, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(`${API_URL}/api/v1/settings/logs/download`, { credentials: 'include' });
     if (res.ok) {
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);

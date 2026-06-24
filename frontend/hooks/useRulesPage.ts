@@ -14,7 +14,7 @@
 
 import useSWR, { mutate } from 'swr';
 import { toast } from 'sonner';
-import { API_URL, getToken } from './_shared';
+import { API_URL } from './_shared';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -67,13 +67,10 @@ interface RulesPageData {
 // ── Composite fetcher (three endpoints in parallel) ───────────────────────────
 
 async function fetchRulesPageData(): Promise<RulesPageData> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? '' : '';
-  const headers = { Authorization: `Bearer ${token}` };
-
   const [rulesRes, statsRes, settingsRes] = await Promise.all([
-    fetch(`${API_URL}/api/v1/rules`,             { headers }),
-    fetch(`${API_URL}/api/v1/dashboard/stats`,   { headers }),
-    fetch(`${API_URL}/api/v1/settings/business`, { headers }),
+    fetch(`${API_URL}/api/v1/rules`,             { credentials: 'include' }),
+    fetch(`${API_URL}/api/v1/dashboard/stats`,   { credentials: 'include' }),
+    fetch(`${API_URL}/api/v1/settings/business`, { credentials: 'include' }),
   ]);
 
   const rulesData    = rulesRes.ok    ? await rulesRes.json()    : {};
@@ -147,7 +144,8 @@ export function useRulesPage() {
     try {
       const res = await fetch(`${API_URL}/api/v1/rules/${rule.ID}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ is_active: newStatus }),
       });
       if (!res.ok) throw new Error('Server error');
@@ -181,7 +179,7 @@ export function useRulesPage() {
 
     const res  = await fetch(`${API_URL}/api/v1/rules/${id}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${getToken()}` },
+      credentials: 'include',
     });
     const json = await res.json().catch(() => ({}));
 
@@ -199,7 +197,8 @@ export function useRulesPage() {
     try {
       const res = await fetch(`${API_URL}/api/v1/knowledge-gaps/${id}/resolve`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ resolved_action: action, resolved_rule_id: resolvedRuleId }),
       });
       if (!res.ok) throw new Error('Failed to resolve gap');
@@ -216,7 +215,7 @@ export function useRulesPage() {
     try {
       const res = await fetch(`${API_URL}/api/v1/knowledge-gaps/${id}/mark-not-needed`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${getToken()}` },
+        credentials: 'include',
       });
       if (!res.ok) throw new Error('Failed to mark gap not needed');
       toast.success('Knowledge gap marked as not needed');

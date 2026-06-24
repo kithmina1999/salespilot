@@ -7,7 +7,10 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -24,7 +27,11 @@ import (
 	"github.com/kithmina1999/salespilot/services"
 )
 
-const maxPaymentProofBytes = 5 * 1024 * 1024
+const (
+	maxPaymentProofBytes         = 5 * 1024 * 1024
+	privateReceiptUploadDir      = "private_uploads/receipts"
+	legacyPublicReceiptUploadDir = "uploads/receipts"
+)
 
 func safeImageExtension(contentType string) string {
 	contentType = strings.ToLower(contentType)
@@ -38,6 +45,165 @@ func safeImageExtension(contentType string) string {
 	default:
 		return ".jpg"
 	}
+}
+
+func systemPaymentReceiptURL(id uint) string {
+	return fmt.Sprintf("/system/payments/%d/receipt", id)
+}
+
+func orderPaymentReceiptURL(id uint) string {
+	return fmt.Sprintf("/api/v1/order-proofs/%d/receipt", id)
+}
+
+func paymentProofResponse(proof models.PaymentProof) models.PaymentProof {
+	if strings.TrimSpace(proof.ScreenshotURL) != "" {
+		proof.ScreenshotURL = systemPaymentReceiptURL(proof.ID)
+	}
+	return proof
+}
+
+func orderPaymentProofResponse(proof models.OrderPaymentProof) models.OrderPaymentProof {
+	if strings.TrimSpace(proof.ScreenshotURL) != "" {
+		proof.ScreenshotURL = orderPaymentReceiptURL(proof.ID)
+	}
+	return proof
+}
+
+func orderPaymentProofResponses(proofs []models.OrderPaymentProof) []models.OrderPaymentProof {
+	responses := make([]models.OrderPaymentProof, len(proofs))
+	for i, proof := range proofs {
+		responses[i] = orderPaymentProofResponse(proof)
+	}
+	return responses
+}
+
+func localReceiptFilesystemPath(raw string) (string, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || isRemoteReceiptURL(raw) {
+		return "", false
+	}
+
+	cleanSlashPath := path.Clean(strings.TrimPrefix(strings.ReplaceAll(raw, "\\", "/"), "/"))
+	allowedDirs := []string{privateReceiptUploadDir, legacyPublicReceiptUploadDir}
+	for _, allowedDir := range allowedDirs {
+		allowedSlashDir := strings.TrimSuffix(filepath.ToSlash(allowedDir), "/")
+		if cleanSlashPath != allowedSlashDir && !strings.HasPrefix(cleanSlashPath, allowedSlashDir+"/") {
+			continue
+		}
+
+		fsPath := filepath.FromSlash(cleanSlashPath)
+		absPath, err := filepath.Abs(fsPath)
+		if err != nil {
+			return "", false
+		}
+		absAllowedDir, err := filepath.Abs(filepath.FromSlash(allowedSlashDir))
+		if err != nil {
+			return "", false
+		}
+		rel, err := filepath.Rel(absAllowedDir, absPath)
+		if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+			return "", false
+		}
+		return absPath, true
+	}
+
+	return "", false
+}
+
+func isRemoteReceiptURL(raw string) bool {
+	lower := strings.ToLower(strings.TrimSpace(raw))
+	return strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "http://")
+}
+
+func isAllowedRemoteReceiptURL(raw string) bool {
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme != "https" {
+		return false
+	}
+	host := strings.ToLower(parsed.Hostname())
+	return host == "res.cloudinary.com" || strings.HasSuffix(host, ".cloudinary.com")
+}
+
+func servePaymentReceipt(c *gin.Context, rawURL, filenamePrefix string) {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Receipt not found"})
+		return
+	}
+
+	c.Header("Cache-Control", "private, no-store")
+	c.Header("X-Content-Type-Options", "nosniff")
+
+	if isRemoteReceiptURL(rawURL) {
+		if !isAllowedRemoteReceiptURL(rawURL) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Receipt URL is not allowed"})
+			return
+		}
+		proxyRemoteReceipt(c, rawURL)
+		return
+	}
+
+	localPath, ok := localReceiptFilesystemPath(rawURL)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Receipt not found"})
+		return
+	}
+	info, err := os.Stat(localPath)
+	if err != nil || info.IsDir() {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Receipt not found"})
+		return
+	}
+
+	ext := filepath.Ext(localPath)
+	if ext == "" {
+		ext = ".jpg"
+	}
+	c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="%s%s"`, filenamePrefix, ext))
+	c.File(localPath)
+}
+
+func proxyRemoteReceipt(c *gin.Context, rawURL string) {
+	req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, rawURL, nil)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to prepare receipt request"})
+		return
+	}
+
+	resp, err := httpclient.DoContext(c.Request.Context(), httpclient.DependencyCloudinary, "fetch_receipt", req, httpclient.RetryTransient)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to fetch receipt"})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to fetch receipt"})
+		return
+	}
+	if resp.ContentLength > maxPaymentProofBytes {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "Receipt is too large"})
+		return
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxPaymentProofBytes+1))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to read receipt"})
+		return
+	}
+	if len(body) > maxPaymentProofBytes {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "Receipt is too large"})
+		return
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+	if !strings.HasPrefix(strings.ToLower(contentType), "image/") {
+		contentType = http.DetectContentType(body)
+	}
+	if !strings.HasPrefix(strings.ToLower(contentType), "image/") {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "Receipt is not an image"})
+		return
+	}
+	c.Data(http.StatusOK, contentType, body)
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -222,16 +388,17 @@ func SubmitPaymentProof(c *gin.Context) {
 		return
 	}
 
-	// Save locally first
-	uploadDir := "uploads/receipts"
+	// Save receipt images outside the public static tree.
+	uploadDir := privateReceiptUploadDir
 	if err := os.MkdirAll(uploadDir, 0700); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload directory"})
 		return
 	}
 
 	filename := fmt.Sprintf("proof_%d_%d%s", businessID, time.Now().UnixNano(), safeImageExtension(contentType))
-	localPath := fmt.Sprintf("%s/%s", uploadDir, filename)
-	dst, err := os.OpenFile(localPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	localPath := filepath.ToSlash(filepath.Join(uploadDir, filename))
+	localFSPath := filepath.FromSlash(localPath)
+	dst, err := os.OpenFile(localFSPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file locally"})
 		return
@@ -239,18 +406,18 @@ func SubmitPaymentProof(c *gin.Context) {
 	written, copyErr := io.Copy(dst, io.LimitReader(src, maxPaymentProofBytes+1))
 	closeErr := dst.Close()
 	if copyErr != nil || closeErr != nil {
-		_ = os.Remove(localPath)
+		_ = os.Remove(localFSPath)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file locally"})
 		return
 	}
 	if written > maxPaymentProofBytes {
-		_ = os.Remove(localPath)
+		_ = os.Remove(localFSPath)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Image must be under 5MB"})
 		return
 	}
 
 	// Read bytes for AI
-	imageBytes, err := os.ReadFile(localPath)
+	imageBytes, err := os.ReadFile(localFSPath)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read saved file"})
 		return
@@ -296,7 +463,7 @@ func SubmitPaymentProof(c *gin.Context) {
 		OneTimeTotal:        oneTimeTotal,
 		MonthlyAddonTotal:   monthlyAddonTotal,
 		TotalAmount:         totalAmount,
-		ScreenshotURL:       "/" + localPath, // Serve statically
+		ScreenshotURL:       localPath,
 		Status:              status,
 		LineItems:           lineItems,
 		DeclaredAmount:      declaredAmount,
@@ -387,17 +554,39 @@ func ListPaymentProofs(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch payment proofs"})
 		return
 	}
+	responses := make([]models.PaymentProof, len(proofs))
+	for i, proof := range proofs {
+		responses[i] = paymentProofResponse(proof)
+	}
 
 	var pendingCount, approvedCount int64
 	database.DB.Model(&models.PaymentProof{}).Where("status = ?", models.PaymentStatusPending).Count(&pendingCount)
 	database.DB.Model(&models.PaymentProof{}).Where("status = ?", models.PaymentStatusApproved).Count(&approvedCount)
 
 	c.JSON(http.StatusOK, gin.H{
-		"proofs":         proofs,
+		"proofs":         responses,
 		"total":          len(proofs),
 		"pending_count":  pendingCount,
 		"approved_count": approvedCount,
 	})
+}
+
+// GET /system/payments/:id/receipt  (Master Admin)
+// Streams a payment proof receipt after super-admin authorization.
+func ServeSystemPaymentProofReceipt(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid proof ID"})
+		return
+	}
+
+	var proof models.PaymentProof
+	if err := database.DB.First(&proof, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Payment proof not found"})
+		return
+	}
+
+	servePaymentReceipt(c, proof.ScreenshotURL, fmt.Sprintf("payment-proof-%d", proof.ID))
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -498,10 +687,9 @@ func ApprovePayment(c *gin.Context) {
 	}
 
 	newScreenshotURL := proof.ScreenshotURL
-	if strings.HasPrefix(proof.ScreenshotURL, "/uploads/") && cloudinaryURL != "" {
+	if localPath, ok := localReceiptFilesystemPath(proof.ScreenshotURL); ok && cloudinaryURL != "" {
 		cld, err := cloudinary.NewFromURL(cloudinaryURL)
 		if err == nil {
-			localPath := strings.TrimPrefix(proof.ScreenshotURL, "/")
 			ctx, cancel := context.WithTimeout(context.Background(), httpclient.ExternalAPITimeout)
 			defer cancel()
 			resp, err := cld.Upload.Upload(ctx, localPath, uploader.UploadParams{
@@ -590,8 +778,7 @@ func RejectPayment(c *gin.Context) {
 	}
 
 	// Optionally delete local file
-	if strings.HasPrefix(proof.ScreenshotURL, "/uploads/") {
-		localPath := strings.TrimPrefix(proof.ScreenshotURL, "/")
+	if localPath, ok := localReceiptFilesystemPath(proof.ScreenshotURL); ok {
 		os.Remove(localPath)
 	}
 

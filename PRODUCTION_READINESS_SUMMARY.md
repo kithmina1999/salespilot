@@ -157,7 +157,8 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 | ✅ | Upload validation | Magic-byte image checks, server-generated names, file permissions, size enforcement | A02 Security Misconfiguration |
 | ✅ | HTTP server hardening | Read/write/idle timeouts, header-size limits | A10 Exceptional Conditions |
 | ✅ | JWT algorithm | Enforce HS256 only | A07 Authentication Failures |
-| ✅ | Brute-force rate limiting | IP-based limits on auth routes | A07 Authentication Failures |
+| Fixed | Tenant JWT storage | Backend-set HttpOnly cookie; frontend no longer stores JWT in localStorage | A07 Authentication Failures |
+| Fixed | Brute-force rate limiting | Redis-backed IP and identifier limits on auth routes, plus Nginx edge limits | A07 Authentication Failures + API4 Resource Consumption |
 | ✅ | Payment webhook signature | Constant-time comparison | A04 Cryptographic Failures |
 
 ### 4.2 Open Security Findings
@@ -165,10 +166,10 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 | ID | Severity | Status | OWASP | Issue | Required Fix | Target |
 |----|----|--------|-------|-------|------------|--------|
 | **SA-001** | ✅ High | Fixed | A04 + A03 | Tenant Meta/WhatsApp tokens stored plaintext | Envelope encryption at application layer with startup backfill | Complete |
-| **SA-002** | 🔴 High | Open | A07 | Tenant JWT in localStorage + client-set cookie | Move to HttpOnly backend-set cookie or OAuth flow | Before production |
+| **SA-002** | High | Fixed | A07 | Tenant JWT in localStorage + client-set cookie | Backend-set HttpOnly cookie with session hydration endpoint; frontend credentialed requests | Complete |
 | **SA-003** | ✅ Medium | Fixed | A07 + A02 | Credentials accepted in query strings | Removed `?token=`, `?api_key=`, `?master_key=` fallbacks; header-only auth regression tests added | Complete |
-| **SA-004** | 🟠 Medium | Partial | A02 + A03 | Payment receipt uploads locally readable | Private storage or signed S3 URLs | Before production |
-| **SA-005** | 🟠 Medium | Partial | A07 + API4 | In-memory rate limiting only | Add Redis-backed and Nginx `limit_req` | Before production |
+| **SA-004** | Medium | Fixed | A02 + A03 | Payment receipt uploads locally readable | Private receipt storage plus authenticated receipt endpoints for super-admin and tenant order proofs | Complete |
+| **SA-005** | Medium | Fixed | A07 + API4 | In-memory rate limiting only | Redis-backed shared limiter with per-IP/per-identifier auth keys and Nginx `limit_req` zones | Complete |
 | **SA-006** | 🟠 Medium | Open | A02 | CSP not enforced (report-only) | Add CSP, tune for Sentry/Cloudinary, enforce | Before production |
 | **SA-007** | 🟠 Medium | Open | A03 | No dependency vulnerability scanning | Add `npm audit` and `govulncheck` to CI | Before staging |
 | **SA-008** | 🟡 Low | Open | A02 | Container security options not set | Add `no-new-privileges`, `cap_drop`, resource limits, read-only FS | After launch acceptable |
@@ -180,7 +181,7 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 |------|--------|-------|
 | **In-Transit (TLS)** | ✅ | Nginx + Let's Encrypt; HSTS enabled |
 | **Backup Encryption** | ✅ | AES-256-GCM via GPG |
-| **At-Rest (App Layer)** | ❌ | Tenant tokens not encrypted; database encryption not enabled |
+| **At-Rest (App Layer)** | Fixed | Tenant provider tokens are envelope-encrypted; database encryption remains infrastructure-dependent |
 | **JWT Secret** | ✅ | Length enforced; HS256 algorithm locked |
 | **Backup Passphrase** | ⚠️ | Stored on disk; no rotation policy |
 
@@ -188,7 +189,7 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 
 | Item | Status | Implementation | Notes |
 |------|--------|-----------------|-------|
-| **Tenant Auth** | ✅ | JWT + cookie, revocable sessions | Middleware injects tenant context |
+| **Tenant Auth** | Complete | Backend-set HttpOnly JWT cookie, revocable sessions | Middleware injects tenant context |
 | **Super-Admin Auth** | ✅ | Session hash, HTTP-only cookies | Separate login endpoint with brute-force protection |
 | **Multi-Tenant Isolation** | ✅ | DB scoping via `WHERE business_id = ?` | Tenant-scoped DB instance injected into context |
 | **API Key Auth** | ✅ | Long-lived for external integrations | Logged separately |
@@ -293,7 +294,7 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 | # | Category | Issue | Effort | Timeline |
 |---|----------|-------|--------|----------|
 | **1** | Security | SA-001: Encrypt tenant provider tokens at rest | Complete | Done |
-| **2** | Security | SA-002: Move tenant JWT out of localStorage to HttpOnly cookies | 8h (backend changes, frontend refactor) | 1 sprint |
+| **2** | Security | SA-002: Move tenant JWT out of localStorage to HttpOnly cookies | Complete | Done |
 | **3** | Compliance | Vendor due diligence: Data handling, retention, subprocessors not documented | 6h (policy writing) | Before sales |
 | **4** | Operations | Passphrase rotation procedure not documented; backup encryption key at risk | 2h (docs + script) | 1 week |
 | **5** | Testing | No staging environment runbook; "staging" not proven to work | 4h (runbook + manual test) | 1 week |
@@ -303,12 +304,10 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 | # | Category | Issue | Effort | Timeline |
 |---|----------|-------|--------|----------|
 | **6** | Security | SA-003: Remove query-string credential acceptance | Complete | Done |
-| **7** | Security | SA-004: Implement private receipt storage or signed S3 URLs | 6h | 1 sprint |
-| **8** | Security | SA-005: Replace in-memory rate limiter with Redis + Nginx `limit_req` | 8h | 1 sprint |
-| **9** | Security | SA-006: Add and enforce CSP headers after tuning | 4h | 1 sprint |
-| **10** | Monitoring | Define and deploy alert rules for error spikes, auth failures, webhook issues | 4h | 1 sprint |
-| **11** | Testing | Add CI pipeline for `npm audit` and `govulncheck` | 2h | 1 day |
-| **12** | Database | Formalize migration strategy; move away from AutoMigrate | 12h (refactor migrations) | 2 sprints |
+| **7** | Security | SA-006: Add and enforce CSP headers after tuning | 4h | 1 sprint |
+| **8** | Monitoring | Define and deploy alert rules for error spikes, auth failures, webhook issues | 4h | 1 sprint |
+| **9** | Testing | Add CI pipeline for `npm audit` and `govulncheck` | 2h | 1 day |
+| **10** | Database | Formalize migration strategy; move away from AutoMigrate | 12h (refactor migrations) | 2 sprints |
 
 ### 7.3 🟡 Medium-Priority Items (Polish Before Scale)
 
@@ -324,12 +323,14 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 ### 7.4 Deployment Readiness Checklist
 
 - [x] 🔴 **SA-001:** Tenant token encryption implemented and tested
-- [ ] 🔴 **SA-002:** JWT moved to HttpOnly cookies; XSS attack surface reduced
+- [x] **SA-002:** JWT moved to HttpOnly cookies; XSS attack surface reduced
 - [ ] 🔴 **Compliance:** Vendor due diligence doc completed and signed
 - [ ] 🔴 **Passphrase rotation:** Procedure written and tested
 - [ ] 🔴 **Staging proven:** Manual test run on staging VPS completed
 - [x] 🟠 **SA-003:** Query-string credential acceptance removed
-- [ ] 🟠 **SA-004 through SA-006:** Remaining security findings addressed
+- [x] **SA-004:** Payment receipts stored privately and served through authenticated endpoints
+- [x] **SA-005:** Rate limiting moved to Redis-backed app counters plus Nginx `limit_req`
+- [ ] 🟠 **SA-006:** CSP enforcement completed
 - [ ] 🟠 **Alert rules:** Deployed and tested with synthetics
 - [ ] 🟠 **Dependency scanning:** CI pipeline running and passing
 - [ ] 🟠 **Database migrations:** Formalized strategy in place
@@ -374,13 +375,13 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 
 ### Immediate (This Week)
 
-1. **Fix SA-002** – Browser-readable tenant JWTs are now the highest remaining customer-data risk.
+1. **Fix SA-006** - Tune CSP in report-only mode, then enforce before public launch.
 2. **Write passphrase rotation** – Backup integrity depends on this.
 3. **Deploy to staging** – Validate the full stack with real URLs and SSL.
 
 ### Short-Term (1–2 Sprints)
 
-1. Implement SA-004 through SA-006 security findings.
+1. Implement SA-006 and remaining hardening findings.
 2. Add alert rules and test with synthetics.
 3. Formalize database migration strategy.
 4. Add `npm audit` + `govulncheck` to CI.

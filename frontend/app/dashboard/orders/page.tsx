@@ -241,7 +241,7 @@ export default function OrdersPage() {
     addDateParams(params, dateRange);
 
     try {
-      const res = await fetch(`${API}/orders?${params.toString()}`, { headers: headers() });
+      const res = await fetch(`${API}/orders?${params.toString()}`, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         const nextOrders = data.orders || [];
@@ -285,6 +285,7 @@ export default function OrdersPage() {
         const res = await fetch(`${API}/orders/${order.id}/status`, {
           method: "PATCH",
           headers: headers(),
+          credentials: "include",
           body: JSON.stringify({ status: targetStatus }),
         });
         if (!res.ok) throw new Error("Failed to update order");
@@ -305,6 +306,7 @@ export default function OrdersPage() {
       const res = await fetch(`${API}/orders/${confirm.order.id}/status`, {
         method: "PATCH",
         headers: headers(),
+        credentials: "include",
         body: JSON.stringify({
           status: confirm.target,
           tracking_number: tracking,

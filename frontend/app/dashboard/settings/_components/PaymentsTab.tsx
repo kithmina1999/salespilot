@@ -22,9 +22,8 @@ export default function PaymentsTab() {
 
   // Load current payment settings from the business settings endpoint
   useEffect(() => {
-    const token = localStorage.getItem('token');
     fetch(`${API_URL}/api/v1/settings/business`, {
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
     })
       .then(r => r.ok ? r.json() : null)
       .then(d => {
@@ -53,11 +52,11 @@ export default function PaymentsTab() {
     }
 
     setSaving(true);
-    const token = localStorage.getItem('token');
     try {
       const res = await fetch(`${API_URL}/api/v1/settings/business`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(config),
       });
       if (res.ok) toast.success('Payment settings saved!');

@@ -320,14 +320,14 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
   const business = useAppStore((s) => s.business);
   const usage = useAppStore((s) => s.usage);
+  const clearSession = useAppStore((s) => s.clearSession);
   const isFreePlan = business?.plan === 'free';
   const isTrialActive = usage?.active_trial === true;
   const showUpgradeAd = isFreePlan && !isTrialActive;
 
-  function logout() {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    document.cookie = 'token=; path=/; max-age=0';
+  async function logout() {
+    await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+    clearSession();
     router.push('/login');
   }
 

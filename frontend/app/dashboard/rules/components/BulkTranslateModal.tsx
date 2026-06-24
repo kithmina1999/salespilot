@@ -41,10 +41,10 @@ export function BulkTranslateModal({ rules, targetLang, sourceLang, onClose, onA
       setLoadingIds(prev => new Set(prev).add(rule.ID));
       
       try {
-        const token = localStorage.getItem('token');
         const res = await fetch('/api/v1/rules/translate', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({
             text: sourceText,
             target_lang: LANG_META[targetLang]?.label || targetLang,

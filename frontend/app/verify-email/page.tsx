@@ -58,9 +58,7 @@ function VerifyEmailContent() {
       });
       
       // Verification successful — seed session into store (syncs cookie + localStorage)
-      localStorage.setItem('token', res.token);
       setSession(
-        res.token,
         { id: res.user.id, email: res.user.email, role: res.user.role, business_id: res.user.business_id },
         {
           id: res.business.id,

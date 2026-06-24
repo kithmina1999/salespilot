@@ -22,6 +22,7 @@ export function OrderModal({ order, onClose, onProofAction }: { order: Order; on
       await fetch(`${API}/orders/${order.id}/late-alert`, {
         method: 'PATCH',
         headers: headers(),
+        credentials: 'include',
         body: JSON.stringify({ enabled: next }),
       });
     } catch {

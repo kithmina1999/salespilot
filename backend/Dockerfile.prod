@@ -24,7 +24,7 @@ ENV GIN_MODE=release \
 
 COPY --from=builder /out/salespilot /usr/local/bin/salespilot
 
-RUN mkdir -p /app/uploads/products /app/uploads/receipts /app/data \
+RUN mkdir -p /app/uploads/products /app/private_uploads/receipts /app/data \
     && chown -R salespilot:salespilot /app
 
 USER salespilot

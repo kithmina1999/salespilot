@@ -11,7 +11,7 @@
 
 import useSWR, { mutate } from 'swr';
 import { toast } from 'sonner';
-import { API_URL, getToken, apiFetcher } from './_shared';
+import { API_URL, apiFetcher } from './_shared';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -59,7 +59,8 @@ export function useProducts() {
     try {
       const res = await fetch(`${API_URL}/api/v1/products/${product.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ active: newActive }),
       });
       if (!res.ok) throw new Error('Server error');
@@ -85,7 +86,7 @@ export function useProducts() {
     try {
       const res = await fetch(`${API_URL}/api/v1/products/${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${getToken()}` },
+        credentials: 'include',
       });
       if (!res.ok) throw new Error('Server error');
       toast.success('Product deleted');

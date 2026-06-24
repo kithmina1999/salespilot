@@ -1,8 +1,11 @@
 package middleware
 
 import (
+	"errors"
 	"log"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -16,18 +19,29 @@ import (
 func AuthRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenStr := ""
+		tokenSource := ""
 
-		authHeader := c.GetHeader("Authorization")
-		if authHeader != "" {
+		if cookieToken, err := c.Cookie("token"); err == nil && strings.TrimSpace(cookieToken) != "" {
+			tokenStr = strings.TrimSpace(cookieToken)
+			tokenSource = "cookie"
+		} else if authHeader := c.GetHeader("Authorization"); authHeader != "" {
 			parts := strings.Split(authHeader, " ")
 			if len(parts) == 2 && parts[0] == "Bearer" {
 				tokenStr = parts[1]
+				tokenSource = "authorization_header"
 			}
 		}
 
 		if tokenStr == "" {
 			log.Printf("[AuthRequired] 401: Token is completely empty")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization token required"})
+			c.Abort()
+			return
+		}
+
+		if tokenSource == "cookie" && isUnsafeMethod(c.Request.Method) && !allowedBrowserOrigin(c) {
+			log.Printf("[AuthRequired] 403: Rejected unsafe cookie-auth request from origin=%q referer=%q", c.GetHeader("Origin"), c.GetHeader("Referer"))
+			c.JSON(http.StatusForbidden, gin.H{"error": "Request origin not allowed"})
 			c.Abort()
 			return
 		}
@@ -134,4 +148,59 @@ func RequireBusinessActive() gin.HandlerFunc {
 		}
 		c.Next()
 	}
+}
+
+func isUnsafeMethod(method string) bool {
+	switch method {
+	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+		return true
+	default:
+		return false
+	}
+}
+
+func allowedBrowserOrigin(c *gin.Context) bool {
+	origin := strings.TrimSpace(c.GetHeader("Origin"))
+	if origin == "" {
+		referer := strings.TrimSpace(c.GetHeader("Referer"))
+		if referer == "" {
+			return true
+		}
+		parsed, err := url.Parse(referer)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+			return false
+		}
+		origin = parsed.Scheme + "://" + parsed.Host
+	}
+
+	normalizedOrigin, err := normalizeOrigin(origin)
+	if err != nil {
+		return false
+	}
+
+	for _, allowed := range frontendAllowedOrigins() {
+		if normalizedAllowed, err := normalizeOrigin(allowed); err == nil && normalizedAllowed == normalizedOrigin {
+			return true
+		}
+	}
+	return false
+}
+
+func frontendAllowedOrigins() []string {
+	raw := os.Getenv("FRONTEND_URL")
+	if raw == "" {
+		raw = "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001"
+	}
+	return strings.Split(raw, ",")
+}
+
+func normalizeOrigin(raw string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return "", err
+	}
+	if parsed.Scheme == "" || parsed.Host == "" {
+		return "", errors.New("origin must include scheme and host")
+	}
+	return strings.ToLower(parsed.Scheme + "://" + parsed.Host), nil
 }

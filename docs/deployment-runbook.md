@@ -277,6 +277,7 @@ Install SSL config:
 ```bash
 sudo cp deploy/nginx/salespilot-ssl-params.conf /etc/nginx/snippets/salespilot-ssl-params.conf
 sudo cp deploy/nginx/salespilot-security-headers.conf /etc/nginx/snippets/salespilot-security-headers.conf
+sudo cp deploy/nginx/salespilot-api-proxy.conf /etc/nginx/snippets/salespilot-api-proxy.conf
 sudo cp deploy/nginx/salespilot.ssl.conf /etc/nginx/sites-available/salespilot
 sudo nginx -t
 sudo systemctl reload nginx

@@ -46,6 +46,23 @@ func makeProofTestOrder(t *testing.T, bizID uint, paymentStatus string) models.O
 	return order
 }
 
+func TestProofReview_ReceiptRequiresOwningBusiness(t *testing.T) {
+	order := makeProofTestOrder(t, testPaymentBizID, "awaiting_verification")
+	proof := makeProofRecord(t, testPaymentBizID, order.ID)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Set("business_id", testPaymentBizID+999)
+	c.Params = gin.Params{{Key: "id", Value: fmt.Sprintf("%d", proof.ID)}}
+	c.Request, _ = http.NewRequest("GET", "/api/v1/order-proofs/receipt", nil)
+
+	ServeOrderProofReceipt(c)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for another business receipt, got %d - body: %s", w.Code, w.Body.String())
+	}
+}
+
 func makeProofRecord(t *testing.T, bizID, orderID uint) models.OrderPaymentProof {
 	t.Helper()
 	proof := models.OrderPaymentProof{
@@ -53,6 +70,7 @@ func makeProofRecord(t *testing.T, bizID, orderID uint) models.OrderPaymentProof
 		OrderID:       orderID,
 		CustomerPhone: "94770000099",
 		Amount:        3500,
+		ScreenshotURL: "https://res.cloudinary.com/demo/image/upload/proof.jpg",
 		Description:   "Bank transfer screenshot",
 		Status:        "pending",
 	}
@@ -157,7 +175,7 @@ func TestProofReview_RejectUpdatesOrderAndProof(t *testing.T) {
 // returns proof records that need merchant review.
 func TestProofReview_ListProofsReturnsPending(t *testing.T) {
 	order := makeProofTestOrder(t, testPaymentBizID, "awaiting_verification")
-	makeProofRecord(t, testPaymentBizID, order.ID)
+	proof := makeProofRecord(t, testPaymentBizID, order.ID)
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -176,6 +194,24 @@ func TestProofReview_ListProofsReturnsPending(t *testing.T) {
 	proofs, ok := resp["proofs"].([]interface{})
 	if !ok || len(proofs) == 0 {
 		t.Errorf("expected at least 1 pending proof in response, got: %v", resp)
+	}
+
+	foundMaskedURL := false
+	for _, raw := range proofs {
+		proofMap, ok := raw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if uint(proofMap["id"].(float64)) != proof.ID {
+			continue
+		}
+		foundMaskedURL = true
+		if got := proofMap["screenshot_url"]; got != orderPaymentReceiptURL(proof.ID) {
+			t.Fatalf("expected masked screenshot_url, got %v", got)
+		}
+	}
+	if !foundMaskedURL {
+		t.Fatalf("did not find proof %d in response", proof.ID)
 	}
 
 	t.Logf("✅ ListProofs returned %d pending proofs", len(proofs))
