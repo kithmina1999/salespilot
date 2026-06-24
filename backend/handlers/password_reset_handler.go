@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -21,7 +22,7 @@ import (
 
 // ── Internal: Send OTP via WhatsApp ─────────────────────────────────────────
 // Uses the Meta Cloud API to send the OTP.
-func sendOTPViaWhatsApp(phone string, otp string) error {
+func sendOTPViaWhatsApp(ctx context.Context, phone string, otp string) error {
 	var biz models.Business
 	cfg := config.Load()
 
@@ -42,6 +43,11 @@ func sendOTPViaWhatsApp(phone string, otp string) error {
 	if biz.WAPhoneNumberID == "" || biz.WAAccessToken == "" {
 		return fmt.Errorf("Meta API credentials missing for OTP sender")
 	}
+	accessToken, err := whatsappAccessTokenForBusiness(biz)
+	if err != nil {
+		log.Printf("failed to decrypt OTP sender token: %v", err)
+		return fmt.Errorf("Meta API credentials unavailable for OTP sender")
+	}
 
 	cleanPhone := phone
 	if len(cleanPhone) > 0 && cleanPhone[0] == '+' {
@@ -49,13 +55,13 @@ func sendOTPViaWhatsApp(phone string, otp string) error {
 	}
 
 	// Call the generic SendAuthTemplate handler to bypass the 24h window
-	err = whatsapp.SendAuthTemplate(biz.WAPhoneNumberID, biz.WAAccessToken, cleanPhone, cfg.WhatsAppOTPTemplate, otp)
+	err = whatsapp.SendAuthTemplateContext(ctx, biz.WAPhoneNumberID, accessToken, cleanPhone, cfg.WhatsAppOTPTemplate, otp)
 	if err != nil {
-		log.Printf("❌ Failed to send OTP template to %s: %v", phone, err)
+		log.Printf("Failed to send OTP template: %v", err)
 		return fmt.Errorf("failed to send WhatsApp message")
 	}
 
-	log.Printf("✅ OTP Template sent via WhatsApp to %s", phone)
+	log.Println("OTP template accepted by Meta")
 	return nil
 }
 
@@ -124,7 +130,7 @@ func ForgotPassword(c *gin.Context) {
 		return
 	}
 
-	if err := sendOTPViaWhatsApp(input.Phone, otp); err != nil {
+	if err := sendOTPViaWhatsApp(c.Request.Context(), input.Phone, otp); err != nil {
 		database.DB.Delete(&record)
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"error": "Could not send OTP: your WhatsApp bot is disconnected. Please contact support to recover your account.",

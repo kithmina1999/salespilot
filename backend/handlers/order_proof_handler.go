@@ -38,7 +38,7 @@ func ListOrderProofs(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"proofs": proofs,
+		"proofs": orderPaymentProofResponses(proofs),
 		"count":  len(proofs),
 	})
 }
@@ -63,9 +63,29 @@ func GetOrderProofs(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"proofs": proofs,
+		"proofs": orderPaymentProofResponses(proofs),
 		"count":  len(proofs),
 	})
+}
+
+// ServeOrderProofReceipt streams a customer payment proof receipt for the owning tenant.
+// GET /api/v1/order-proofs/:id/receipt
+func ServeOrderProofReceipt(c *gin.Context) {
+	businessID := c.GetUint("business_id")
+	proofID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid proof ID"})
+		return
+	}
+
+	var proof models.OrderPaymentProof
+	if err := database.DB.Where("id = ? AND business_id = ?", proofID, businessID).
+		First(&proof).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Payment proof not found"})
+		return
+	}
+
+	servePaymentReceipt(c, proof.ScreenshotURL, fmt.Sprintf("order-proof-%d", proof.ID))
 }
 
 // ApproveOrderProof approves a customer's payment proof:
@@ -127,6 +147,11 @@ func ApproveOrderProof(c *gin.Context) {
 		if business.WAPhoneNumberID == "" || business.WAAccessToken == "" {
 			return
 		}
+		accessToken, err := whatsappAccessTokenForBusiness(business)
+		if err != nil {
+			log.Printf("failed to decrypt customer approval token: %v", err)
+			return
+		}
 		msg := fmt.Sprintf(
 			"✅ *Payment Approved!*\n\n"+
 				"Hi %s, your payment for *Order #%d* (Rs. %.0f) has been approved.\n\n"+
@@ -137,7 +162,7 @@ func ApproveOrderProof(c *gin.Context) {
 		if len(customerPhone) > 0 && customerPhone[0] == '+' {
 			customerPhone = customerPhone[1:]
 		}
-		if err := whatsapp.SendText(business.WAPhoneNumberID, business.WAAccessToken, customerPhone, msg); err != nil {
+		if err := whatsapp.SendText(business.WAPhoneNumberID, accessToken, customerPhone, msg); err != nil {
 			log.Printf("⚠️ [ProofHandler] Failed to notify customer of approval: %v", err)
 		}
 	}()
@@ -212,6 +237,11 @@ func RejectOrderProof(c *gin.Context) {
 		if business.WAPhoneNumberID == "" || business.WAAccessToken == "" {
 			return
 		}
+		accessToken, err := whatsappAccessTokenForBusiness(business)
+		if err != nil {
+			log.Printf("failed to decrypt customer rejection token: %v", err)
+			return
+		}
 		reasonLine := ""
 		if req.Note != "" {
 			reasonLine = fmt.Sprintf("\n\nReason: _%s_", req.Note)
@@ -226,7 +256,7 @@ func RejectOrderProof(c *gin.Context) {
 		if len(customerPhone) > 0 && customerPhone[0] == '+' {
 			customerPhone = customerPhone[1:]
 		}
-		if err := whatsapp.SendText(business.WAPhoneNumberID, business.WAAccessToken, customerPhone, msg); err != nil {
+		if err := whatsapp.SendText(business.WAPhoneNumberID, accessToken, customerPhone, msg); err != nil {
 			log.Printf("⚠️ [ProofHandler] Failed to notify customer of rejection: %v", err)
 		}
 	}()

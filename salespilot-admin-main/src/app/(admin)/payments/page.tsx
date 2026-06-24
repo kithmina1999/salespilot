@@ -89,14 +89,6 @@ function getApiErrorMessage(err: unknown) {
   return "Unknown error";
 }
 
-function getImageUrl(url: string) {
-  if (!url) return "";
-  if (url.startsWith("/")) {
-    return `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}${url}`;
-  }
-  return url;
-}
-
 function getProofStatusNotice(proof: PaymentProof) {
   const scanReason = proof.scan_reason?.trim();
   const adminNote = proof.admin_note?.trim();
@@ -139,6 +131,7 @@ export default function PaymentsPage() {
 
   // Lightbox state
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [receiptLoadingID, setReceiptLoadingID] = useState<number | null>(null);
 
   // Approve modal state
   const [approving, setApproving] = useState<PaymentProof | null>(null);
@@ -151,6 +144,14 @@ export default function PaymentsPage() {
 
   const { admin } = useAuth();
   const isOwner = admin?.role === "owner";
+
+  useEffect(() => {
+    return () => {
+      if (lightboxUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(lightboxUrl);
+      }
+    };
+  }, [lightboxUrl]);
 
   // Filter logic
   useEffect(() => {
@@ -194,6 +195,23 @@ export default function PaymentsPage() {
     } finally {
       setRejectLoading(false);
     }
+  }
+
+  async function openReceipt(proof: PaymentProof) {
+    if (!proof.screenshot_url) return;
+    setReceiptLoadingID(proof.id);
+    try {
+      const res = await api.get(proof.screenshot_url, { responseType: "blob" });
+      setLightboxUrl(URL.createObjectURL(res.data));
+    } catch (err: unknown) {
+      alert("Failed to load receipt: " + getApiErrorMessage(err));
+    } finally {
+      setReceiptLoadingID(null);
+    }
+  }
+
+  function closeLightbox() {
+    setLightboxUrl(null);
   }
 
   const inputStyle: React.CSSProperties = {
@@ -358,17 +376,16 @@ export default function PaymentsPage() {
                   <div>
                     {proof.screenshot_url ? (
                       <button
-                        onClick={() => setLightboxUrl(getImageUrl(proof.screenshot_url))}
-                        style={{ background: "none", border: "1px solid var(--border-2)", borderRadius: "0.5rem", padding: "2px", cursor: "pointer", display: "flex", overflow: "hidden", position: "relative", width: 60, height: 44 }}
+                        onClick={() => openReceipt(proof)}
+                        disabled={receiptLoadingID === proof.id}
+                        style={{ background: "var(--surface-2)", border: "1px solid var(--border-2)", borderRadius: "0.5rem", padding: "2px", cursor: receiptLoadingID === proof.id ? "wait" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", width: 60, height: 44, color: "var(--muted-foreground)" }}
                         title="Click to view full screenshot"
                       >
-                        <img src={getImageUrl(proof.screenshot_url)} alt="Receipt" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "0.375rem" }} />
-                        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s" }}
-                          onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
-                          onMouseLeave={e => (e.currentTarget.style.opacity = "0")}
-                        >
-                          <ZoomIn size={14} color="#fff" />
-                        </div>
+                        {receiptLoadingID === proof.id ? (
+                          <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} />
+                        ) : (
+                          <ZoomIn size={14} />
+                        )}
                       </button>
                     ) : (
                       <div style={{ width: 60, height: 44, background: "var(--surface-2)", borderRadius: "0.5rem", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -441,12 +458,12 @@ export default function PaymentsPage() {
       {/* ── Lightbox ──────────────────────────────────────────────── */}
       {lightboxUrl && (
         <div
-          onClick={() => setLightboxUrl(null)}
+          onClick={closeLightbox}
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}
           className="animate-fade-in"
         >
           <button
-            onClick={() => setLightboxUrl(null)}
+            onClick={closeLightbox}
             style={{ position: "absolute", top: "1.5rem", right: "1.5rem", background: "rgba(255,255,255,0.1)", border: "none", borderRadius: "0.75rem", padding: "0.5rem", cursor: "pointer", color: "#fff", display: "flex", alignItems: "center" }}
           >
             <X size={20} />

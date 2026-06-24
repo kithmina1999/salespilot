@@ -80,10 +80,9 @@ export default function NotificationBell({ collapsed, mobile = false }: Notifica
     clearAll();
     
     try {
-      const token = localStorage.getItem('token');
       await fetch(`${API_URL}/api/v1/dashboard/notifications/mark-read`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
+        credentials: 'include',
       });
       mutate();
     } catch (err) {}

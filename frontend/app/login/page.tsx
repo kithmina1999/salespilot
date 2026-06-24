@@ -10,7 +10,12 @@ import { apiFetch } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 
 interface LoginResponse {
-  token: string;
+  user: {
+    id: number;
+    email: string;
+    role: string;
+    business_id: number;
+  };
   business: {
     id: number;
     name: string;
@@ -45,10 +50,9 @@ export default function LoginPage() {
         body: JSON.stringify({ identifier: identifier.trim(), password }),
       });
 
-      // Persist session in Zustand (syncs localStorage + cookies)
+      // Persist non-sensitive session shell; JWT is in a backend-set HttpOnly cookie.
       setSession(
-        data.token,
-        { id: 0, email: identifier.trim(), role: 'admin', business_id: data.business.id },
+        data.user,
         {
           id: data.business.id,
           name: data.business.name,
@@ -59,9 +63,6 @@ export default function LoginPage() {
           bot_name: 'AI Assistant',
         }
       );
-      // Also keep raw token in localStorage for apiFetch
-      localStorage.setItem('token', data.token);
-
       toast.success(`Welcome back, ${data.business.name}! 👋`);
 
       if (!data.business.onboarding_complete) {

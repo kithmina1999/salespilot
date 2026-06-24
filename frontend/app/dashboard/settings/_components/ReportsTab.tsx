@@ -19,23 +19,21 @@ export default function ReportsTab() {
   useEffect(() => { fetchSettings(); fetchHistory(); }, []);
 
   async function fetchSettings() {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${API_URL}/api/v1/settings/report`, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(`${API_URL}/api/v1/settings/report`, { credentials: 'include' });
     if (res.ok) setSettings(await res.json());
   }
 
   async function fetchHistory() {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${API_URL}/api/v1/settings/report/history`, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(`${API_URL}/api/v1/settings/report/history`, { credentials: 'include' });
     if (res.ok) { const d = await res.json(); setHistory(d.reports || []); }
   }
 
   async function save() {
     setSaving(true);
-    const token = localStorage.getItem('token');
     const res = await fetch(`${API_URL}/api/v1/settings/report`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(settings),
     });
     if (res.ok) toast.success('Report settings saved ✅');
@@ -45,9 +43,9 @@ export default function ReportsTab() {
 
   async function sendTest() {
     setSending(true);
-    const token = localStorage.getItem('token');
     const res = await fetch(`${API_URL}/api/v1/settings/report/test`, {
-      method: 'POST', headers: { Authorization: `Bearer ${token}` },
+      method: 'POST',
+      credentials: 'include',
     });
     if (res.ok) {
       toast.success('Test report generating! Check your WhatsApp in ~30s 📊');

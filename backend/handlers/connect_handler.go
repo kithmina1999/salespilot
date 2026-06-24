@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
 	"github.com/kithmina1999/salespilot/models"
+	"github.com/kithmina1999/salespilot/providersecrets"
 	"github.com/kithmina1999/salespilot/utils"
 	"github.com/kithmina1999/salespilot/whatsapp"
 )
@@ -37,7 +38,7 @@ func SaveMetaCredentials(c *gin.Context) {
 	}
 
 	// Quick liveness test before saving
-	phoneInfo, err := whatsapp.TestCredentialsWithInfo(req.PhoneNumberID, req.AccessToken)
+	phoneInfo, err := whatsapp.TestCredentialsWithInfoContext(c.Request.Context(), req.PhoneNumberID, req.AccessToken)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":  "Could not verify credentials with Meta. Check your Phone Number ID and Access Token.",
@@ -45,19 +46,25 @@ func SaveMetaCredentials(c *gin.Context) {
 		})
 		return
 	}
+	encryptedToken, err := providersecrets.EncryptProviderToken(req.AccessToken)
+	if err != nil {
+		log.Printf("failed to encrypt Meta access token for business %d: %v", businessID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to secure Meta credentials. Check server encryption configuration."})
+		return
+	}
 
 	now := time.Now()
 	database.DB.Model(&biz).Updates(map[string]interface{}{
 		"wa_phone_number_id": req.PhoneNumberID,
 		"waba_id":            req.WABAID,
-		"wa_access_token":    req.AccessToken,
+		"wa_access_token":    encryptedToken,
 		"wa_status":          "connected",
 		"connected_at":       now,
 	})
 
 	// Subscribe the business's WABA to our platform webhook so Meta sends events to us
 	// Non-fatal: log failure but don't block the UI — operator can retry via Test
-	if err := whatsapp.SubscribeWABAWebhook(req.WABAID, req.AccessToken); err != nil {
+	if err := whatsapp.SubscribeWABAWebhookContext(c.Request.Context(), req.WABAID, req.AccessToken); err != nil {
 		log.Printf("⚠️  WABA %s webhook subscription failed: %v (credentials saved, retry via Test)", req.WABAID, err)
 	}
 
@@ -115,8 +122,14 @@ func TestMetaConnection(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No credentials saved. Connect your WhatsApp first."})
 		return
 	}
+	accessToken, err := whatsappAccessTokenForBusiness(biz)
+	if err != nil {
+		log.Printf("failed to decrypt Meta access token for business %d: %v", businessID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Saved Meta credentials cannot be decrypted. Check server encryption configuration."})
+		return
+	}
 
-	if err := whatsapp.TestCredentials(biz.WAPhoneNumberID, biz.WAAccessToken); err != nil {
+	if err := whatsapp.TestCredentialsContext(c.Request.Context(), biz.WAPhoneNumberID, accessToken); err != nil {
 		// Mark as disconnected in DB
 		database.DB.Model(&biz).Update("wa_status", "disconnected")
 		// Alert the team — this tenant's bot is now silent

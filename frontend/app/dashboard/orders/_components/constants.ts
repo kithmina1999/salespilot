@@ -19,10 +19,10 @@ export const COL_STYLE: Record<string, { header: string; card: string; badge: st
 };
 
 export const API = `${API_URL}/api/v1`;
-export const token = () => typeof window !== 'undefined' ? localStorage.getItem('token') || '' : '';
-export const headers = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` });
+export const headers = () => ({ 'Content-Type': 'application/json' });
 
-export const fetcher = (url: string) => fetch(url, { headers: headers() }).then(r => r.json());
+export const fetcher = (url: string) => fetch(url, { credentials: 'include' }).then(r => r.json());
+export const apiAssetURL = (url: string) => (url.startsWith('/') ? `${API_URL}${url}` : url);
 
 export function paymentBadgeConfig(method: string, status: string) {
   if (method !== 'bank_transfer') return null; // COD has no badge

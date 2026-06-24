@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"log"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kithmina1999/salespilot/database"
+	"github.com/kithmina1999/salespilot/httpclient"
 	"github.com/kithmina1999/salespilot/models"
 	"github.com/kithmina1999/salespilot/platform"
 )
@@ -93,7 +93,7 @@ Your output MUST be a valid JSON object matching exactly this schema and nothing
 	}
 
 	jsonValue, _ := json.Marshal(requestBody)
-	resp, err := http.Post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="+apiKey, "application/json", bytes.NewBuffer(jsonValue))
+	resp, err := httpclient.PostJSONContext(c.Request.Context(), httpclient.DependencyGemini, "seed_onboarding", "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="+apiKey, jsonValue, httpclient.RetryTransient)
 	if err != nil {
 		log.Printf("Gemini call failed during seeding: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "AI seeding failed"})
@@ -113,7 +113,7 @@ Your output MUST be a valid JSON object matching exactly this schema and nothing
 	}
 
 	if err := json.Unmarshal(bodyBytes, &geminiResponse); err != nil || len(geminiResponse.Candidates) == 0 {
-		log.Printf("Failed to unmarshal Gemini payload: %v | Raw: %s", err, string(bodyBytes))
+		log.Printf("Failed to unmarshal Gemini payload: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "AI response was invalid"})
 		return
 	}

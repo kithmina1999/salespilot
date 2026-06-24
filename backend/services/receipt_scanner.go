@@ -1,14 +1,15 @@
 package services
 
 import (
-	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"log"
-	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/kithmina1999/salespilot/httpclient"
 )
 
 type ReceiptAnalysis struct {
@@ -25,6 +26,10 @@ type ReceiptAnalysis struct {
 
 // AnalyzePaymentReceipt uses Gemini 2.5 Flash to pre-check a payment receipt image.
 func AnalyzePaymentReceipt(imageBytes []byte, mimeType string) ReceiptAnalysis {
+	return AnalyzePaymentReceiptContext(context.Background(), imageBytes, mimeType)
+}
+
+func AnalyzePaymentReceiptContext(ctx context.Context, imageBytes []byte, mimeType string) ReceiptAnalysis {
 	fallback := ReceiptAnalysis{
 		IsValid: true, // Fail open if API fails
 		Reason:  "AI scan unavailable",
@@ -78,8 +83,7 @@ Rules:
 	jsonBody, _ := json.Marshal(body)
 	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey
 
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Post(url, "application/json", bytes.NewBuffer(jsonBody))
+	resp, err := httpclient.PostJSONContext(ctx, httpclient.DependencyGemini, "analyze_payment_receipt", url, jsonBody, httpclient.RetryTransient)
 	if err != nil {
 		log.Printf("❌ [ReceiptScanner] Vision API call failed: %v", err)
 		return fallback
@@ -112,7 +116,7 @@ Rules:
 	}
 
 	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
-		log.Printf("⚠️ [ReceiptScanner] Could not parse JSON from Vision: %q", raw)
+		log.Printf("[ReceiptScanner] Could not parse Vision response JSON")
 		return fallback
 	}
 
@@ -121,7 +125,7 @@ Rules:
 		if t, err := time.Parse(time.RFC3339, *parsed.Date); err == nil {
 			extractedDate = &t
 		} else {
-			log.Printf("⚠️ [ReceiptScanner] Could not parse date %q: %v", *parsed.Date, err)
+			log.Printf("[ReceiptScanner] Could not parse extracted date: %v", err)
 		}
 	}
 

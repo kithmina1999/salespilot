@@ -12,9 +12,6 @@ import (
 func TenantAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		key := c.GetHeader("X-API-Key")
-		if key == "" {
-			key = c.Query("api_key")
-		}
 		// Allow Bearer token format
 		if key == "" {
 			authHeader := c.GetHeader("Authorization")
@@ -50,9 +47,6 @@ func TenantAuth() gin.HandlerFunc {
 func MasterAuth(masterKey string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		key := c.GetHeader("X-Master-Key")
-		if key == "" {
-			key = c.Query("master_key")
-		}
 
 		if key != masterKey || masterKey == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid master key"})

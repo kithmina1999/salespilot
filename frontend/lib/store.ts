@@ -2,7 +2,7 @@
  * useAppStore — Global Zustand store for SalesPilot
  * 
  * Centralizes:
- *  - Auth session (token, user)
+ *  - Auth session (user; JWT lives in a backend-set HttpOnly cookie)
  *  - Business profile (plan, WA status, onboarding state)
  *  - Usage stats (quotas, counters)
  *  - Billing details (trial, expiry, pricing)
@@ -13,8 +13,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { API_URL } from '@/hooks/_shared';
+import { apiFetch, clearLegacyAuthStorage } from '@/lib/api';
 
 const apiUrl = (path: string) => `${API_URL}${path}`;
+
+if (typeof window !== 'undefined') {
+  clearLegacyAuthStorage();
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -106,7 +111,6 @@ export interface PlatformNotice {
 
 interface AppState {
   // Auth
-  token: string | null;
   user: AppUser | null;
 
   // Data
@@ -124,11 +128,14 @@ interface AppState {
 
   // ── Actions ──────────────────────────────────────────────────────────────
   
-  /** Call after successful login or verify-email */
-  setSession: (token: string, user: AppUser, business: AppBusiness) => void;
+  /** Call after successful login, verify-email, or session hydration */
+  setSession: (user: AppUser, business: AppBusiness) => void;
 
   /** Call on logout or 401 */
   clearSession: () => void;
+
+  /** Hydrate user/business from the backend-set HttpOnly cookie */
+  hydrateSession: () => Promise<boolean>;
 
   /** Fetch business profile + WA status from backend */
   fetchBusiness: () => Promise<void>;
@@ -151,7 +158,6 @@ export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
       // Initial state
-      token: null,
       user: null,
       business: null,
       usage: null,
@@ -161,32 +167,39 @@ export const useAppStore = create<AppState>()(
       businessLoaded: false,
       usageLoaded: false,
 
-      setSession: (token, user, business) => {
-        // Sync to cookie for edge middleware
-        document.cookie = `token=${token}; path=/; SameSite=Lax; max-age=${60 * 60 * 24 * 7}`;
+      setSession: (user, business) => {
+        clearLegacyAuthStorage();
         if (business.onboarding_complete) {
           document.cookie = `onboarding_passed=1; path=/; SameSite=Lax; max-age=${60 * 60 * 24 * 7}`;
         }
-        set({ token, user, business, businessLoaded: true });
+        set({ user, business, businessLoaded: true });
       },
 
       clearSession: () => {
-        // Nuke cookies
-        document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax';
+        clearLegacyAuthStorage();
         document.cookie = 'onboarding_passed=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax';
         set({
-          token: null, user: null, business: null,
+          user: null, business: null,
           usage: null, pricing: null,
           businessLoaded: false, usageLoaded: false,
         });
       },
 
+      hydrateSession: async () => {
+        try {
+          const data = await apiFetch<{ user: AppUser; business: AppBusiness }>('/api/v1/auth/session');
+          get().setSession(data.user, data.business);
+          return true;
+        } catch {
+          get().clearSession();
+          return false;
+        }
+      },
+
       fetchBusiness: async () => {
-        const { token } = get();
-        if (!token) return;
         try {
           const res = await fetch(apiUrl('/api/v1/settings/business'), {
-            headers: { Authorization: `Bearer ${token}` },
+            credentials: 'include',
           });
           if (res.status === 401) { get().clearSession(); return; }
           if (!res.ok) return;
@@ -213,16 +226,14 @@ export const useAppStore = create<AppState>()(
       },
 
       fetchUsage: async () => {
-        const { token } = get();
-        if (!token) return;
         try {
           // Fetch usage + billing in parallel
           const [usageRes, billingRes] = await Promise.all([
             fetch(apiUrl('/api/v1/settings/usage'), {
-              headers: { Authorization: `Bearer ${token}` },
+              credentials: 'include',
             }),
             fetch(apiUrl('/api/v1/billing/status'), {
-              headers: { Authorization: `Bearer ${token}` },
+              credentials: 'include',
             }),
           ]);
 
@@ -305,9 +316,9 @@ export const useAppStore = create<AppState>()(
 
     {
       name: 'salespilot-app',           // localStorage key
-      partialize: (state) => ({         // Only persist auth and appearance
-        token: state.token,
+      partialize: (state) => ({         // Persist non-sensitive session shell and appearance
         user: state.user,
+        business: state.business,
         appearance: state.appearance,
       }),
     }

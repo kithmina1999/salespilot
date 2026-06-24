@@ -11,7 +11,7 @@
 import useSWR from 'swr';
 import { mutate } from 'swr';
 import { toast } from 'sonner';
-import { API_URL, getToken, apiFetcher } from './_shared';
+import { API_URL, apiFetcher } from './_shared';
 
 // ── Cache key ─────────────────────────────────────────────────────────────────
 
@@ -36,10 +36,8 @@ export function useSettings() {
     try {
       const res = await fetch(`${API_URL}/api/v1/settings/business`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${getToken()}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(updates),
       });
       if (!res.ok) throw new Error('Server error');

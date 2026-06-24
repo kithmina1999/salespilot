@@ -1,0 +1,15 @@
+# SalesPilot PostgreSQL backup job.
+# CHANGE_ME: If the repo is deployed somewhere else, replace /opt/salespilot-v2.
+
+[Unit]
+Description=SalesPilot PostgreSQL encrypted backup
+Wants=docker.service salespilot.service
+After=docker.service salespilot.service
+
+[Service]
+Type=oneshot
+Environment=BACKUP_ENV_FILE=/etc/salespilot/backup.env
+ExecStart=/bin/bash /opt/salespilot-v2/deploy/scripts/backup-postgres.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

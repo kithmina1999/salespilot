@@ -6,6 +6,7 @@ import (
 
 	"github.com/kithmina1999/salespilot/models"
 	"github.com/kithmina1999/salespilot/platform"
+	"github.com/kithmina1999/salespilot/providersecrets"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -55,6 +56,7 @@ func Init(dsn string) {
 			&models.PlatformBillingSettings{}, &models.SubscriptionPlan{},
 			&models.BillingPaymentAttempt{}, &models.BillingAddon{},
 			&models.PaymentProofLineItem{}, &models.BillingServicePurchase{},
+			&models.EmbeddingArtifact{},
 		)
 	}
 
@@ -85,12 +87,23 @@ func Init(dsn string) {
 		&models.BillingAddon{},
 		&models.PaymentProofLineItem{},
 		&models.BillingServicePurchase{},
+		&models.EmbeddingArtifact{},
 	)
 	if err != nil {
 		log.Fatalf("❌ Failed to migrate database: %v", err)
 	}
 
+	if err := EnsureProductionIndexes(DB); err != nil {
+		log.Fatalf("❌ Failed to ensure production indexes: %v", err)
+	}
+
 	log.Println("✅ PostgreSQL connected and migrated successfully")
+
+	if count, err := providersecrets.BackfillBusinessWAAccessTokens(DB); err != nil {
+		log.Fatalf("failed to encrypt tenant provider tokens: %v", err)
+	} else if count > 0 {
+		log.Printf("encrypted %d existing tenant provider token(s)", count)
+	}
 
 	if err := platform.EnsureBillingDefaults(DB); err != nil {
 		log.Fatalf("Failed to seed billing catalog defaults: %v", err)
@@ -148,7 +161,7 @@ func seedDemoData() {
 			Role:            "admin",
 			IsEmailVerified: true, // skip email verification for demo account
 		})
-		log.Println("🔑 Demo admin — email: admin@byteshift.lk | password: admin123")
+		log.Println("Demo admin seeded; credentials are not written to logs")
 
 		// ── 20 PRODUCTION GLOBAL FAQ RULES (BusinessID = NULL) ─────────────────────
 		globalRules := []models.Rule{

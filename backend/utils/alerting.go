@@ -1,13 +1,14 @@
 package utils
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"time"
+
+	"github.com/kithmina1999/salespilot/httpclient"
 )
 
 // ── Discord Alerting ──────────────────────────────────────────────────────────
@@ -26,6 +27,10 @@ const (
 // Warning/Info → DISCORD_GENERAL_ISSUES_WEBHOOK_URL  (#general-issues)
 // If the relevant URL is unset the call is silently skipped.
 func SendDiscordAlert(level AlertLevel, title, message string) {
+	SendDiscordAlertContext(context.Background(), level, title, message)
+}
+
+func SendDiscordAlertContext(ctx context.Context, level AlertLevel, title, message string) {
 	webhookURL := discordWebhookURL(level)
 	if webhookURL == "" {
 		return
@@ -50,7 +55,7 @@ func SendDiscordAlert(level AlertLevel, title, message string) {
 		return
 	}
 
-	resp, err := http.Post(webhookURL, "application/json", bytes.NewBuffer(b))
+	resp, err := httpclient.PostJSONContext(ctx, httpclient.DependencyDiscord, "send_operational_alert", webhookURL, b, httpclient.NoRetry)
 	if err != nil {
 		log.Printf("⚠️  [Alert] Discord webhook call failed: %v", err)
 		return

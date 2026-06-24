@@ -48,7 +48,7 @@ export function WAConnectionCard({ business }: { business: BusinessDetail }) {
             <Key className="w-3.5 h-3.5" /> Access Token
           </div>
           <span className="text-xs font-bold text-foreground">
-            {business.wa_access_token ? "✅ Present" : "❌ Missing"}
+            {business.has_wa_access_token ? "Present" : "Missing"}
           </span>
         </div>
 

@@ -115,7 +115,6 @@ export default function SubscribeTab({ paymentStatus, onRefresh, onActivateTab, 
     if (!bankConfigured) { toast.error('Bank transfer details are not configured yet'); return; }
     if (!file) { toast.error('Please select your payment screenshot'); return; }
     setUploading(true);
-    const token = localStorage.getItem('token');
     try {
       const form = new FormData();
       form.append('image', file);
@@ -123,7 +122,7 @@ export default function SubscribeTab({ paymentStatus, onRefresh, onActivateTab, 
       form.append('plan', selectedPlan);
       const res = await fetch(
         `${API_URL}/api/v1/billing/submit-proof`,
-        { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form }
+        { method: 'POST', credentials: 'include', body: form }
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Upload failed');

@@ -23,8 +23,10 @@ package whatsapp
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -35,10 +37,16 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+var errCartAlreadyPlaced = errors.New("cart already placed")
+
 // ─── DB Tracking Wrappers ───────────────────────────────────────────────────────
 
 func botSendText(business *models.Business, phone, body string) error {
-	err := SendText(business.WAPhoneNumberID, business.WAAccessToken, phone, body)
+	accessToken, err := whatsappAccessTokenForBusiness(business)
+	if err != nil {
+		return err
+	}
+	err = SendText(business.WAPhoneNumberID, accessToken, phone, body)
 	if err == nil {
 		database.DB.Create(&models.Message{BusinessID: business.ID, Phone: phone, Role: "model", Content: body})
 	}
@@ -46,7 +54,11 @@ func botSendText(business *models.Business, phone, body string) error {
 }
 
 func botSendButtons(business *models.Business, phone, body string, buttons []Button) error {
-	err := SendButtons(business.WAPhoneNumberID, business.WAAccessToken, phone, body, buttons)
+	accessToken, err := whatsappAccessTokenForBusiness(business)
+	if err != nil {
+		return err
+	}
+	err = SendButtons(business.WAPhoneNumberID, accessToken, phone, body, buttons)
 	if err == nil {
 		database.DB.Create(&models.Message{BusinessID: business.ID, Phone: phone, Role: "model", Content: "[Buttons] " + body})
 	}
@@ -54,7 +66,11 @@ func botSendButtons(business *models.Business, phone, body string, buttons []But
 }
 
 func botSendList(business *models.Business, phone, body, label string, sections []ListSection) error {
-	err := SendList(business.WAPhoneNumberID, business.WAAccessToken, phone, body, label, sections)
+	accessToken, err := whatsappAccessTokenForBusiness(business)
+	if err != nil {
+		return err
+	}
+	err = SendList(business.WAPhoneNumberID, accessToken, phone, body, label, sections)
 	if err == nil {
 		database.DB.Create(&models.Message{BusinessID: business.ID, Phone: phone, Role: "model", Content: "[List] " + body})
 	}
@@ -142,7 +158,7 @@ func handleCartMessage(business *models.Business, phone, fromRaw, msg string) bo
 	if cart.State == models.CartStateBrowsing || cart.State == models.CartStateItemSelected || cart.State == models.CartStateAddMore {
 		intent := ClassifyMessageIntent(msg)
 		if intent == "general" {
-			log.Printf("🤔 [OrderBot] %s state + general intent → FAQ/Gemini bypass: %q", cart.State, msg)
+			log.Printf("[OrderBot] %s state with general intent; FAQ/Gemini bypass", cart.State)
 			return false
 		}
 	}
@@ -162,7 +178,7 @@ func startOrderFlow(business *models.Business, phone, fromRaw string) {
 		ExpiresAt:     time.Now().Add(24 * time.Hour),
 	}
 	if err := database.DB.Create(&cart).Error; err != nil {
-		log.Printf("❌ [OrderBot] Failed to create cart for %s: %v", phone, err)
+		log.Printf("[OrderBot] Failed to create cart (business_id=%d): %v", business.ID, err)
 		botSendText(business, fromRaw,
 			"Sorry, I couldn't start your order. Please try again!")
 		return
@@ -493,7 +509,7 @@ func handlePendingAddress(cart *models.Cart, business *models.Business, phone, f
 
 	// Catch inability/frustration phrases — never save as a delivery address.
 	if isInabilityPhrase(address) {
-		log.Printf("🚫 [OrderBot] Rejected inability phrase as address: %q", address)
+		log.Printf("[OrderBot] Rejected inability phrase as address")
 		botSendButtons(business, fromRaw,
 			"No worries! 😊 To complete your order I need a delivery address.\nType your address (e.g. 12/A, Galle Road, Colombo) or cancel:",
 			[]Button{{ID: "cancel_order", Title: "❌ Cancel Order"}},
@@ -505,7 +521,7 @@ func handlePendingAddress(cart *models.Cart, business *models.Business, phone, f
 	// IsLikelyAddress uses embedding cosine similarity (~$0.000001/call) with
 	// automatic fallback to keyword+entropy heuristic if embeddings not ready.
 	if ok, _ := IsLikelyAddress(address); !ok {
-		log.Printf("🚫 [OrderBot] Rejected non-address input: %q", address)
+		log.Printf("[OrderBot] Rejected non-address input")
 		botSendText(business, fromRaw,
 			"📍 That doesn't look like a delivery address. Please type your full address (e.g. 12/A, Galle Road, Colombo):")
 		return
@@ -638,6 +654,7 @@ func finalizeOrder(cart *models.Cart, business *models.Business, phone, fromRaw 
 	var order models.Order
 	var orderNum uint
 	var customerName string
+	var placedCart models.Cart
 
 	// Wrap everything in a single DB transaction:
 	// 1. Atomically grab the next order number (no gap in sequence)
@@ -645,21 +662,35 @@ func finalizeOrder(cart *models.Cart, business *models.Business, phone, fromRaw 
 	// 3. Create the order record
 	// All three steps succeed together or roll back together.
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
-		if cart.PaymentMethod == "" {
+		var lockedCart models.Cart
+		if err := tx.
+			Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND business_id = ? AND phone = ?", cart.ID, business.ID, phone).
+			First(&lockedCart).Error; err != nil {
+			return fmt.Errorf("cart lock: %w", err)
+		}
+		if lockedCart.State == models.CartStatePlaced {
+			return errCartAlreadyPlaced
+		}
+		if lockedCart.State != models.CartStatePendingConfirm {
+			return fmt.Errorf("cart is not ready to confirm (state=%s)", lockedCart.State)
+		}
+
+		if lockedCart.PaymentMethod == "" {
 			if business.AllowCOD {
-				cart.PaymentMethod = "cod"
+				lockedCart.PaymentMethod = "cod"
 			} else if business.AllowTransfer {
-				cart.PaymentMethod = "bank_transfer"
+				lockedCart.PaymentMethod = "bank_transfer"
 			}
 		}
-		if cart.PaymentMethod == "cod" && !business.AllowCOD {
+		if lockedCart.PaymentMethod == "cod" && !business.AllowCOD {
 			return fmt.Errorf("cod payment is disabled")
 		}
-		if cart.PaymentMethod == "bank_transfer" && !business.AllowTransfer {
+		if lockedCart.PaymentMethod == "bank_transfer" && !business.AllowTransfer {
 			return fmt.Errorf("bank transfer payment is disabled")
 		}
-		if cart.PaymentMethod != "cod" && cart.PaymentMethod != "bank_transfer" {
-			return fmt.Errorf("unsupported payment method %q", cart.PaymentMethod)
+		if lockedCart.PaymentMethod != "cod" && lockedCart.PaymentMethod != "bank_transfer" {
+			return fmt.Errorf("unsupported payment method %q", lockedCart.PaymentMethod)
 		}
 
 		if tx.Dialector.Name() == "postgres" {
@@ -679,26 +710,28 @@ func finalizeOrder(cart *models.Cart, business *models.Business, phone, fromRaw 
 		orderNum = maxNum.Max + 1
 
 		// Step 2: lock each product row and decrement stock
-		items := loadCartItems(cart.Items)
+		items := loadCartItems(lockedCart.Items)
 		if len(items) == 0 {
 			return fmt.Errorf("cart has no items")
 		}
-		for _, item := range items {
-			if item.Qty <= 0 {
-				return fmt.Errorf("invalid quantity for product %d", item.ProductID)
-			}
+		requiredQty, productIDs, err := aggregateCartItemQuantities(items)
+		if err != nil {
+			return err
+		}
+		for _, productID := range productIDs {
+			qty := requiredQty[productID]
 			var product models.Product
 			if err := tx.
 				Clauses(clause.Locking{Strength: "UPDATE"}).
-				Where("id = ? AND business_id = ? AND active = ?", item.ProductID, business.ID, true).
+				Where("id = ? AND business_id = ? AND active = ?", productID, business.ID, true).
 				First(&product).Error; err != nil {
-				return fmt.Errorf("product %d not found: %w", item.ProductID, err)
+				return fmt.Errorf("product %d not found: %w", productID, err)
 			}
-			if product.Stock < item.Qty {
-				return fmt.Errorf("insufficient stock for product %d: have %d need %d", item.ProductID, product.Stock, item.Qty)
+			if product.Stock < qty {
+				return fmt.Errorf("insufficient stock for product %d: have %d need %d", productID, product.Stock, qty)
 			}
-			if err := tx.Model(&product).UpdateColumn("stock", product.Stock-item.Qty).Error; err != nil {
-				return fmt.Errorf("stock decrement for product %d: %w", item.ProductID, err)
+			if err := tx.Model(&product).UpdateColumn("stock", product.Stock-qty).Error; err != nil {
+				return fmt.Errorf("stock decrement for product %d: %w", productID, err)
 			}
 		}
 
@@ -710,45 +743,87 @@ func finalizeOrder(cart *models.Cart, business *models.Business, phone, fromRaw 
 		order = models.Order{
 			BusinessOrderNum: orderNum,
 			BusinessID:       business.ID,
-			CartID:           cart.ID,
+			CartID:           lockedCart.ID,
 			CustomerPhone:    phone,
 			CustomerName:     customerName,
-			Items:            cart.Items,
-			TotalPrice:       cart.TotalPrice,
+			Items:            lockedCart.Items,
+			TotalPrice:       lockedCart.TotalPrice,
 			Status:           models.OrderStatusNew,
-			Address:          cart.Address,
-			Notes:            cart.Notes,
-			PaymentMethod:    cart.PaymentMethod,
+			Address:          lockedCart.Address,
+			Notes:            lockedCart.Notes,
+			PaymentMethod:    lockedCart.PaymentMethod,
 			PaymentStatus:    "pending",
 		}
-		return tx.Create(&order).Error
+		if err := tx.Create(&order).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Model(&lockedCart).Updates(map[string]interface{}{
+			"state":          models.CartStatePlaced,
+			"payment_method": lockedCart.PaymentMethod,
+			"expires_at":     time.Now(),
+		}).Error; err != nil {
+			return fmt.Errorf("cart placement update: %w", err)
+		}
+
+		lockedCart.State = models.CartStatePlaced
+		lockedCart.ExpiresAt = time.Now()
+		placedCart = lockedCart
+		return nil
 	})
 
 	if err != nil {
-		log.Printf("❌ [OrderBot] Transaction failed for %s: %v", phone, err)
+		if errors.Is(err, errCartAlreadyPlaced) {
+			botSendText(business, fromRaw, "This order has already been placed. We'll contact you soon to confirm dispatch.")
+			return
+		}
+		log.Printf("[OrderBot] Order transaction failed (business_id=%d): %v", business.ID, err)
 		botSendText(business, fromRaw,
 			"Sorry, there was an error placing your order. Please try again!")
 		return
 	}
 
-	updateCart(cart, map[string]interface{}{"state": models.CartStatePlaced, "expires_at": time.Now()})
+	*cart = placedCart
 
-	items := loadCartItems(cart.Items)
+	items := loadCartItems(placedCart.Items)
 	paymentText := "COD"
-	if cart.PaymentMethod == "bank_transfer" {
+	if placedCart.PaymentMethod == "bank_transfer" {
 		paymentText = "Bank Transfer"
 	}
 	receipt := fmt.Sprintf(
 		"🎉 *Order #%d Confirmed!*\n\n%s\n\n📍 Delivery to: %s\n💰 Total: Rs.%.0f (%s)\n\nWe'll contact you soon to confirm dispatch. Thank you! 🙏",
-		orderNum, buildItemsText(items), cart.Address, cart.TotalPrice, paymentText,
+		orderNum, buildItemsText(items), placedCart.Address, placedCart.TotalPrice, paymentText,
 	)
 	botSendText(business, fromRaw, receipt)
 
 	go notifyTenantNewOrder(business, &order, customerName)
-	log.Printf("✅ [OrderBot] Order #%d created for %s (biz=%d)", orderNum, phone, business.ID)
+	log.Printf("[OrderBot] Order #%d created (business_id=%d)", orderNum, business.ID)
 }
 
 // ─── Display Helpers ────────────────────────────────────────────────────────────
+
+func aggregateCartItemQuantities(items []models.CartItem) (map[uint]int, []uint, error) {
+	requiredQty := make(map[uint]int)
+	for _, item := range items {
+		if item.ProductID == 0 {
+			return nil, nil, fmt.Errorf("cart item is missing product id")
+		}
+		if item.Qty <= 0 {
+			return nil, nil, fmt.Errorf("invalid quantity for product %d", item.ProductID)
+		}
+		requiredQty[item.ProductID] += item.Qty
+	}
+
+	productIDs := make([]uint, 0, len(requiredQty))
+	for productID := range requiredQty {
+		productIDs = append(productIDs, productID)
+	}
+	sort.Slice(productIDs, func(i, j int) bool {
+		return productIDs[i] < productIDs[j]
+	})
+
+	return requiredQty, productIDs, nil
+}
 
 func showProductList(business *models.Business, fromRaw string) {
 	var products []models.Product
@@ -1173,8 +1248,13 @@ func showCustomerOrders(business *models.Business, phone, fromRaw string) {
 		}
 	}
 
+	accessToken, err := whatsappAccessTokenForBusiness(business)
+	if err != nil {
+		log.Printf("failed to decrypt recent-orders WhatsApp token: %v", err)
+		return
+	}
 	SendList(
-		business.WAPhoneNumberID, business.WAAccessToken, fromRaw,
+		business.WAPhoneNumberID, accessToken, fromRaw,
 		"📦 *Your Recent Orders*\n\nTap any order to view details:",
 		"View Orders",
 		[]ListSection{{Title: "Recent Orders", Rows: rows}},

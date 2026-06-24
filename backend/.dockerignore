@@ -1,0 +1,13 @@
+.env
+.env.*
+.git
+.gitignore
+*.db
+*.exe
+*.log
+out.*
+tmp/
+tmp_build
+uploads/
+whatsapp_sessions.db
+**/*_test.go

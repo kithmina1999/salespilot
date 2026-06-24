@@ -2,6 +2,7 @@ package whatsapp
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -11,7 +12,9 @@ import (
 	"strings"
 
 	"github.com/kithmina1999/salespilot/database"
+	"github.com/kithmina1999/salespilot/httpclient"
 	"github.com/kithmina1999/salespilot/models"
+	"gorm.io/gorm"
 )
 
 // ─── Embedding API ─────────────────────────────────────────────────────────────
@@ -23,6 +26,10 @@ const embeddingModel = "gemini-embedding-001"
 // EmbedText calls the Gemini Embedding API and returns a []float64 vector.
 // Uses text-embedding-004 which is multilingual and handles Sinhala natively.
 func EmbedText(text string) ([]float64, error) {
+	return EmbedTextContext(context.Background(), text)
+}
+
+func EmbedTextContext(ctx context.Context, text string) ([]float64, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("GEMINI_API_KEY not set")
@@ -47,7 +54,7 @@ func EmbedText(text string) ([]float64, error) {
 		return nil, fmt.Errorf("embedding: marshal failed: %w", err)
 	}
 
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonBody))
+	resp, err := httpclient.PostJSONContext(ctx, httpclient.DependencyGemini, "embed_text", url, jsonBody, httpclient.RetryTransient)
 	if err != nil {
 		return nil, fmt.Errorf("embedding: http request failed: %w", err)
 	}
@@ -165,8 +172,8 @@ func EmbedAndStoreRule(r *models.Rule) {
 // EmbedAllMissingRules scans all active rules with no embedding and embeds them.
 // Called once on server startup to migrate existing rules created before this feature.
 func EmbedAllMissingRules() {
-	var rules []models.Rule
-	if err := database.DB.Where("is_active = ? AND (embedding IS NULL OR embedding = ?)", true, "").Find(&rules).Error; err != nil {
+	rules, err := findRulesNeedingEmbeddings(database.DB)
+	if err != nil {
 		log.Printf("❌ EmbedAllMissingRules: DB query failed: %v", err)
 		return
 	}
@@ -183,4 +190,23 @@ func EmbedAllMissingRules() {
 		}
 		log.Printf("✅ EmbedAllMissingRules: batch embedding complete")
 	}()
+}
+
+// semanticRulesQuery is shared by cache loading and embedding backfill so
+// settings-only knowledge can never trigger unused embedding work.
+func semanticRulesQuery(db *gorm.DB) *gorm.DB {
+	return db.Where(
+		"is_active = ? AND (source_type IS NULL OR source_type = ? OR source_type NOT IN ?)",
+		true,
+		"",
+		[]string{models.SourceTypePaymentSettings, models.SourceTypeDeliverySettings},
+	)
+}
+
+func findRulesNeedingEmbeddings(db *gorm.DB) ([]models.Rule, error) {
+	var rules []models.Rule
+	err := semanticRulesQuery(db).
+		Where("(embedding IS NULL OR embedding = ?)", "").
+		Find(&rules).Error
+	return rules, err
 }

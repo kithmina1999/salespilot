@@ -29,14 +29,11 @@ export default function QuickFAQModal({ unmatchedMessage, onClose, onSuccess }: 
   // ── "Generalize & Draft" — matches inbox-mode in rules page ──────────────
   async function handleGeneralizeAndDraft() {
     setDrafting(true);
-    const token = localStorage.getItem('token');
     try {
       const res = await fetch(`${API}/api/v1/faqs/draft`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ message: unmatchedMessage, from_inbox: true }),
       });
       if (res.ok) {
@@ -67,14 +64,11 @@ export default function QuickFAQModal({ unmatchedMessage, onClose, onSuccess }: 
     e.preventDefault();
     if (!form.response.trim()) { toast.error('English response is required'); return; }
     setSaving(true);
-    const token = localStorage.getItem('token');
     try {
       const res = await fetch(`${API}/api/v1/rules`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           keywords:         form.keywords,
           response:         form.response,

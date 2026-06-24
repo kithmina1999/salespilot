@@ -55,10 +55,10 @@ export function RuleModal({
 
     setTranslating(true);
     try {
-      const token = localStorage.getItem('token');
       const res = await fetch('/api/v1/rules/translate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           text: enText,
           target_lang: LANG_META[activeResponseLang]?.label || activeResponseLang,

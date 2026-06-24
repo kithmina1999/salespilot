@@ -15,15 +15,22 @@ import (
 	"github.com/kithmina1999/salespilot/cache"
 	"github.com/kithmina1999/salespilot/config"
 	"github.com/kithmina1999/salespilot/database"
+	"github.com/kithmina1999/salespilot/errorreporting"
 	"github.com/kithmina1999/salespilot/handlers"
 	"github.com/kithmina1999/salespilot/knowledge"
 	"github.com/kithmina1999/salespilot/middleware"
+	"github.com/kithmina1999/salespilot/observability"
 	"github.com/kithmina1999/salespilot/services"
 	"github.com/kithmina1999/salespilot/utils"
 	"github.com/kithmina1999/salespilot/whatsapp"
 )
 
 func main() {
+	observability.ConfigureFromEnv("salespilot-backend")
+	reporter := errorreporting.NewDiscordReporter(100)
+	observability.SetErrorReporter(reporter)
+	defer reporter.Close()
+
 	// Load config
 	cfg := config.Load()
 
@@ -40,6 +47,7 @@ func main() {
 		log.Fatalf("failed to initialize pipeline state store: %v", err)
 	}
 	whatsapp.SetStateStore(appStore)
+	middleware.SetRateLimitStore(appStore)
 
 	// 10 concurrent workers
 	utils.InitWorkerPool(10)
@@ -62,10 +70,11 @@ func main() {
 
 	// Create uploads directory
 	os.MkdirAll("uploads/products", 0755)
-	os.MkdirAll("uploads/receipts", 0755)
+	os.MkdirAll("private_uploads/receipts", 0700)
 
 	// Setup Gin
-	r := gin.Default()
+	r := gin.New()
+	r.Use(middleware.RequestContext(), middleware.Recovery())
 
 	// Fix: Only trust the local reverse proxy (nginx on same host), not all proxies
 	if err := r.SetTrustedProxies([]string{"127.0.0.1", "::1"}); err != nil {
@@ -86,8 +95,8 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	// Serve uploaded images as static files
-	r.Static("/uploads", "./uploads")
+	// Product images are public; receipts are served through authenticated handlers.
+	r.Static("/uploads/products", "./uploads/products")
 
 	// Health check with DB ping (no auth)
 	r.GET("/health", func(c *gin.Context) {
@@ -147,6 +156,7 @@ func main() {
 
 		// Payment proof verification queue
 		system.GET("/payments", middleware.RequireSuperPermission(middleware.PermBillingView), handlers.ListPaymentProofs)
+		system.GET("/payments/:id/receipt", middleware.RequireSuperPermission(middleware.PermBillingView), handlers.ServeSystemPaymentProofReceipt)
 		system.POST("/payments/:id/approve", middleware.RequireSuperPermission(middleware.PermBillingManage), middleware.HighRiskRoute("approve_payment"), handlers.ApprovePayment)
 		system.POST("/payments/:id/reject", middleware.RequireSuperPermission(middleware.PermBillingManage), middleware.HighRiskRoute("reject_payment"), handlers.RejectPayment)
 
@@ -179,14 +189,16 @@ func main() {
 	// Dashboard Authentication
 	auth := r.Group("/api/v1/auth")
 	{
-		auth.POST("/login", middleware.RateLimit(20), handlers.Login)
-		auth.POST("/register", handlers.Register)
-		auth.POST("/verify-email", handlers.VerifyEmailOTP)
-		auth.POST("/resend-verification", handlers.ResendEmailOTP)
+		auth.POST("/login", middleware.RateLimitAuth(20, "identifier"), handlers.Login)
+		auth.POST("/logout", handlers.Logout)
+		auth.GET("/session", middleware.AuthRequired(), handlers.AuthSession)
+		auth.POST("/register", middleware.RateLimitAuth(20, "email", "phone"), handlers.Register)
+		auth.POST("/verify-email", middleware.RateLimitAuth(30, "email"), handlers.VerifyEmailOTP)
+		auth.POST("/resend-verification", middleware.RateLimitAuth(10, "email"), handlers.ResendEmailOTP)
 		// Password reset via WhatsApp OTP — 3-step flow
-		auth.POST("/forgot-password", handlers.ForgotPassword) // Step 1: send OTP
-		auth.POST("/verify-otp", handlers.VerifyOTP)           // Step 2: verify OTP → get reset token
-		auth.POST("/reset-password", handlers.ResetPassword)   // Step 3: set new password
+		auth.POST("/forgot-password", middleware.RateLimitAuth(10, "phone"), handlers.ForgotPassword)     // Step 1: send OTP
+		auth.POST("/verify-otp", middleware.RateLimitAuth(30, "phone"), handlers.VerifyOTP)               // Step 2: verify OTP → get reset token
+		auth.POST("/reset-password", middleware.RateLimitAuth(20, "reset_token"), handlers.ResetPassword) // Step 3: set new password
 	}
 
 	// Dashboard Secured API (JWT)
@@ -243,6 +255,7 @@ func main() {
 		// Slice 4: Payment proof review
 		dash.GET("/orders/:id/proofs", handlers.GetOrderProofs)
 		dash.GET("/order-proofs", handlers.ListOrderProofs)
+		dash.GET("/order-proofs/:id/receipt", handlers.ServeOrderProofReceipt)
 		dash.POST("/order-proofs/:id/approve", middleware.RequireBusinessActive(), handlers.ApproveOrderProof)
 		dash.POST("/order-proofs/:id/reject", middleware.RequireBusinessActive(), handlers.RejectOrderProof)
 
@@ -336,11 +349,16 @@ func main() {
 	// Start Background Cron Jobs (e.g., 7-day order follow-ups)
 	services.StartCronJobs()
 
-	log.Printf("📁 Uploads served at %s/uploads/", cfg.ServerURL)
+	log.Printf("📁 Product uploads served at %s/uploads/products/", cfg.ServerURL)
 
 	srv := &http.Server{
-		Addr:    ":" + cfg.Port,
-		Handler: r,
+		Addr:              ":" + cfg.Port,
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      180 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
 
 	go func() {

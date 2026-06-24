@@ -66,7 +66,7 @@ func RequestPasswordChangeOTP(c *gin.Context) {
 		return
 	}
 
-	if err := utils.SendVerificationEmail(user.Email, otp); err != nil {
+	if err := utils.SendVerificationEmailContext(c.Request.Context(), user.Email, otp); err != nil {
 		database.DB.Delete(&record)
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Failed to send verification email. Please try again."})
 		return

@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,14 +10,19 @@ import (
 	"net/http"
 
 	"github.com/kithmina1999/salespilot/config"
+	"github.com/kithmina1999/salespilot/httpclient"
 )
 
 // SendVerificationEmail sends a 6-digit OTP code to the user via Resend
 func SendVerificationEmail(toEmail, otp string) error {
+	return SendVerificationEmailContext(context.Background(), toEmail, otp)
+}
+
+func SendVerificationEmailContext(ctx context.Context, toEmail, otp string) error {
 	cfg := config.Load()
 
 	if cfg.ResendAPIKey == "" {
-		log.Println("⚠️ RESEND_API_KEY is missing. Simulating email send for", toEmail, "| OTP:", otp)
+		log.Println("RESEND_API_KEY is missing; verification email was simulated without logging its recipient or OTP")
 		return nil
 	}
 
@@ -48,7 +54,7 @@ func SendVerificationEmail(toEmail, otp string) error {
 
 	jsonPayload, _ := json.Marshal(payload)
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return err
 	}
@@ -56,28 +62,31 @@ func SendVerificationEmail(toEmail, otp string) error {
 	req.Header.Set("Authorization", "Bearer "+cfg.ResendAPIKey)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := httpclient.DoContext(ctx, httpclient.DependencyResend, "send_verification_email", req, httpclient.NoRetry)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to send email via Resend, status code: %d, response: %s", resp.StatusCode, string(bodyBytes))
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
+		return fmt.Errorf("failed to send email via Resend, status code: %d", resp.StatusCode)
 	}
 
-	log.Printf("📧 Email OTP sent successfully to %s", toEmail)
+	log.Println("Email OTP sent successfully")
 	return nil
 }
 
 // SendActivationCodeEmail sends the activation code to a tenant after admin approves their payment proof.
 func SendActivationCodeEmail(toEmail, businessName, code, plan, cycle string, durationDays int) error {
+	return SendActivationCodeEmailContext(context.Background(), toEmail, businessName, code, plan, cycle, durationDays)
+}
+
+func SendActivationCodeEmailContext(ctx context.Context, toEmail, businessName, code, plan, cycle string, durationDays int) error {
 	cfg := config.Load()
 
 	if cfg.ResendAPIKey == "" {
-		log.Printf("⚠️ RESEND_API_KEY missing. Would have sent activation code %s to %s", code, toEmail)
+		log.Println("RESEND_API_KEY is missing; activation email was simulated without logging its recipient or code")
 		return nil
 	}
 
@@ -132,26 +141,25 @@ func SendActivationCodeEmail(toEmail, businessName, code, plan, cycle string, du
 	}
 
 	jsonPayload, _ := json.Marshal(payload)
-	req, err := http.NewRequest("POST", "https://api.resend.com/emails", bytes.NewBuffer(jsonPayload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.resend.com/emails", bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+cfg.ResendAPIKey)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := httpclient.DoContext(ctx, httpclient.DependencyResend, "send_activation_email", req, httpclient.NoRetry)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("resend activation email failed: status %d, body: %s", resp.StatusCode, string(bodyBytes))
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
+		return fmt.Errorf("resend activation email failed: status %d", resp.StatusCode)
 	}
 
-	log.Printf("📧 Activation code email sent to %s (code: %s)", toEmail, code)
+	log.Println("Activation code email sent successfully")
 	return nil
 }
 
@@ -160,10 +168,14 @@ func SendActivationCodeEmail(toEmail, businessName, code, plan, cycle string, du
 // This is email-based (not WhatsApp) because late deliveries are cold outbound
 // — outside the Meta 24-hour session window.
 func SendLateDeliveryEmail(toEmail, businessName string, orderNum int64, customerName, customerPhone string, daysLate int, totalPrice float64) error {
+	return SendLateDeliveryEmailContext(context.Background(), toEmail, businessName, orderNum, customerName, customerPhone, daysLate, totalPrice)
+}
+
+func SendLateDeliveryEmailContext(ctx context.Context, toEmail, businessName string, orderNum int64, customerName, customerPhone string, daysLate int, totalPrice float64) error {
 	cfg := config.Load()
 
 	if cfg.ResendAPIKey == "" {
-		log.Printf("⚠️ RESEND_API_KEY missing. Would have sent late delivery alert to %s for order #%d", toEmail, orderNum)
+		log.Printf("RESEND_API_KEY is missing; late-delivery email for order %d was simulated", orderNum)
 		return nil
 	}
 
@@ -221,25 +233,24 @@ func SendLateDeliveryEmail(toEmail, businessName string, orderNum int64, custome
 	}
 
 	jsonPayload, _ := json.Marshal(payload)
-	req, err := http.NewRequest("POST", "https://api.resend.com/emails", bytes.NewBuffer(jsonPayload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.resend.com/emails", bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+cfg.ResendAPIKey)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := httpclient.DoContext(ctx, httpclient.DependencyResend, "send_late_delivery_email", req, httpclient.NoRetry)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("late delivery email failed: status %d, body: %s", resp.StatusCode, string(bodyBytes))
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
+		return fmt.Errorf("late delivery email failed: status %d", resp.StatusCode)
 	}
 
-	log.Printf("📧 Late delivery alert email sent to %s (order #%d, %d days late)", toEmail, orderNum, daysLate)
+	log.Printf("Late-delivery email sent for order %d (%d days late)", orderNum, daysLate)
 	return nil
 }

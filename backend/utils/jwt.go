@@ -59,6 +59,9 @@ func GenerateToken(userID, businessID uint, role string, sessionID string) (stri
 func ValidateToken(tokenString string) (*Claims, error) {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
+		if t.Method != jwt.SigningMethodHS256 {
+			return nil, errors.New("unexpected JWT signing method")
+		}
 		return getJWTSecret(), nil
 	})
 	if err != nil {

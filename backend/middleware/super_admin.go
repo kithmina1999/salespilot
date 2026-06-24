@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -119,39 +118,6 @@ func HighRiskRoute(action string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Set("risk", "high")
 		c.Set("risk_action", action)
-		c.Next()
-	}
-}
-
-var adminLoginAttempts = make(map[string]struct {
-	count   int
-	expires time.Time
-})
-var adminLoginLock sync.Mutex
-
-// RateLimitAdminLogin protects the super admin login from brute force attacks.
-func RateLimitAdminLogin() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		ip := c.ClientIP()
-		adminLoginLock.Lock()
-		defer adminLoginLock.Unlock()
-
-		now := time.Now()
-		info, exists := adminLoginAttempts[ip]
-
-		if exists && now.After(info.expires) {
-			info.count = 0
-		}
-
-		if info.count >= 10 {
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "too_many_attempts"})
-			return
-		}
-
-		info.count++
-		info.expires = now.Add(15 * time.Minute)
-		adminLoginAttempts[ip] = info
-
 		c.Next()
 	}
 }

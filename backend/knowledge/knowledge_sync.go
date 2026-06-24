@@ -13,12 +13,19 @@ import (
 
 // SyncProductKnowledge upserts a system-managed Rule for a product.
 func SyncProductKnowledge(db *gorm.DB, product models.Product) error {
+	_, _, err := SyncProductKnowledgeWithEmbeddingState(db, product)
+	return err
+}
+
+// SyncProductKnowledgeWithEmbeddingState also reports whether the generated
+// semantic text changed and therefore needs a new embedding.
+func SyncProductKnowledgeWithEmbeddingState(db *gorm.DB, product models.Product) (*models.Rule, bool, error) {
 	keywords := GenerateProductKeywords(product)
 	responses, err := json.Marshal(map[string]string{
 		"en": "*{{product_name}}*\nPrice: {{product_price}}\n{{product_stock_status}}\n{{product_options_summary}}",
 	})
 	if err != nil {
-		return err
+		return nil, false, err
 	}
 	responsesJSON := string(responses)
 
@@ -26,6 +33,7 @@ func SyncProductKnowledge(db *gorm.DB, product models.Product) error {
 	err = db.Where("business_id = ? AND source_type = ? AND source_id = ?", product.BusinessID, models.SourceTypeProduct, product.ID).First(&rule).Error
 
 	if err == nil {
+		semanticTextChanged := rule.Keywords != keywords || rule.Responses != responsesJSON
 		// Update existing rule
 		rule.Keywords = keywords
 		rule.Responses = responsesJSON
@@ -33,7 +41,13 @@ func SyncProductKnowledge(db *gorm.DB, product models.Product) error {
 		rule.Category = "Product Catalog"
 		rule.SystemManaged = true
 		rule.KnowledgeType = models.KnowledgeTypeProductCatalog
-		return db.Save(&rule).Error
+		if semanticTextChanged {
+			rule.Embedding = nil
+		}
+		if err := db.Save(&rule).Error; err != nil {
+			return nil, false, err
+		}
+		return &rule, semanticTextChanged || len(rule.Embedding) == 0, nil
 	} else if err == gorm.ErrRecordNotFound {
 		// Create new rule
 		bizID := product.BusinessID
@@ -49,9 +63,12 @@ func SyncProductKnowledge(db *gorm.DB, product models.Product) error {
 			SourceID:      &prodID,
 			SystemManaged: true,
 		}
-		return db.Create(&rule).Error
+		if err := db.Create(&rule).Error; err != nil {
+			return nil, false, err
+		}
+		return &rule, true, nil
 	}
-	return err
+	return nil, false, err
 }
 
 // SyncAllSystemKnowledge backfills system-managed knowledge for existing dev data.

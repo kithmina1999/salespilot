@@ -11,7 +11,7 @@
 
 import useSWR, { mutate } from 'swr';
 import { toast } from 'sonner';
-import { API_URL, getToken, apiFetcher } from './_shared';
+import { API_URL, apiFetcher } from './_shared';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -69,7 +69,8 @@ export function useOrders() {
     try {
       const res = await fetch(`${API_URL}/api/v1/orders/${orderId}/status`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ status: newStatus, ...extra }),
       });
       if (!res.ok) throw new Error('Server error');
@@ -94,7 +95,8 @@ export function useOrders() {
     try {
       const res = await fetch(`${API_URL}/api/v1/orders/${orderId}/payment`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ payment_status: paymentStatus }),
       });
       if (!res.ok) throw new Error('Server error');

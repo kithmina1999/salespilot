@@ -17,6 +17,7 @@ package services
 // Template-based WA outbound alerts are planned for Phase 5.
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"time"
@@ -65,7 +66,9 @@ func RunLateDeliveryAlerts() {
 			customerDisplay = order.CustomerPhone
 		}
 
-		if err := utils.SendLateDeliveryEmail(
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		err := utils.SendLateDeliveryEmailContext(
+			ctx,
 			adminUser.Email,
 			business.Name,
 			int64(order.BusinessOrderNum),
@@ -73,7 +76,9 @@ func RunLateDeliveryAlerts() {
 			order.CustomerPhone,
 			daysLate,
 			order.TotalPrice,
-		); err != nil {
+		)
+		cancel()
+		if err != nil {
 			log.Printf("❌ [LateDelivery] Email failed for order #%d: %v", order.BusinessOrderNum, err)
 		}
 
