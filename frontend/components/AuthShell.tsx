@@ -15,6 +15,8 @@ const features = [
   'Full sales analytics dashboard',
 ];
 
+const marketingSiteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://salespilot.lk';
+
 export default function AuthShell({ children, panelTitle, panelSub }: AuthShellProps) {
   return (
     <div className="flex min-h-screen font-sans relative w-full h-screen">
@@ -60,7 +62,7 @@ export default function AuthShell({ children, panelTitle, panelSub }: AuthShellP
             <div className="w-[24px] h-[24px] bg-linear-to-br  flex items-center justify-center  shrink-0">
               <Image src="/assets/logo-sm.png" alt="SalesPilot" width={55} height={55} />
             </div>
-            <Link href="/" className="font-bold text-[1.15rem] text-black no-underline tracking-[.5px] drop-shadow-md">
+            <Link href={marketingSiteUrl} className="font-bold text-[1.15rem] text-black no-underline tracking-[.5px] drop-shadow-md">
               SalesPilot
             </Link>
           </div>

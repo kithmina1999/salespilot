@@ -43,7 +43,11 @@ func Init(dsn string) {
 	sqlDB.SetMaxOpenConns(25)
 	sqlDB.SetMaxIdleConns(5)
 
-	if os.Getenv("SEED_DB") == "true" {
+	if isProductionRuntime() && isTruthy(os.Getenv("SEED_DB")) {
+		log.Fatal("FATAL: SEED_DB=true is not allowed in production/release mode")
+	}
+
+	if isTruthy(os.Getenv("SEED_DB")) {
 		log.Println("⚠️ SEED_DB is true. Dropping existing tables...")
 		DB.Migrator().DropTable(
 			&models.Product{}, &models.Order{}, &models.Customer{},
@@ -60,44 +64,52 @@ func Init(dsn string) {
 		)
 	}
 
-	// Auto-migrate all models (creates/updates tables in Postgres)
-	err = DB.AutoMigrate(
-		&models.Business{}, &models.User{}, &models.Product{}, &models.Order{},
-		&models.Customer{}, &models.Rule{}, &models.RuleTemplate{}, &models.Message{},
-		&models.KnowledgeGap{}, &models.AuditLog{},
-		&models.BlacklistedNumber{}, &models.ActivationCode{},
-		&models.PasswordResetToken{}, // WhatsApp OTP password reset
-		&models.EmailVerificationToken{},
-		&models.PaymentProof{},        // Bank transfer proof submissions
-		&models.TeamInvite{},          // Multi-user RBAC invitations
-		&models.MonthlyReport{},       // AI-generated monthly business intelligence reports
-		&models.Cart{},                // In-progress customer order sessions
-		&models.SavedAddress{},        // Customer saved delivery addresses
-		&models.PasswordChangeToken{}, // Authenticated email-OTP password change flow
-		&models.UserSession{},         // Login session tracking (active sessions + login history)
-		&models.OrderPaymentProof{},   // Customer bank-transfer receipt submissions (Slice 3)
-		&models.SuperAdminUser{},
-		&models.SuperAdminSession{},
-		&models.PipelineLog{},
-		&models.PipelineSignalLog{},
-		&models.PlatformNotice{},
-		&models.PlatformBillingSettings{},
-		&models.SubscriptionPlan{},
-		&models.BillingPaymentAttempt{},
-		&models.BillingAddon{},
-		&models.PaymentProofLineItem{},
-		&models.BillingServicePurchase{},
-		&models.EmbeddingArtifact{},
-	)
-	if err != nil {
-		log.Fatalf("❌ Failed to migrate database: %v", err)
-	}
+	if startupAutoMigrateEnabled() {
+		// Auto-migrate all models (creates/updates tables in Postgres)
+		err = DB.AutoMigrate(
+			&models.Business{}, &models.User{}, &models.Product{}, &models.Order{},
+			&models.Customer{}, &models.Rule{}, &models.RuleTemplate{}, &models.Message{},
+			&models.KnowledgeGap{}, &models.AuditLog{},
+			&models.BlacklistedNumber{}, &models.ActivationCode{},
+			&models.PasswordResetToken{}, // WhatsApp OTP password reset
+			&models.EmailVerificationToken{},
+			&models.PaymentProof{},        // Bank transfer proof submissions
+			&models.TeamInvite{},          // Multi-user RBAC invitations
+			&models.MonthlyReport{},       // AI-generated monthly business intelligence reports
+			&models.Cart{},                // In-progress customer order sessions
+			&models.SavedAddress{},        // Customer saved delivery addresses
+			&models.PasswordChangeToken{}, // Authenticated email-OTP password change flow
+			&models.UserSession{},         // Login session tracking (active sessions + login history)
+			&models.OrderPaymentProof{},   // Customer bank-transfer receipt submissions (Slice 3)
+			&models.SuperAdminUser{},
+			&models.SuperAdminSession{},
+			&models.PipelineLog{},
+			&models.PipelineSignalLog{},
+			&models.PlatformNotice{},
+			&models.PlatformBillingSettings{},
+			&models.SubscriptionPlan{},
+			&models.BillingPaymentAttempt{},
+			&models.BillingAddon{},
+			&models.PaymentProofLineItem{},
+			&models.BillingServicePurchase{},
+			&models.EmbeddingArtifact{},
+		)
+		if err != nil {
+			log.Fatalf("❌ Failed to migrate database: %v", err)
+		}
 
-	if err := EnsureProductionIndexes(DB); err != nil {
-		log.Fatalf("❌ Failed to ensure production indexes: %v", err)
-	}
+		if err := EnsureProductionIndexes(DB); err != nil {
+			log.Fatalf("❌ Failed to ensure production indexes: %v", err)
+		}
 
-	log.Println("✅ PostgreSQL connected and migrated successfully")
+		log.Println("✅ PostgreSQL connected and migrated successfully")
+
+	} else {
+		if err := VerifyNoPendingMigrations(DB); err != nil {
+			log.Fatalf("Database migrations are required before startup: %v", err)
+		}
+		log.Println("Database schema verified; startup migrations disabled")
+	}
 
 	if count, err := providersecrets.BackfillBusinessWAAccessTokens(DB); err != nil {
 		log.Fatalf("failed to encrypt tenant provider tokens: %v", err)
@@ -109,7 +121,7 @@ func Init(dsn string) {
 		log.Fatalf("Failed to seed billing catalog defaults: %v", err)
 	}
 
-	if os.Getenv("SEED_DB") == "true" {
+	if isTruthy(os.Getenv("SEED_DB")) {
 		seedDemoData()
 	}
 

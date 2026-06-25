@@ -30,7 +30,7 @@ function VerifyEmailContent() {
   useEffect(() => {
     if (!emailParam) {
       toast.error('No email provided. Redirecting to register.');
-      router.push('/register');
+      router.push('/auth/register');
     }
   }, [emailParam, router]);
 
@@ -162,7 +162,7 @@ function VerifyEmailContent() {
 
         <p className="auth-sub" style={{ textAlign: 'center', marginTop: '1.5rem' }}>
           Signed up with the wrong email?{' '}
-          <Link href="/register" className="text-green-600 font-semibold hover:underline" style={{ textDecoration: 'none' }}>
+          <Link href="/auth/register" className="text-green-600 font-semibold hover:underline" style={{ textDecoration: 'none' }}>
             Start over
           </Link>
         </p>

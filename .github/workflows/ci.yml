@@ -46,6 +46,12 @@ jobs:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
 
+      - name: Run database migrations
+        run: go run ./cmd/migrate up
+
+      - name: Check migration status
+        run: go run ./cmd/migrate status
+
       - name: Run tests
         run: go test -p 1 ./...
 

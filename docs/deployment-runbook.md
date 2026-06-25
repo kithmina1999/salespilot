@@ -225,12 +225,35 @@ Validate Compose config:
 docker compose --env-file .env.production -f docker-compose.prod.yml config --quiet
 ```
 
+Confirm production container hardening renders in the Compose output:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml config \
+  | grep -E "no-new-privileges|cap_drop|read_only|mem_limit|pids_limit"
+```
+
 Go/no-go:
 
 - Go if Compose config renders cleanly.
 - Stop if any value still contains `REPLACE_WITH_`, `CHANGE_ME`, or placeholder domains.
+- Stop if backend/frontend/admin/landing do not render read-only roots, capability
+  drops, and resource limits.
 
 ## Phase 4 - First App Boot
+
+Start Postgres and run reviewed database migrations:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build postgres
+docker compose --env-file .env.production -f docker-compose.prod.yml build migrate
+docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --no-deps migrate
+```
+
+Confirm no migrations remain pending:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --no-deps migrate status
+```
 
 Start the Compose stack:
 
@@ -242,6 +265,16 @@ Check containers:
 
 ```bash
 docker compose --env-file .env.production -f docker-compose.prod.yml ps
+```
+
+Inspect representative runtime hardening:
+
+```bash
+docker inspect salespilot-backend-1 \
+  --format 'security={{json .HostConfig.SecurityOpt}} readOnly={{.HostConfig.ReadonlyRootfs}} capDrop={{json .HostConfig.CapDrop}} memory={{.HostConfig.Memory}} pids={{.HostConfig.PidsLimit}}'
+
+docker inspect salespilot-postgres-1 \
+  --format 'security={{json .HostConfig.SecurityOpt}} capDrop={{json .HostConfig.CapDrop}} memory={{.HostConfig.Memory}} pids={{.HostConfig.PidsLimit}}'
 ```
 
 Local health checks:
@@ -266,6 +299,11 @@ Go/no-go:
 
 - Go if all local health checks pass.
 - Stop if backend cannot connect to Postgres/Redis or if any required container restarts repeatedly.
+- Stop if backend logs say database migrations are required; run the `migrate`
+  service and inspect pending entries before restarting backend.
+- Stop if logs show `permission denied` on `/app/uploads`, `/app/private_uploads`,
+  `/app/data`, `/tmp`, or `.next/cache`; those are the only expected app write
+  paths under the read-only root filesystem.
 
 ## Phase 5 - Nginx And SSL
 
@@ -467,6 +505,7 @@ The script does:
 - Docker/Compose preflight
 - Nginx config check
 - Optional pre-deploy backup
+- Reviewed database migrations through the `migrate` Compose service
 - Compose rebuild/recreate
 - Container health checks
 - Local URL checks
@@ -652,6 +691,8 @@ Production launch is ready only when:
 - Gemini retry and Meta no-retry smoke tests match `docs/error-handling.md`.
 - 100-concurrent-user load test passes against staging or the final VPS.
 - OWASP security audit has no open High findings.
+- Production Compose hardening is enabled and verified with `docker inspect`.
+- `salespilot-migrate status` reports no pending database migrations.
 - Sentry DSN is configured or intentionally deferred.
 - Uptime monitoring is configured or intentionally deferred.
 - Primary and secondary on-call owners are scheduled for the next four weeks.

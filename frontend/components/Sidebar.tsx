@@ -328,7 +328,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   async function logout() {
     await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
     clearSession();
-    router.push('/login');
+    router.push('/auth/login');
   }
 
   return (

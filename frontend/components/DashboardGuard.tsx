@@ -21,7 +21,7 @@ export default function DashboardGuard({ children }: { children: React.ReactNode
       .then((ok) => {
         if (!ok) {
           clearSession();
-          router.replace('/login');
+          router.replace('/auth/login');
           return Promise.reject(new Error('unauthenticated'));
         }
         return fetchAll();

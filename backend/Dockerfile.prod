@@ -10,6 +10,7 @@ RUN go mod download
 
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/salespilot .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/salespilot-migrate ./cmd/migrate
 
 FROM alpine:3.22 AS runner
 
@@ -23,6 +24,7 @@ ENV GIN_MODE=release \
     WA_SESSIONS_DB_PATH=/app/data/whatsapp_sessions.db
 
 COPY --from=builder /out/salespilot /usr/local/bin/salespilot
+COPY --from=builder /out/salespilot-migrate /usr/local/bin/salespilot-migrate
 
 RUN mkdir -p /app/uploads/products /app/private_uploads/receipts /app/data \
     && chown -R salespilot:salespilot /app

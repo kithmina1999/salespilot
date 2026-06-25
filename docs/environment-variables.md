@@ -55,6 +55,7 @@ must use shell-safe quoting.
 | `APP_RELEASE` | Recommended | `SENTRY_RELEASE`, `IMAGE_TAG`, or `unknown` | No | Immutable release or Git SHA attached to backend logs and error reports. |
 | `LOG_FORMAT` | Recommended | `json` in release; `text` otherwise | No | Backend log encoding. Production must use `json` for Loki parsing. |
 | `LOG_LEVEL` | Optional | `info` | No | Minimum backend level: `debug`, `info`, `warn`, or `error`. |
+| `DB_AUTO_MIGRATE` | Managed in production | `false` in production, `true` otherwise | No | Controls startup schema mutation. Production Compose sets `false`; reviewed migrations run through `salespilot-migrate` before backend startup. |
 
 `FRONTEND_URL` example:
 
@@ -118,7 +119,7 @@ openssl rand -base64 32
 | --- | --- | --- | --- | --- |
 | `SUPER_ADMIN_EMAIL` | Optional | Empty | Personal | Creates the first super-admin only when no super-admin exists and the initial password is also set. |
 | `SUPER_ADMIN_INITIAL_PASSWORD` | Conditional | Empty | Yes | One-time bootstrap password. Remove it after first login and password rotation. |
-| `SEED_DB` | Optional/dangerous | `false` | No | `true` drops and reseeds core data. Keep `false` in every production env. |
+| `SEED_DB` | Optional/dangerous | `false` | No | `true` drops and reseeds core data outside production. Production/release startup exits if this is enabled. |
 
 ## Frontend And Landing Builds
 
@@ -193,6 +194,8 @@ These variables belong in `/etc/salespilot/deploy.env`, copied from
 | `RUN_PRE_DEPLOY_BACKUP` | `true` | Runs the database backup service before changing containers. |
 | `BACKUP_SERVICE` | `salespilot-db-backup.service` | Systemd backup unit to invoke. |
 | `BACKUP_ENV_FILE` | `/etc/salespilot/backup.env` | Backup settings passed to the backup service/script. |
+| `RUN_DATABASE_MIGRATIONS` | `true` | Runs the Compose migration service before app services start. |
+| `MIGRATION_SERVICE` | `migrate` | Compose service that executes `salespilot-migrate up`. |
 | `REQUIRED_SERVICES` | All production services | Space-separated Compose services that must be running and healthy. |
 | `LOCAL_HEALTH_URLS` | Local service URLs | Space-separated loopback URLs checked before public checks. |
 | `CHECK_PUBLIC_HEALTH` | `true` | Enables public HTTPS health checks. Set false before DNS and TLS exist. |

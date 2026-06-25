@@ -42,6 +42,8 @@ LOCAL_HEALTH_URLS="${LOCAL_HEALTH_URLS:-http://127.0.0.1:8080/health http://127.
 CHECK_PUBLIC_HEALTH="${CHECK_PUBLIC_HEALTH:-true}"
 PUBLIC_HEALTH_URLS="${PUBLIC_HEALTH_URLS:-https://api.salespilot.lk/health https://app.salespilot.lk https://admin.salespilot.lk https://salespilot.lk}"
 CHECK_NGINX="${CHECK_NGINX:-true}"
+RUN_DATABASE_MIGRATIONS="${RUN_DATABASE_MIGRATIONS:-true}"
+MIGRATION_SERVICE="${MIGRATION_SERVICE:-migrate}"
 HEALTH_TIMEOUT_SECONDS="${HEALTH_TIMEOUT_SECONDS:-240}"
 HEALTH_INTERVAL_SECONDS="${HEALTH_INTERVAL_SECONDS:-5}"
 CURL_MAX_TIME_SECONDS="${CURL_MAX_TIME_SECONDS:-10}"
@@ -107,33 +109,10 @@ run_pre_deploy_backup() {
   die "backup enabled, but neither $BACKUP_SERVICE nor backup-postgres.sh is available"
 }
 
-deploy_stack() {
-  cd "$APP_DIR"
-  log "deploying stack using strategy: $DEPLOY_STRATEGY"
-
-  case "$DEPLOY_STRATEGY" in
-    compose)
-      compose up -d --build --remove-orphans
-      ;;
-    systemd)
-      require_command systemctl
-      if systemctl is-active --quiet "$SYSTEMD_SERVICE"; then
-        systemctl reload "$SYSTEMD_SERVICE"
-      else
-        systemctl start "$SYSTEMD_SERVICE"
-        compose up -d --build --remove-orphans
-      fi
-      ;;
-    *)
-      die "unknown DEPLOY_STRATEGY: $DEPLOY_STRATEGY"
-      ;;
-  esac
-}
-
-wait_for_container_health() {
+wait_for_services() {
   local deadline all_ok svc cid state health
   local -a services statuses
-  read -r -a services <<< "$REQUIRED_SERVICES"
+  services=("$@")
   deadline=$((SECONDS + HEALTH_TIMEOUT_SECONDS))
 
   log "waiting for container health: ${services[*]}"
@@ -171,6 +150,53 @@ wait_for_container_health() {
 
   print_failure_context
   die "containers did not become healthy within ${HEALTH_TIMEOUT_SECONDS}s"
+}
+
+run_database_migrations() {
+  if ! is_true "$RUN_DATABASE_MIGRATIONS"; then
+    log "database migrations disabled"
+    return
+  fi
+
+  cd "$APP_DIR"
+  log "starting postgres for database migrations"
+  compose up -d --build postgres
+  wait_for_services postgres
+
+  log "building migration image"
+  compose build "$MIGRATION_SERVICE"
+
+  log "running database migrations"
+  compose run --rm --no-deps "$MIGRATION_SERVICE"
+}
+
+deploy_stack() {
+  cd "$APP_DIR"
+  log "deploying stack using strategy: $DEPLOY_STRATEGY"
+
+  case "$DEPLOY_STRATEGY" in
+    compose)
+      compose up -d --build --remove-orphans
+      ;;
+    systemd)
+      require_command systemctl
+      if systemctl is-active --quiet "$SYSTEMD_SERVICE"; then
+        systemctl reload "$SYSTEMD_SERVICE"
+      else
+        systemctl start "$SYSTEMD_SERVICE"
+        compose up -d --build --remove-orphans
+      fi
+      ;;
+    *)
+      die "unknown DEPLOY_STRATEGY: $DEPLOY_STRATEGY"
+      ;;
+  esac
+}
+
+wait_for_container_health() {
+  local -a services
+  read -r -a services <<< "$REQUIRED_SERVICES"
+  wait_for_services "${services[@]}"
 }
 
 wait_for_urls() {
@@ -215,6 +241,7 @@ wait_for_urls() {
 main() {
   preflight
   run_pre_deploy_backup
+  run_database_migrations
   deploy_stack
   wait_for_container_health
   wait_for_urls "local" "$LOCAL_HEALTH_URLS"

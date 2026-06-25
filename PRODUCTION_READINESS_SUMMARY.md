@@ -45,8 +45,8 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 | **Volume Persistence** | ✅ | Named volumes | `postgres_data`, `redis_data`, `backend_uploads`, `loki_data`, `grafana_data`, `alloy_data` |
 | **Networking** | ✅ | Private bridge network | Services isolated from host; only nginx exposed |
 | **Init Process** | ✅ | `init: true` in app services | Zombie process prevention |
-| **Resource Limits** | ❌ | Not set | CPU/memory caps missing – add in production pass |
-| **Security Options** | ❌ | Not set | `no-new-privileges`, `cap_drop`, read-only filesystems missing |
+| **Resource Limits** | ✅ | Set | Production Compose applies CPU, memory, and pid limits per service |
+| **Security Options** | ✅ | Set | `no-new-privileges`, capability drops, and app read-only roots are enabled |
 
 ### 2.2 Reverse Proxy & TLS
 
@@ -141,7 +141,7 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 | **SSL Certificate Renewal Automation** | Medium | Manual `certbot renew` cron; should auto-trigger via systemd timer |
 | **Secrets Rotation Procedures** | High | Need written steps for backup passphrase, DB password, API keys |
 | **Monitoring/Alerting Rules** | High | Need Loki alert queries for 5xx errors, auth spikes, webhook failures |
-| **Database Migration Strategy** | High | AutoMigrate currently used; should formalize before serious launch |
+| **Database Migration Strategy** | Complete | Production startup verifies versioned migrations; deploy/systemd runs `salespilot-migrate` before backend boot |
 | **Horizontal Scaling Plan** | Low | Out of scope; doc should note VPS-only for now |
 | **Vendor Audit Checklist** | Medium | SOC 2, GDPR, data retention policies not documented |
 
@@ -170,10 +170,10 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 | **SA-003** | ✅ Medium | Fixed | A07 + A02 | Credentials accepted in query strings | Removed `?token=`, `?api_key=`, `?master_key=` fallbacks; header-only auth regression tests added | Complete |
 | **SA-004** | Medium | Fixed | A02 + A03 | Payment receipt uploads locally readable | Private receipt storage plus authenticated receipt endpoints for super-admin and tenant order proofs | Complete |
 | **SA-005** | Medium | Fixed | A07 + API4 | In-memory rate limiting only | Redis-backed shared limiter with per-IP/per-identifier auth keys and Nginx `limit_req` zones | Complete |
-| **SA-006** | 🟠 Medium | Open | A02 | CSP not enforced (report-only) | Add CSP, tune for Sentry/Cloudinary, enforce | Before production |
-| **SA-007** | 🟠 Medium | Open | A03 | No dependency vulnerability scanning | Add `npm audit` and `govulncheck` to CI | Before staging |
-| **SA-008** | 🟡 Low | Open | A02 | Container security options not set | Add `no-new-privileges`, `cap_drop`, resource limits, read-only FS | After launch acceptable |
-| **SA-009** | 🟡 Low | Open | A08 | AutoMigrate used in production startup | Move to reviewed migration files | Before serious launch |
+| **SA-006** | Medium | Fixed | A02 | CSP not enforced (report-only) | Enforced production CSP with current Sentry, Cloudinary, Google Fonts, and PayHere allowances | Complete |
+| **SA-007** | Medium | Fixed | A03 | No dependency vulnerability scanning | Added GitHub Actions `npm audit --omit=dev --audit-level=high` and `govulncheck` gates | Complete |
+| **SA-008** | Low | Fixed | A02 | Container security options not set | Added `no-new-privileges`, capability drops, resource limits, app read-only roots, and explicit writable mounts | Complete |
+| **SA-009** | Low | Fixed | A08 | AutoMigrate used in production startup | Production startup now disables schema mutation and requires reviewed `schema_migrations`; deploy/systemd runs `salespilot-migrate` first | Complete |
 
 ### 4.3 Encryption & Keys
 
@@ -273,7 +273,7 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 | **Docker build** | ✅ | Implicit in compose | Multi-stage builds tested |
 | **Integration tests** | ❌ | Not in CI | Manual staging validation only |
 | **Load tests** | ❌ | Not in CI | Manual pre-launch only |
-| **Security scanning** | ❌ | Not in CI | No SAST/DAST; see SA-007 |
+| **Security scanning** | ✅ | `.github/workflows/security.yml` | `govulncheck` plus high-severity production `npm audit` gates |
 
 ### 6.4 Manual Testing Performed
 
@@ -304,16 +304,16 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 | # | Category | Issue | Effort | Timeline |
 |---|----------|-------|--------|----------|
 | **6** | Security | SA-003: Remove query-string credential acceptance | Complete | Done |
-| **7** | Security | SA-006: Add and enforce CSP headers after tuning | 4h | 1 sprint |
+| **7** | Security | SA-006: Add and enforce CSP headers after tuning | Complete | Done |
 | **8** | Monitoring | Define and deploy alert rules for error spikes, auth failures, webhook issues | 4h | 1 sprint |
-| **9** | Testing | Add CI pipeline for `npm audit` and `govulncheck` | 2h | 1 day |
-| **10** | Database | Formalize migration strategy; move away from AutoMigrate | 12h (refactor migrations) | 2 sprints |
+| **9** | Testing | Add CI pipeline for `npm audit` and `govulncheck` | Complete | Done |
+| **10** | Database | Formalize migration strategy; move away from AutoMigrate | Complete | Done |
 
 ### 7.3 🟡 Medium-Priority Items (Polish Before Scale)
 
 | # | Category | Issue | Effort | Timeline |
 |---|----------|-------|--------|----------|
-| **13** | Infrastructure | Add Docker container security hardening (`no-new-privileges`, resource limits, etc.) | 6h | 1 sprint |
+| **13** | Infrastructure | Add Docker container security hardening (`no-new-privileges`, resource limits, etc.) | Complete | Done |
 | **14** | Infrastructure | Implement SSL certificate renewal automation via systemd timer | 2h | 1 day |
 | **15** | Observability | Add Prometheus metrics scrape config and dashboard | 4h | 1 sprint |
 | **16** | Testing | Create staging-vs-production load-test baseline | 4h | 1 sprint |
@@ -330,11 +330,11 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 - [x] 🟠 **SA-003:** Query-string credential acceptance removed
 - [x] **SA-004:** Payment receipts stored privately and served through authenticated endpoints
 - [x] **SA-005:** Rate limiting moved to Redis-backed app counters plus Nginx `limit_req`
-- [ ] 🟠 **SA-006:** CSP enforcement completed
+- [x] 🟠 **SA-006:** CSP enforcement completed
 - [ ] 🟠 **Alert rules:** Deployed and tested with synthetics
-- [ ] 🟠 **Dependency scanning:** CI pipeline running and passing
-- [ ] 🟠 **Database migrations:** Formalized strategy in place
-- [ ] 🟡 **Container hardening:** Security options applied
+- [x] 🟠 **Dependency scanning:** CI pipeline running and passing
+- [x] 🟠 **Database migrations:** Formalized strategy in place
+- [x] 🟡 **Container hardening:** Security options applied
 - [ ] 🟡 **SSL automation:** Renewal tested and automated
 - [ ] 🟡 **Load baseline:** p95 latency confirmed <1s at 100 VUs
 - [ ] 📋 **Backup restore drill:** RTO/RPO targets met in simulation
@@ -351,12 +351,12 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 ├────────────────────────────┬──────┬──────────────────────────────┤
 │ Category                   │ %    │ Assessment                   │
 ├────────────────────────────┼──────┼──────────────────────────────┤
-│ Containerization           │ 92%  │ ✅ Excellent (missing limits)│
-│ Reverse Proxy & TLS        │ 95%  │ ✅ Excellent (CSP pending)   │
+│ Containerization           │ 96%  │ ✅ Excellent (hardened)      │
+│ Reverse Proxy & TLS        │ 98%  │ ✅ Excellent (CSP enforced)  │
 │ Backup & DR                │ 85%  │ ✅ Good (non-DB volumes)     │
 │ Systemd Integration        │ 90%  │ ✅ Good (renewal automation) │
 │ Observability              │ 80%  │ ✅ Good (alert rules needed) │
-│ Security                   │ 65%  │ ⚠️  Acceptable (5 blockers)  │
+│ Security                   │ 78%  │ ⚠️  Acceptable (ops gaps)    │
 │ Testing                    │ 70%  │ ⚠️  Partial (no E2E/frontend)│
 │ Documentation              │ 88%  │ ✅ Good (secrets rotation)   │
 ├────────────────────────────┼──────┼──────────────────────────────┤
@@ -375,22 +375,17 @@ SalesPilot v2 has achieved a mature production infrastructure with comprehensive
 
 ### Immediate (This Week)
 
-1. **Fix SA-006** - Tune CSP in report-only mode, then enforce before public launch.
-2. **Write passphrase rotation** – Backup integrity depends on this.
-3. **Deploy to staging** – Validate the full stack with real URLs and SSL.
+1. **Write passphrase rotation** – Backup integrity depends on this.
+2. **Deploy to staging** – Validate the full stack with real URLs and SSL.
 
 ### Short-Term (1–2 Sprints)
 
-1. Implement SA-006 and remaining hardening findings.
-2. Add alert rules and test with synthetics.
-3. Formalize database migration strategy.
-4. Add `npm audit` + `govulncheck` to CI.
+1. Add alert rules and test with synthetics.
 
 ### Medium-Term (Post-Launch Acceptable)
 
-1. Docker hardening (no-new-privileges, resource limits).
-2. Prometheus metrics dashboard.
-3. Vendor audit checklist / SOC 2 prep.
+1. Prometheus metrics dashboard.
+2. Vendor audit checklist / SOC 2 prep.
 
 ---
 

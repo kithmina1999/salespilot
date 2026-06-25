@@ -209,7 +209,7 @@ flowchart LR
 | `backend/knowledge` | System knowledge synchronization and prompt-ready rendering |
 | `backend/platform` | Platform-owned billing catalog behavior |
 | `backend/models` | GORM persistence models and domain constants |
-| `backend/database` | PostgreSQL connection, schema migration, indexes, and seed/bootstrap behavior |
+| `backend/database` | PostgreSQL connection, versioned schema migrations, indexes, and seed/bootstrap behavior |
 | `backend/cache` | Memory/Redis `StateStore` abstraction for shared pipeline state |
 | `backend/httpclient` | Dependency budgets, safe retries, circuit breakers, and classified external request errors |
 | `backend/observability` | JSON logging, request correlation, redaction, and the error-reporter interface |
@@ -370,8 +370,9 @@ These are architectural boundaries, not hidden assumptions:
    should move to private object storage with authorized access.
 6. The three Next.js apps receive public URLs at image build time and must be
    rebuilt when `NEXT_PUBLIC_*` values change.
-7. Database startup currently includes automatic migration behavior. Reviewed,
-   versioned production migrations remain the safer long-term boundary.
+7. Production database startup verifies `schema_migrations` instead of mutating
+   schema. Reviewed migrations run through `salespilot-migrate` before backend
+   startup.
 8. Tenant isolation depends on `business_id` scoping. New data access paths need
    explicit tenant-isolation tests.
 

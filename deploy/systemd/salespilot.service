@@ -18,6 +18,9 @@ TimeoutStopSec=120
 
 ExecStartPre=/usr/bin/test -f /opt/salespilot-v2/.env.production
 ExecStartPre=/usr/bin/docker compose --env-file /opt/salespilot-v2/.env.production -f /opt/salespilot-v2/docker-compose.prod.yml config --quiet
+ExecStartPre=/usr/bin/docker compose --env-file /opt/salespilot-v2/.env.production -f /opt/salespilot-v2/docker-compose.prod.yml up -d --build postgres
+ExecStartPre=/usr/bin/docker compose --env-file /opt/salespilot-v2/.env.production -f /opt/salespilot-v2/docker-compose.prod.yml build migrate
+ExecStartPre=/usr/bin/docker compose --env-file /opt/salespilot-v2/.env.production -f /opt/salespilot-v2/docker-compose.prod.yml run --rm --no-deps migrate
 ExecStart=/usr/bin/docker compose --env-file /opt/salespilot-v2/.env.production -f /opt/salespilot-v2/docker-compose.prod.yml up -d --remove-orphans
 ExecReload=/usr/bin/docker compose --env-file /opt/salespilot-v2/.env.production -f /opt/salespilot-v2/docker-compose.prod.yml up -d --build --remove-orphans
 ExecStop=/usr/bin/docker compose --env-file /opt/salespilot-v2/.env.production -f /opt/salespilot-v2/docker-compose.prod.yml down --remove-orphans

@@ -9,6 +9,7 @@ It performs:
 - Docker/Compose preflight checks
 - Optional Nginx config check with `nginx -t`
 - Optional pre-deploy database backup
+- Reviewed database migrations through the `migrate` Compose service
 - Docker Compose rebuild/recreate
 - Container health checks for `postgres`, `redis`, `backend`, `frontend`, `admin`, `landing`, `loki`, `alloy`, and `grafana`
 - Local URL checks against `127.0.0.1`
@@ -68,6 +69,8 @@ RUN_PRE_DEPLOY_BACKUP=false
 | `COMPOSE_FILE` | `/opt/salespilot-v2/docker-compose.prod.yml` | Production Compose file. |
 | `DEPLOY_STRATEGY` | `compose` | `compose` always runs `up -d --build`; `systemd` uses `salespilot.service`. |
 | `RUN_PRE_DEPLOY_BACKUP` | `true` | Runs `salespilot-db-backup.service` or `backup-postgres.sh` before deploy. |
+| `RUN_DATABASE_MIGRATIONS` | `true` | Starts Postgres, builds the migration image, and runs reviewed migrations before app services start. |
+| `MIGRATION_SERVICE` | `migrate` | Compose service that runs `salespilot-migrate up`. |
 | `CHECK_NGINX` | `true` | Runs `nginx -t` when Nginx is installed. |
 | `CHECK_PUBLIC_HEALTH` | `true` | Disable until DNS/SSL are ready. |
 | `HEALTH_TIMEOUT_SECONDS` | `240` | Max wait for container and URL checks. |

@@ -52,8 +52,6 @@ func main() {
 	// 10 concurrent workers
 	utils.InitWorkerPool(10)
 
-	// Run one-time data migrations (idempotent — safe to run on every deploy)
-	database.MigrateRuleResponses()
 	if err := knowledge.SyncAllSystemKnowledge(database.DB); err != nil {
 		log.Printf("knowledge sync failed: %v", err)
 	}

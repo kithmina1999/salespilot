@@ -286,7 +286,7 @@ export default function ForgotPasswordPage() {
             <p className="auth-sub mb-6">
               Your password has been changed successfully.
             </p>
-            <Link href="/login" className="auth-submit-btn inline-flex items-center justify-center" style={{ textDecoration: 'none' }}>
+            <Link href="/auth/login" className="auth-submit-btn inline-flex items-center justify-center" style={{ textDecoration: 'none' }}>
               Sign In Now
             </Link>
           </div>
@@ -296,7 +296,7 @@ export default function ForgotPasswordPage() {
         {step !== 'done' && (
           <p className="auth-sub" style={{ textAlign: 'center', marginTop: '1.5rem' }}>
             Remember it?{' '}
-            <Link href="/login" className="text-green-600 font-semibold hover:underline" style={{ textDecoration: 'none' }}>
+            <Link href="/auth/login" className="text-green-600 font-semibold hover:underline" style={{ textDecoration: 'none' }}>
               Back to Sign In
             </Link>
           </p>

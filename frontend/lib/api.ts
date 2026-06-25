@@ -21,7 +21,7 @@ export async function apiFetch<T>(
       clearLegacyAuthStorage();
       void fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
       document.cookie = 'onboarding_passed=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax';
-      window.location.href = '/login';
+      window.location.href = '/auth/login';
       // Throw so that .catch()/.finally() in callers still fire (cleanup runs),
       // while the redirect is already in-flight.
       throw new DOMException('Session expired', 'AbortError');

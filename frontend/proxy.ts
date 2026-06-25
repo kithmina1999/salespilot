@@ -14,22 +14,22 @@ import { NextRequest, NextResponse } from 'next/server';
  *
  *  ┌────────────────────────────────────────────────────────────────┐
  *  │  Unauthenticated (no token cookie)                             │
- *  │  → /dashboard/* → redirect /login?redirect=...                 │
- *  │  → /onboarding  → redirect /login                             │
+ *  │  → /dashboard/* → redirect /auth/login?redirect=...            │
+ *  │  → /onboarding  → redirect /auth/login                         │
  *  └────────────────────────────────────────────────────────────────┘
  *
  *  ┌────────────────────────────────────────────────────────────────┐
  *  │  Authenticated, NOT onboarded (no onboarding_passed cookie)    │
  *  │  → /dashboard/* → redirect /onboarding                        │
  *  │  → /onboarding  → allow through ✓ (no redirect!)              │
- *  │  → /login /register → redirect /onboarding                    │
+ *  │  → /auth/login /auth/register → redirect /onboarding          │
  *  └────────────────────────────────────────────────────────────────┘
  *
  *  ┌────────────────────────────────────────────────────────────────┐
  *  │  Authenticated + onboarded (both cookies present)             │
  *  │  → /dashboard/* → allow through ✓                             │
  *  │  → /onboarding  → redirect /dashboard (already done)          │
- *  │  → /login /register → redirect /dashboard                     │
+ *  │  → /auth/login /auth/register → redirect /dashboard           │
  *  └────────────────────────────────────────────────────────────────┘
  *
  * Why no infinite loop this time:
@@ -39,12 +39,23 @@ import { NextRequest, NextResponse } from 'next/server';
  *   on /dashboard pages. /onboarding renders freely once token is present.
  */
 
-const AUTH_ROUTES = ['/login', '/register'];
+const AUTH_ROUTES = ['/auth/login', '/auth/register'];
+const LEGACY_AUTH_ROUTES: Record<string, string> = {
+  '/login': '/auth/login',
+  '/register': '/auth/register',
+};
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const token = req.cookies.get('token')?.value;
   const onboardingPassed = req.cookies.get('onboarding_passed')?.value === '1';
+
+  const legacyAuthTarget = LEGACY_AUTH_ROUTES[pathname];
+  if (legacyAuthTarget) {
+    const redirectUrl = new URL(legacyAuthTarget, req.url);
+    redirectUrl.search = req.nextUrl.search;
+    return NextResponse.redirect(redirectUrl);
+  }
 
   // ── 1. Auth routes (login / register) ─────────────────────────────────────
   // If the user already has a token, don't let them see auth pages
@@ -64,8 +75,8 @@ export function proxy(req: NextRequest) {
   if (pathname.startsWith('/dashboard')) {
     if (!token) {
       // Not authenticated → go to login, preserving redirect target
-      const loginUrl = new URL('/login', req.url);
-      loginUrl.searchParams.set('redirect', pathname);
+      const loginUrl = new URL('/auth/login', req.url);
+      loginUrl.searchParams.set('redirect', `${pathname}${req.nextUrl.search}`);
       return NextResponse.redirect(loginUrl);
     }
     if (!onboardingPassed) {
@@ -80,7 +91,7 @@ export function proxy(req: NextRequest) {
   if (pathname.startsWith('/onboarding')) {
     if (!token) {
       // Not authenticated at all → must log in first
-      return NextResponse.redirect(new URL('/login', req.url));
+      return NextResponse.redirect(new URL('/auth/login', req.url));
     }
     if (onboardingPassed) {
       // Already completed onboarding → go to dashboard
@@ -97,6 +108,8 @@ export const config = {
   matcher: [
     '/dashboard/:path*',
     '/onboarding/:path*',
+    '/auth/login',
+    '/auth/register',
     '/login',
     '/register',
   ],

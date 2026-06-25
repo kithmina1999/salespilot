@@ -74,6 +74,20 @@ openssl rand -hex 24
 | `LOG_FORMAT` | Backend | Recommended | Use `json` in production; local development may use `text`. |
 | `LOG_LEVEL` | Backend | Optional | Default `info`; accepts `debug`, `info`, `warn`, or `error`. |
 
+## Schema Migrations
+
+| Variable | Used by | Required | Notes |
+| --- | --- | --- | --- |
+| `DB_AUTO_MIGRATE` | Backend startup | Yes | Keep `false` in production. The backend verifies `schema_migrations` and exits if reviewed migrations are pending. |
+
+Production schema changes run before backend startup through the Compose
+`migrate` service:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --no-deps migrate
+docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --no-deps migrate status
+```
+
 ## Compose Runtime Knobs
 
 | Variable | Used by | Required | Notes |
