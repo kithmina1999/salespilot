@@ -47,6 +47,7 @@ Do not launch with real customer data until these high-priority items are closed
 | Tenant dashboard auth | A07 Authentication Failures | Tenant JWTs are now issued as backend-set `HttpOnly; SameSite=Lax` cookies, with frontend credentialed requests and `/api/v1/auth/session` hydration. |
 | Private receipt access | A02 Security Misconfiguration, API3 Object Property Authorization | Receipt uploads now live outside the public static tree. API responses return authorized receipt endpoints, tenant order receipts are scoped by `business_id`, and super-admin receipts are fetched through authenticated backend proxy/streaming handlers. |
 | Brute-force pressure | A07 Authentication Failures, API4 Resource Consumption | Rate limiting now uses the shared StateStore, so production deployments use Redis-backed counters. Auth routes apply both IP and request-identifier limits, and Nginx applies edge `limit_req` controls for auth, uploads, webhooks, and general API traffic. |
+| Browser content isolation | A02 Security Misconfiguration | Nginx now enforces a CSP for production HTTPS responses, including `frame-ancestors 'none'`, `object-src 'none'`, Cloudinary image/media sources, Sentry ingest connections, Google Fonts for admin, and PayHere form/frame destinations. |
 | Payment webhook comparison | A04 Cryptographic Failures | PayHere signature comparison now uses constant-time comparison. |
 
 ## Open Findings
@@ -58,7 +59,7 @@ Do not launch with real customer data until these high-priority items are closed
 | SA-003 | Medium | Fixed | A07 Authentication Failures, API2 Broken Authentication | `AuthRequired`, `TenantAuth`, and `MasterAuth` no longer accept credentials in query strings. Regression coverage exists in `backend/middleware/auth_test.go`. | Keep tenant JWT, tenant API key, and master key authentication header-only unless a future dedicated one-use token endpoint is designed. |
 | SA-004 | Medium | Fixed | A02 Security Misconfiguration, API3 Object Property Authorization | Public static serving is limited to `/uploads/products`. New tenant receipt files are stored under `private_uploads/receipts`, legacy local receipts are no longer exposed by the static mount, and receipt APIs return `/system/payments/:id/receipt` or `/api/v1/order-proofs/:id/receipt` instead of raw storage locations. | Keep receipt reads behind `RequireSuperPermission(PermBillingView)` or tenant `business_id` checks; use private/signed object storage if receipts move off disk. |
 | SA-005 | Medium | Fixed | A07 Authentication Failures, API4 Resource Consumption | `RateLimit` now increments the app's shared StateStore, which is Redis-backed in production Compose. Auth endpoints use per-IP plus per-identifier keys, super-admin login uses the same shared limiter, and Nginx defines `limit_req` zones for auth, receipt upload, webhook, and general API traffic. | Keep `STATE_STORE=redis` in production and install `/etc/nginx/snippets/salespilot-api-proxy.conf` before enabling the SSL site config. |
-| SA-006 | Medium | Open | A02 Security Misconfiguration | Nginx has HSTS, frame, nosniff, referrer, and permissions headers, but CSP is intentionally not enforced yet. | Add CSP in report-only mode, tune for Next/Sentry/Cloudinary, then enforce. |
+| SA-006 | Medium | Fixed | A02 Security Misconfiguration | `deploy/nginx/salespilot-security-headers.conf` now sends an enforced `Content-Security-Policy` alongside HSTS, frame, nosniff, referrer, and permissions headers. The policy allows current Next.js inline requirements, Sentry ingest, Cloudinary media, Google Fonts, and PayHere redirects. | Validate the policy on staging with browser console checks and tighten `script-src`/`style-src` to nonce or hash-based directives when the Next.js apps are ready. |
 | SA-007 | Medium | Open | A03 Software Supply Chain Failures | Current local shell has no `npm`; `govulncheck` is not installed. | Run dependency scans before launch and in CI: `npm audit --omit=dev --audit-level=high` for each Next app, and `govulncheck ./...` for backend. |
 | SA-008 | Low | Open | A02 Security Misconfiguration | Docker app containers run as non-root and bind ports to localhost, but Compose does not yet set `no-new-privileges`, `cap_drop`, resource limits, or read-only filesystems where feasible. | Add container hardening in a separate Compose pass, testing write paths for uploads, Next cache, Postgres, Redis, Loki, Alloy, and Grafana. |
 | SA-009 | Low | Open | A08 Software/Data Integrity Failures | Production startup uses GORM `AutoMigrate`. This is convenient but can blur migration review boundaries. | Before serious launch, move schema changes to reviewed migration files and keep `AutoMigrate` only for dev/staging or explicitly documented safe migrations. |
@@ -68,11 +69,11 @@ Do not launch with real customer data until these high-priority items are closed
 | Risk | Current posture |
 | --- | --- |
 | A01 Broken Access Control | Tenant-scoped DB context is used broadly. Super-admin token/API-key serialization leak fixed in this pass. Continue testing ID-based endpoints for object-level authorization. |
-| A02 Security Misconfiguration | Nginx headers, localhost-only app ports, and private receipt serving are in place. CSP, Docker security options, and production migration strategy remain open. |
+| A02 Security Misconfiguration | Nginx headers with enforced CSP, localhost-only app ports, and private receipt serving are in place. Docker security options and production migration strategy remain open. |
 | A03 Software Supply Chain Failures | Docker images are pinned by major tags, but dependency CVE scanning was not runnable here. Add CI scans before launch. |
 | A04 Cryptographic Failures | JWT secret length is enforced; PayHere compare hardened. Tenant Meta tokens are envelope-encrypted at rest with startup backfill for legacy plaintext rows. |
 | A05 Injection | GORM parameter binding is used in reviewed query paths. Dynamic update maps are allowlisted in product updates. Continue scanning raw SQL and prompt-to-SQL risks if added later. |
-| A06 Insecure Design | Runbooks, backups, DR, incident response, logs, private receipt access, Redis-backed rate limits, and load tests are now documented or implemented. CSP enforcement remains before production. |
+| A06 Insecure Design | Runbooks, backups, DR, incident response, logs, private receipt access, Redis-backed rate limits, enforced CSP, and load tests are now documented or implemented. |
 | A07 Authentication Failures | JWT sessions are revocable, tenant JWTs are held in backend-set HttpOnly cookies, super-admin sessions are hashed server-side, query-string credential fallbacks have been removed, and auth rate limits are shared across Redis-backed instances. |
 | A08 Software/Data Integrity Failures | Deployment script and rollback docs exist. Move DB migrations and dependency scans into CI before customer launch. |
 | A09 Security Logging and Alerting Failures | Loki, Alloy, Grafana, audit logs, incident response, and alerting hooks exist. Add security-specific alert queries for auth spikes and invalid webhooks. |
@@ -89,7 +90,7 @@ Do not launch with real customer data until these high-priority items are closed
 | API5 Broken Function Level Authorization | Super-admin permission middleware exists. Confirm support role cannot access high-risk mutations or sensitive reveal workflows. |
 | API6 Sensitive Business Flows | Payment approval, activation codes, AI generation, uploads, and WhatsApp connect flows need abuse monitoring and rate-limit tuning. |
 | API7 SSRF | Reviewed outbound URLs are mostly fixed provider URLs. Meta media download follows Meta-provided media URLs; keep host allowlisting if user-supplied URLs are introduced. |
-| API8 Security Misconfiguration | Nginx and Compose are mostly sensible, and receipts are no longer publicly served from the uploads tree. CSP, Docker hardening, and migration control remain. |
+| API8 Security Misconfiguration | Nginx and Compose are mostly sensible, CSP is enforced for HTTPS responses, and receipts are no longer publicly served from the uploads tree. Docker hardening and migration control remain. |
 | API9 Improper Inventory Management | Main runbook documents public domains and health checks. Add an endpoint inventory table before external pentest. |
 | API10 Unsafe Consumption of APIs | External API client timeouts exist. Continue validating Meta, Gemini, Cloudinary, Resend, PayHere, and Discord responses before trusting fields. |
 
@@ -138,6 +139,6 @@ Security launch is ready only when:
 - Medium findings are either closed or explicitly accepted with owner and date.
 - Dependency scans pass with no high/critical reachable vulnerabilities.
 - Authenticated IDOR tests pass for products, orders, rules, chats, payment proofs, sessions, and settings.
-- CSP has run in report-only mode without blocking legitimate traffic.
+- Enforced CSP passes staging browser checks for landing, tenant app, admin, API calls, Sentry, Cloudinary media, and PayHere redirects.
 - A staging ZAP baseline has no high-risk findings.
 - Incident playbook includes the final provider contacts and secret-rotation checklist.

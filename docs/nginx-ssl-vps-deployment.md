@@ -172,5 +172,6 @@ curl -I https://api.salespilot.lk/health
 - If using Cloudflare proxy, set SSL mode to `Full (strict)` after certificates are installed.
 - The Nginx config allows uploads up to `20m`; increase `client_max_body_size` only if product or proof uploads need more.
 - Security headers are installed from `deploy/nginx/salespilot-security-headers.conf`.
-  CSP is intentionally not enforced yet; add `Content-Security-Policy-Report-Only`
-  first and test Sentry, Cloudinary, Google Fonts, API calls, and payment redirects before enforcing it.
+  CSP is enforced there. After installing the SSL config, check browser consoles
+  for CSP violations across landing, tenant app, admin, API calls, Sentry,
+  Cloudinary media, Google Fonts, and PayHere redirects.
