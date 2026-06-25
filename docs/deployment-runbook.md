@@ -83,6 +83,28 @@ go test ./whatsapp -run TestDoesNotExist
 Frontend build checks should be run before a real release. Use the project runtime
 or CI command already configured for each Next.js app.
 
+Dependency vulnerability scans must pass before beta or production deploys:
+
+```bash
+cd backend
+govulncheck ./...
+```
+
+```bash
+cd frontend
+npm audit --omit=dev --audit-level=high
+```
+
+```bash
+cd salespilot-admin-main
+npm audit --omit=dev --audit-level=high
+```
+
+```bash
+cd landing
+npm audit --omit=dev --audit-level=high
+```
+
 Known current caveat: full `go test ./...` can fail in existing WhatsApp payment
 flow tests because they hit real Meta-like paths and test DB state. Fix/mocking
 that test gap before treating full-suite green as a release gate.

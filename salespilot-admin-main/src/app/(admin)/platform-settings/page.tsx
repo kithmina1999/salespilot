@@ -121,8 +121,9 @@ function normalize(value: BillingSettingsResponse | null) {
   })
 }
 
-function getApiErrorMessage(err: any) {
-  const message = err?.response?.data?.error
+function getApiErrorMessage(err: unknown) {
+  const response = (err as { response?: { data?: { error?: unknown } } })?.response
+  const message = response?.data?.error
   return typeof message === "string" ? message : err instanceof Error ? err.message : "Request failed"
 }
 

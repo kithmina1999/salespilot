@@ -22,8 +22,6 @@ Reviewed:
 
 Not completed in this environment:
 
-- `npm audit`, because `npm` is not available on this PowerShell path or bundled runtime
-- `govulncheck`, because the tool is not installed
 - Dynamic scanning with OWASP ZAP
 - Authenticated browser session testing against a running production-like stack
 
@@ -33,7 +31,7 @@ Current status: acceptable for private staging after the fixes in this pass.
 
 Do not launch with real customer data until these high-priority items are closed:
 
-- Run dependency vulnerability scans in CI or on the VPS build runner.
+- Confirm dependency vulnerability scans pass in CI.
 - Validate Nginx `limit_req` behavior on staging after installing the API proxy snippet.
 
 ## Fixes Applied In This Pass
@@ -48,6 +46,7 @@ Do not launch with real customer data until these high-priority items are closed
 | Private receipt access | A02 Security Misconfiguration, API3 Object Property Authorization | Receipt uploads now live outside the public static tree. API responses return authorized receipt endpoints, tenant order receipts are scoped by `business_id`, and super-admin receipts are fetched through authenticated backend proxy/streaming handlers. |
 | Brute-force pressure | A07 Authentication Failures, API4 Resource Consumption | Rate limiting now uses the shared StateStore, so production deployments use Redis-backed counters. Auth routes apply both IP and request-identifier limits, and Nginx applies edge `limit_req` controls for auth, uploads, webhooks, and general API traffic. |
 | Browser content isolation | A02 Security Misconfiguration | Nginx now enforces a CSP for production HTTPS responses, including `frame-ancestors 'none'`, `object-src 'none'`, Cloudinary image/media sources, Sentry ingest connections, Google Fonts for admin, and PayHere form/frame destinations. |
+| Dependency scanning | A03 Software Supply Chain Failures | GitHub Actions now runs `govulncheck ./...` for the Go backend and `npm audit --omit=dev --audit-level=high` for frontend, admin, and landing production dependencies on PRs, pushes to `main`, and manual dispatch. |
 | Payment webhook comparison | A04 Cryptographic Failures | PayHere signature comparison now uses constant-time comparison. |
 
 ## Open Findings
@@ -60,7 +59,7 @@ Do not launch with real customer data until these high-priority items are closed
 | SA-004 | Medium | Fixed | A02 Security Misconfiguration, API3 Object Property Authorization | Public static serving is limited to `/uploads/products`. New tenant receipt files are stored under `private_uploads/receipts`, legacy local receipts are no longer exposed by the static mount, and receipt APIs return `/system/payments/:id/receipt` or `/api/v1/order-proofs/:id/receipt` instead of raw storage locations. | Keep receipt reads behind `RequireSuperPermission(PermBillingView)` or tenant `business_id` checks; use private/signed object storage if receipts move off disk. |
 | SA-005 | Medium | Fixed | A07 Authentication Failures, API4 Resource Consumption | `RateLimit` now increments the app's shared StateStore, which is Redis-backed in production Compose. Auth endpoints use per-IP plus per-identifier keys, super-admin login uses the same shared limiter, and Nginx defines `limit_req` zones for auth, receipt upload, webhook, and general API traffic. | Keep `STATE_STORE=redis` in production and install `/etc/nginx/snippets/salespilot-api-proxy.conf` before enabling the SSL site config. |
 | SA-006 | Medium | Fixed | A02 Security Misconfiguration | `deploy/nginx/salespilot-security-headers.conf` now sends an enforced `Content-Security-Policy` alongside HSTS, frame, nosniff, referrer, and permissions headers. The policy allows current Next.js inline requirements, Sentry ingest, Cloudinary media, Google Fonts, and PayHere redirects. | Validate the policy on staging with browser console checks and tighten `script-src`/`style-src` to nonce or hash-based directives when the Next.js apps are ready. |
-| SA-007 | Medium | Open | A03 Software Supply Chain Failures | Current local shell has no `npm`; `govulncheck` is not installed. | Run dependency scans before launch and in CI: `npm audit --omit=dev --audit-level=high` for each Next app, and `govulncheck ./...` for backend. |
+| SA-007 | Medium | Fixed | A03 Software Supply Chain Failures | `.github/workflows/security.yml` runs Go and Node dependency vulnerability scans on PRs, pushes to `main`, and manual dispatch. The Go job installs `govulncheck` and scans `backend`; the Node matrix audits `frontend`, `salespilot-admin-main`, and `landing` production dependency trees. | Treat high/critical scan failures as release blockers unless explicitly accepted with owner, date, and mitigation. |
 | SA-008 | Low | Open | A02 Security Misconfiguration | Docker app containers run as non-root and bind ports to localhost, but Compose does not yet set `no-new-privileges`, `cap_drop`, resource limits, or read-only filesystems where feasible. | Add container hardening in a separate Compose pass, testing write paths for uploads, Next cache, Postgres, Redis, Loki, Alloy, and Grafana. |
 | SA-009 | Low | Open | A08 Software/Data Integrity Failures | Production startup uses GORM `AutoMigrate`. This is convenient but can blur migration review boundaries. | Before serious launch, move schema changes to reviewed migration files and keep `AutoMigrate` only for dev/staging or explicitly documented safe migrations. |
 
@@ -70,7 +69,7 @@ Do not launch with real customer data until these high-priority items are closed
 | --- | --- |
 | A01 Broken Access Control | Tenant-scoped DB context is used broadly. Super-admin token/API-key serialization leak fixed in this pass. Continue testing ID-based endpoints for object-level authorization. |
 | A02 Security Misconfiguration | Nginx headers with enforced CSP, localhost-only app ports, and private receipt serving are in place. Docker security options and production migration strategy remain open. |
-| A03 Software Supply Chain Failures | Docker images are pinned by major tags, but dependency CVE scanning was not runnable here. Add CI scans before launch. |
+| A03 Software Supply Chain Failures | CI now runs Go and Node vulnerability scans. Keep reviewing Docker image tags and scan results before each release. |
 | A04 Cryptographic Failures | JWT secret length is enforced; PayHere compare hardened. Tenant Meta tokens are envelope-encrypted at rest with startup backfill for legacy plaintext rows. |
 | A05 Injection | GORM parameter binding is used in reviewed query paths. Dynamic update maps are allowlisted in product updates. Continue scanning raw SQL and prompt-to-SQL risks if added later. |
 | A06 Insecure Design | Runbooks, backups, DR, incident response, logs, private receipt access, Redis-backed rate limits, enforced CSP, and load tests are now documented or implemented. |
