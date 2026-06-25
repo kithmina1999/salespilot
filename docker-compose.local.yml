@@ -1,5 +1,258 @@
+name: salespilot-local
+
+# Full local app stack.
+#
+# Quick start:
+#   docker compose -f docker-compose.local.yml up -d --build
+#
+# Optional overrides:
+#   copy .env.local.docker.example to .env.local.docker, edit values, then run:
+#   docker compose --env-file .env.local.docker -f docker-compose.local.yml up -d --build
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-backend-env: &backend-env
+  APP_ENV: ${APP_ENV:-local}
+  APP_RELEASE: ${APP_RELEASE:-local}
+  LOG_FORMAT: ${LOG_FORMAT:-text}
+  LOG_LEVEL: ${LOG_LEVEL:-debug}
+  GIN_MODE: ${GIN_MODE:-debug}
+  PORT: "8080"
+  SERVER_URL: ${SERVER_URL:-http://localhost:18080}
+  FRONTEND_URL: ${FRONTEND_URL:-http://localhost:13000,http://localhost:13001,http://localhost:13002,http://127.0.0.1:13000,http://127.0.0.1:13001,http://127.0.0.1:13002}
+  DATABASE_URL: ${DATABASE_URL:-postgresql://salespilot:local-postgres-password@postgres:5432/salespilot?sslmode=disable}
+  WA_SESSIONS_DB_PATH: /app/data/whatsapp_sessions.db
+  STATE_STORE: redis
+  REDIS_ADDR: redis:6379
+  REDIS_KEY_PREFIX: ${REDIS_KEY_PREFIX:-salespilot-local}
+  JWT_SECRET: ${JWT_SECRET:-local-jwt-secret-0123456789abcdef0123456789abcdef}
+  MASTER_API_KEY: ${MASTER_API_KEY:-local-master-api-key-0123456789abcdef0123456789abcdef}
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-local-gemini-api-key}
+  PROVIDER_TOKEN_ENCRYPTION_KEYS: ${PROVIDER_TOKEN_ENCRYPTION_KEYS:-local:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
+  META_VERIFY_TOKEN: ${META_VERIFY_TOKEN:-local-meta-verify-token}
+  META_APP_SECRET: ${META_APP_SECRET:-local-meta-app-secret}
+  OWNER_PHONE: ${OWNER_PHONE:-+94770000000}
+  WHATSAPP_OTP_TEMPLATE: ${WHATSAPP_OTP_TEMPLATE:-salespilot_otp}
+  CLOUDINARY_URL: ${CLOUDINARY_URL:-cloudinary://local:local@local}
+  CLOUDINARY_RECEIPTS_URL: ${CLOUDINARY_RECEIPTS_URL:-}
+  RESEND_API_KEY: ${RESEND_API_KEY:-re_local}
+  RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-SalesPilot <noreply@example.test>}
+  PAYHERE_MERCHANT_ID: ${PAYHERE_MERCHANT_ID:-local}
+  PAYHERE_MERCHANT_SECRET: ${PAYHERE_MERCHANT_SECRET:-local}
+  PAYHERE_SANDBOX: ${PAYHERE_SANDBOX:-true}
+  R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+  R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+  R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+  R2_BUCKET_NAME: ${R2_BUCKET_NAME:-}
+  DISCORD_GENERAL_ISSUES_WEBHOOK_URL: ${DISCORD_GENERAL_ISSUES_WEBHOOK_URL:-}
+  DISCORD_CRITICAL_ISSUES_WEBHOOK_URL: ${DISCORD_CRITICAL_ISSUES_WEBHOOK_URL:-}
+  SEED_DB: ${SEED_DB:-false}
+  SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:-}
+  SUPER_ADMIN_INITIAL_PASSWORD: ${SUPER_ADMIN_INITIAL_PASSWORD:-}
+
+x-frontend-env: &frontend-env
+  BACKEND_URL: http://backend:8080
+  NEXT_PUBLIC_API_URL: ${SERVER_URL:-http://localhost:18080}
+  NEXT_PUBLIC_SENTRY_ENABLED: ${NEXT_PUBLIC_SENTRY_ENABLED:-false}
+  NEXT_PUBLIC_SENTRY_FRONTEND_DSN: ${NEXT_PUBLIC_SENTRY_FRONTEND_DSN:-}
+  NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${NEXT_PUBLIC_SENTRY_ENVIRONMENT:-local}
+  NEXT_PUBLIC_SENTRY_RELEASE: ${NEXT_PUBLIC_SENTRY_RELEASE:-local}
+  NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: ${NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE:-0}
+  SENTRY_ENABLED: ${SENTRY_ENABLED:-false}
+  SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-local}
+  SENTRY_RELEASE: ${SENTRY_RELEASE:-local}
+  SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0}
+  SENTRY_AUTH_TOKEN: ${SENTRY_AUTH_TOKEN:-}
+  SENTRY_ORG: ${SENTRY_ORG:-salespilot-5b}
+  SENTRY_FRONTEND_PROJECT: ${SENTRY_FRONTEND_PROJECT:-frontend-salespilot}
+  SENTRY_FRONTEND_DSN: ${SENTRY_FRONTEND_DSN:-}
+  NEXT_TELEMETRY_DISABLED: "1"
+  NODE_ENV: production
+
+x-landing-env: &landing-env
+  NEXT_APPLICATION_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:13000}
+  NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:13000}
+  NEXT_PUBLIC_COMPANY_ADDRESS: ${NEXT_PUBLIC_COMPANY_ADDRESS:-Local}
+  NEXT_PUBLIC_COMPANY_NAME: ${NEXT_PUBLIC_COMPANY_NAME:-SalesPilot}
+  NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:13002}
+  NEXT_PUBLIC_SUPPORT_EMAIL: ${NEXT_PUBLIC_SUPPORT_EMAIL:-support@example.test}
+  NEXT_PUBLIC_SUPPORT_PHONE_NUMBER: ${NEXT_PUBLIC_SUPPORT_PHONE_NUMBER:-+94770000000}
+  NEXT_TELEMETRY_DISABLED: "1"
+  NODE_ENV: production
+
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-salespilot}
+      POSTGRES_USER: ${POSTGRES_USER:-salespilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-postgres-password}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-15432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - salespilot-local
+
   redis:
     image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:${REDIS_PORT:-16379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - salespilot-local
+
+  backend:
+    image: salespilot/backend:local
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    environment:
+      <<: *backend-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    init: true
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-18080}:8080"
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_private_uploads:/app/private_uploads
+      - backend_data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+    stop_grace_period: 30s
+    logging: *default-logging
+    networks:
+      - salespilot-local
+
+  frontend:
+    image: salespilot/frontend:local
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        BACKEND_URL: http://backend:8080
+        NEXT_PUBLIC_API_URL: ${SERVER_URL:-http://localhost:18080}
+        NEXT_PUBLIC_SENTRY_ENABLED: ${NEXT_PUBLIC_SENTRY_ENABLED:-false}
+        NEXT_PUBLIC_SENTRY_FRONTEND_DSN: ${NEXT_PUBLIC_SENTRY_FRONTEND_DSN:-}
+        NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${NEXT_PUBLIC_SENTRY_ENVIRONMENT:-local}
+        NEXT_PUBLIC_SENTRY_RELEASE: ${NEXT_PUBLIC_SENTRY_RELEASE:-local}
+        NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: ${NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE:-0}
+        SENTRY_AUTH_TOKEN: ${SENTRY_AUTH_TOKEN:-}
+        SENTRY_ORG: ${SENTRY_ORG:-salespilot-5b}
+        SENTRY_FRONTEND_PROJECT: ${SENTRY_FRONTEND_PROJECT:-frontend-salespilot}
+    environment:
+      <<: *frontend-env
+    depends_on:
+      backend:
+        condition: service_healthy
+    init: true
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-13000}:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - salespilot-local
+
+  admin:
+    image: salespilot/admin:local
+    build:
+      context: ./salespilot-admin-main
+      dockerfile: Dockerfile.prod
+      args:
+        NEXT_PUBLIC_API_URL: ${SERVER_URL:-http://localhost:18080}
+    environment:
+      NEXT_PUBLIC_API_URL: ${SERVER_URL:-http://localhost:18080}
+      NEXT_TELEMETRY_DISABLED: "1"
+      NODE_ENV: production
+    depends_on:
+      backend:
+        condition: service_healthy
+    init: true
+    ports:
+      - "127.0.0.1:${ADMIN_PORT:-13001}:3001"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - salespilot-local
+
+  landing:
+    image: salespilot/landing:local
+    build:
+      context: ./landing
+      dockerfile: Dockerfile.prod
+      args:
+        NEXT_APPLICATION_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:13000}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:13000}
+        NEXT_PUBLIC_COMPANY_ADDRESS: ${NEXT_PUBLIC_COMPANY_ADDRESS:-Local}
+        NEXT_PUBLIC_COMPANY_NAME: ${NEXT_PUBLIC_COMPANY_NAME:-SalesPilot}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:13002}
+        NEXT_PUBLIC_SUPPORT_EMAIL: ${NEXT_PUBLIC_SUPPORT_EMAIL:-support@example.test}
+        NEXT_PUBLIC_SUPPORT_PHONE_NUMBER: ${NEXT_PUBLIC_SUPPORT_PHONE_NUMBER:-+94770000000}
+    environment:
+      <<: *landing-env
+    init: true
+    ports:
+      - "127.0.0.1:${LANDING_PORT:-13002}:3002"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - salespilot-local
+
+networks:
+  salespilot-local:
+    driver: bridge
+
+volumes:
+  backend_data:
+  backend_private_uploads:
+  backend_uploads:
+  postgres_data:
+  redis_data:
