@@ -19,10 +19,10 @@ import { NextRequest, NextResponse } from 'next/server';
  *  └────────────────────────────────────────────────────────────────┘
  *
  *  ┌────────────────────────────────────────────────────────────────┐
- *  │  Authenticated, NOT onboarded (no onboarding_passed cookie)    │
- *  │  → /dashboard/* → redirect /onboarding                        │
+ *  │  Authenticated, onboarding cookie missing/stale                 │
+ *  │  → /dashboard/* → allow; DashboardGuard checks backend state    │
  *  │  → /onboarding  → allow through ✓ (no redirect!)              │
- *  │  → /auth/login /auth/register → redirect /onboarding          │
+ *  │  → /auth/login /auth/register → redirect /dashboard           │
  *  └────────────────────────────────────────────────────────────────┘
  *
  *  ┌────────────────────────────────────────────────────────────────┐
@@ -61,11 +61,7 @@ export function proxy(req: NextRequest) {
   // If the user already has a token, don't let them see auth pages
   if (AUTH_ROUTES.includes(pathname)) {
     if (token) {
-      if (onboardingPassed) {
-        return NextResponse.redirect(new URL('/dashboard', req.url));
-      } else {
-        return NextResponse.redirect(new URL('/onboarding', req.url));
-      }
+      return NextResponse.redirect(new URL('/dashboard', req.url));
     }
     // No token → allow through
     return NextResponse.next();
@@ -79,11 +75,8 @@ export function proxy(req: NextRequest) {
       loginUrl.searchParams.set('redirect', `${pathname}${req.nextUrl.search}`);
       return NextResponse.redirect(loginUrl);
     }
-    if (!onboardingPassed) {
-      // Authenticated but hasn't finished onboarding → send to onboarding
-      return NextResponse.redirect(new URL('/onboarding', req.url));
-    }
-    // Authenticated + onboarded → allow through ✓
+    // Onboarding is checked by DashboardGuard against backend business state.
+    // A missing/stale onboarding_passed cookie should not block completed users.
     return NextResponse.next();
   }
 
