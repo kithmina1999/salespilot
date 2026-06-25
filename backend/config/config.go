@@ -11,30 +11,31 @@ import (
 )
 
 type Config struct {
-	Port                string
-	DatabaseURL         string // PostgreSQL connection string (main app DB)
-	WASessionsDBPath    string // SQLite path for whatsmeow sessions only
-	APIKey              string
-	OwnerPhone          string
-	ServerURL           string
-	MasterAPIKey        string
-	GeminiAPIKey        string
-	GinMode             string // "debug" | "release"
-	FrontendURL         string
-	R2AccountID         string
-	R2AccessKey         string
-	R2SecretKey         string
-	R2Bucket            string
-	ResendAPIKey        string
-	ResendFromEmail     string // Sender address shown in transactional emails (RESEND_FROM_EMAIL)
-	WhatsAppOTPTemplate string // To bypass the 24-hour service window limit
-	StateStoreBackend   string // "memory" for local/dev, "redis" for multi-instance production
-	RedisURL            string
-	RedisAddr           string
-	RedisPassword       string
-	RedisDB             int
-	RedisKeyPrefix      string
-	ProviderTokenKeys   string // PROVIDER_TOKEN_ENCRYPTION_KEYS, key-id:base64-32-byte-key[,old-id:...]
+	Port                      string
+	DatabaseURL               string // PostgreSQL connection string (main app DB)
+	WASessionsDBPath          string // SQLite path for whatsmeow sessions only
+	APIKey                    string
+	OwnerPhone                string
+	ServerURL                 string
+	MasterAPIKey              string
+	GeminiAPIKey              string
+	GinMode                   string // "debug" | "release"
+	FrontendURL               string
+	R2AccountID               string
+	R2AccessKey               string
+	R2SecretKey               string
+	R2Bucket                  string
+	ResendAPIKey              string
+	ResendFromEmail           string // Sender address shown in transactional emails (RESEND_FROM_EMAIL)
+	EmailVerificationRequired bool
+	WhatsAppOTPTemplate       string // To bypass the 24-hour service window limit
+	StateStoreBackend         string // "memory" for local/dev, "redis" for multi-instance production
+	RedisURL                  string
+	RedisAddr                 string
+	RedisPassword             string
+	RedisDB                   int
+	RedisKeyPrefix            string
+	ProviderTokenKeys         string // PROVIDER_TOKEN_ENCRYPTION_KEYS, key-id:base64-32-byte-key[,old-id:...]
 }
 
 // dangerousWeakDefaults lists known unsafe placeholder values that must never
@@ -52,30 +53,31 @@ func Load() *Config {
 	godotenv.Load()
 
 	cfg := &Config{
-		Port:                getEnv("PORT", "8080"),
-		DatabaseURL:         os.Getenv("DATABASE_URL"),
-		WASessionsDBPath:    getEnv("WA_SESSIONS_DB_PATH", "whatsapp_sessions.db"),
-		APIKey:              os.Getenv("API_KEY"),
-		OwnerPhone:          getEnv("OWNER_PHONE", "+94771234567"),
-		ServerURL:           getEnv("SERVER_URL", "http://localhost:8080"),
-		MasterAPIKey:        os.Getenv("MASTER_API_KEY"),
-		GeminiAPIKey:        os.Getenv("GEMINI_API_KEY"),
-		GinMode:             getEnv("GIN_MODE", "debug"),
-		FrontendURL:         getEnv("FRONTEND_URL", "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001"),
-		R2AccountID:         os.Getenv("R2_ACCOUNT_ID"),
-		R2AccessKey:         os.Getenv("R2_ACCESS_KEY_ID"),
-		R2SecretKey:         os.Getenv("R2_SECRET_ACCESS_KEY"),
-		R2Bucket:            os.Getenv("R2_BUCKET_NAME"),
-		ResendAPIKey:        os.Getenv("RESEND_API_KEY"),
-		ResendFromEmail:     getEnv("RESEND_FROM_EMAIL", "SalesPilot <onboarding@resend.dev>"),
-		WhatsAppOTPTemplate: getEnv("WHATSAPP_OTP_TEMPLATE", "salespilot_otp"),
-		StateStoreBackend:   getEnv("STATE_STORE", "memory"),
-		RedisURL:            os.Getenv("REDIS_URL"),
-		RedisAddr:           getEnv("REDIS_ADDR", "localhost:6379"),
-		RedisPassword:       os.Getenv("REDIS_PASSWORD"),
-		RedisDB:             getEnvInt("REDIS_DB", 0),
-		RedisKeyPrefix:      getEnv("REDIS_KEY_PREFIX", "salespilot"),
-		ProviderTokenKeys:   os.Getenv(providersecrets.ProviderTokenEnvVar),
+		Port:                      getEnv("PORT", "8080"),
+		DatabaseURL:               os.Getenv("DATABASE_URL"),
+		WASessionsDBPath:          getEnv("WA_SESSIONS_DB_PATH", "whatsapp_sessions.db"),
+		APIKey:                    os.Getenv("API_KEY"),
+		OwnerPhone:                getEnv("OWNER_PHONE", "+94771234567"),
+		ServerURL:                 getEnv("SERVER_URL", "http://localhost:8080"),
+		MasterAPIKey:              os.Getenv("MASTER_API_KEY"),
+		GeminiAPIKey:              os.Getenv("GEMINI_API_KEY"),
+		GinMode:                   getEnv("GIN_MODE", "debug"),
+		FrontendURL:               getEnv("FRONTEND_URL", "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001"),
+		R2AccountID:               os.Getenv("R2_ACCOUNT_ID"),
+		R2AccessKey:               os.Getenv("R2_ACCESS_KEY_ID"),
+		R2SecretKey:               os.Getenv("R2_SECRET_ACCESS_KEY"),
+		R2Bucket:                  os.Getenv("R2_BUCKET_NAME"),
+		ResendAPIKey:              os.Getenv("RESEND_API_KEY"),
+		ResendFromEmail:           getEnv("RESEND_FROM_EMAIL", "SalesPilot <onboarding@resend.dev>"),
+		EmailVerificationRequired: getEnvBool("EMAIL_VERIFICATION_REQUIRED", true),
+		WhatsAppOTPTemplate:       getEnv("WHATSAPP_OTP_TEMPLATE", "salespilot_otp"),
+		StateStoreBackend:         getEnv("STATE_STORE", "memory"),
+		RedisURL:                  os.Getenv("REDIS_URL"),
+		RedisAddr:                 getEnv("REDIS_ADDR", "localhost:6379"),
+		RedisPassword:             os.Getenv("REDIS_PASSWORD"),
+		RedisDB:                   getEnvInt("REDIS_DB", 0),
+		RedisKeyPrefix:            getEnv("REDIS_KEY_PREFIX", "salespilot"),
+		ProviderTokenKeys:         os.Getenv(providersecrets.ProviderTokenEnvVar),
 	}
 
 	// ── Critical key validation — crash fast, not silently ────────────────────
@@ -117,6 +119,19 @@ func getEnvInt(key string, fallback int) int {
 	parsed, err := strconv.Atoi(val)
 	if err != nil {
 		log.Fatalf("invalid integer value for %s: %q", key, val)
+	}
+	return parsed
+}
+
+func getEnvBool(key string, fallback bool) bool {
+	val := os.Getenv(key)
+	if val == "" {
+		return fallback
+	}
+
+	parsed, err := strconv.ParseBool(val)
+	if err != nil {
+		log.Fatalf("invalid boolean value for %s: %q", key, val)
 	}
 	return parsed
 }

@@ -241,6 +241,7 @@ If Cloudinary is missing, some image workflows fall back to local uploads or can
 | --- | --- | --- | --- |
 | `RESEND_API_KEY` | Backend | Recommended | Sends OTPs, activation codes, and alerts. Missing key logs simulated sends. |
 | `RESEND_FROM_EMAIL` | Backend | Recommended | Sender shown in transactional emails, e.g. `SalesPilot <noreply@salespilot.lk>`. |
+| `EMAIL_VERIFICATION_REQUIRED` | Backend | Recommended | Defaults to `true`. Set `false` only while the Resend sending domain is not verified; registration then skips email OTP verification. |
 
 ## Payments
 

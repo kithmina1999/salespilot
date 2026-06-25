@@ -33,6 +33,7 @@ func main() {
 
 	// Load config
 	cfg := config.Load()
+	handlers.SetEmailVerificationRequired(cfg.EmailVerificationRequired)
 
 	// Set Gin mode before creating the engine
 	gin.SetMode(cfg.GinMode)

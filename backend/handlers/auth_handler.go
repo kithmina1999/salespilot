@@ -18,6 +18,12 @@ import (
 // e164Re matches a valid E.164 phone number: + followed by 7–15 digits.
 var e164Re = regexp.MustCompile(`^\+[1-9]\d{6,14}$`)
 
+var emailVerificationRequired = true
+
+func SetEmailVerificationRequired(required bool) {
+	emailVerificationRequired = required
+}
+
 type LoginInput struct {
 	Identifier string `json:"identifier" binding:"required"` // Can be Email or Phone
 	Password   string `json:"password" binding:"required"`
@@ -63,7 +69,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	if !user.IsEmailVerified {
+	if emailVerificationRequired && !user.IsEmailVerified {
 		recordFailed(user.ID, user.BusinessID, "unverified_email")
 		c.JSON(http.StatusForbidden, gin.H{
 			"error":                 "Please verify your email address to log in.",
@@ -71,6 +77,13 @@ func Login(c *gin.Context) {
 			"email":                 user.Email,
 		})
 		return
+	}
+	if !emailVerificationRequired && !user.IsEmailVerified {
+		if err := database.DB.Model(&user).Update("is_email_verified", true).Error; err != nil {
+			log.Printf("failed to auto-mark user %d verified while email verification is disabled: %v", user.ID, err)
+		} else {
+			user.IsEmailVerified = true
+		}
 	}
 
 	// Create session record
@@ -183,11 +196,12 @@ func Register(c *gin.Context) {
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 
 	user := models.User{
-		BusinessID:   business.ID,
-		Email:        input.Email,
-		Phone:        input.Phone,
-		PasswordHash: string(hashedPassword),
-		Role:         "admin",
+		BusinessID:      business.ID,
+		Email:           input.Email,
+		Phone:           input.Phone,
+		PasswordHash:    string(hashedPassword),
+		Role:            "admin",
+		IsEmailVerified: !emailVerificationRequired,
 	}
 
 	if err := tx.Create(&user).Error; err != nil {
@@ -197,6 +211,15 @@ func Register(c *gin.Context) {
 	}
 
 	tx.Commit()
+
+	if !emailVerificationRequired {
+		c.JSON(http.StatusOK, gin.H{
+			"message":               "Account created successfully. You can now log in.",
+			"requires_verification": false,
+			"email":                 user.Email,
+		})
+		return
+	}
 
 	// Generate 6-digit OTP
 	otp, err := generateSixDigitOTP()

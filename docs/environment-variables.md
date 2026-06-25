@@ -105,6 +105,7 @@ openssl rand -base64 32
 | --- | --- | --- | --- | --- |
 | `RESEND_API_KEY` | Conditional | Empty | Yes | Sends verification, activation, reset, and operational emails. Without it, the backend logs simulated sends. |
 | `RESEND_FROM_EMAIL` | Conditional | `SalesPilot <onboarding@resend.dev>` | No | Verified sender used by Resend. Set a production-domain sender before launch. |
+| `EMAIL_VERIFICATION_REQUIRED` | Recommended | `true` | No | Set `false` temporarily before the Resend sending domain is verified. New users are created as verified and registration skips the email OTP flow. |
 | `CLOUDINARY_URL` | Conditional | Empty | Yes | Cloudinary URL for product media and fallback receipt storage. |
 | `CLOUDINARY_RECEIPTS_URL` | Optional | `CLOUDINARY_URL` | Yes | Separate Cloudinary URL for payment proofs. |
 | `PAYHERE_MERCHANT_ID` | Conditional | Empty | Sensitive | PayHere merchant identifier. Required when billing checkout is enabled. |
