@@ -182,21 +182,22 @@ export default function PhoneInput({
               padding: '0 10px',
               height: 42,
               borderRadius: 8,
-              border: '1px solid rgba(255,255,255,0.1)',
-              background: 'rgba(255,255,255,0.05)',
-              color: '#e8eaf0',
+              border: `1px solid ${open ? '#16a34a' : '#d1d5db'}`,
+              background: '#ffffff',
+              color: '#111827',
               cursor: 'pointer',
               fontSize: '0.9rem',
               whiteSpace: 'nowrap',
               minWidth: 90,
-              transition: 'border-color 0.2s',
+              boxShadow: open ? '0 0 0 3px rgba(22,163,74,0.18)' : '0 1px 2px rgba(15,23,42,0.05)',
+              transition: 'border-color 0.2s, box-shadow 0.2s',
             }}
             aria-haspopup="listbox"
             aria-expanded={open}
           >
             <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>{selected.flag}</span>
-            <span style={{ color: '#9ca3af', fontSize: '0.82rem' }}>{selected.dial}</span>
-            <ChevronDown size={13} style={{ color: '#6b7280', transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 0.2s' }} />
+            <span style={{ color: '#374151', fontSize: '0.82rem' }}>{selected.dial}</span>
+            <ChevronDown size={13} style={{ color: '#4b5563', transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 0.2s' }} />
           </button>
 
           {open && (
@@ -210,28 +211,29 @@ export default function PhoneInput({
                 width: 280,
                 maxHeight: 300,
                 overflowY: 'auto',
-                background: '#1a1d27',
-                border: '1px solid rgba(255,255,255,0.1)',
+                background: '#ffffff',
+                border: '1px solid #d1d5db',
                 borderRadius: 10,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                boxShadow: '0 12px 28px rgba(15,23,42,0.16)',
                 display: 'flex',
                 flexDirection: 'column',
               }}
             >
               {/* Search */}
-              <div style={{ padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ padding: '8px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Search size={13} style={{ color: '#6b7280', flexShrink: 0 }} />
                 <input
                   ref={searchRef}
                   type="text"
                   placeholder="Search country..."
+                  className="phone-input-search"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   style={{
                     background: 'transparent',
                     border: 'none',
                     outline: 'none',
-                    color: '#e8eaf0',
+                    color: '#111827',
                     fontSize: '0.82rem',
                     width: '100%',
                   }}
@@ -259,12 +261,12 @@ export default function PhoneInput({
                       background: c.code === selected.code ? 'rgba(16,185,129,0.12)' : 'transparent',
                       border: 'none',
                       cursor: 'pointer',
-                      color: '#e8eaf0',
+                      color: '#111827',
                       fontSize: '0.85rem',
                       textAlign: 'left',
                       transition: 'background 0.1s',
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#f3f4f6')}
                     onMouseLeave={e => (e.currentTarget.style.background = c.code === selected.code ? 'rgba(16,185,129,0.12)' : 'transparent')}
                   >
                     <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{c.flag}</span>
