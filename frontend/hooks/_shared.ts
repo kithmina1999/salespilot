@@ -4,7 +4,13 @@
  * Import from here — never duplicate in individual hook files.
  */
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+// Authenticated browser requests must stay same-origin so the app-domain
+// HttpOnly session cookie is sent on hosted deployments.
+export const API_URL = '';
+
+// Public/backend origin for values that must leave the app origin, such as
+// webhook callback URLs and backend-hosted assets.
+export const PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 export const jsonHeaders = { 'Content-Type': 'application/json' };
 

@@ -1,6 +1,6 @@
 import { CheckCircle2, XCircle, BanknoteIcon, Eye } from 'lucide-react';
 import { CartItem } from './types';
-import { API_URL } from '@/hooks/_shared';
+import { API_URL, PUBLIC_API_URL } from '@/hooks/_shared';
 
 export const COLUMNS = [
   { key: 'new',       label: 'New',       emoji: '🆕', color: 'amber'  },
@@ -22,7 +22,7 @@ export const API = `${API_URL}/api/v1`;
 export const headers = () => ({ 'Content-Type': 'application/json' });
 
 export const fetcher = (url: string) => fetch(url, { credentials: 'include' }).then(r => r.json());
-export const apiAssetURL = (url: string) => (url.startsWith('/') ? `${API_URL}${url}` : url);
+export const apiAssetURL = (url: string) => (url.startsWith('/') ? `${PUBLIC_API_URL}${url}` : url);
 
 export function paymentBadgeConfig(method: string, status: string) {
   if (method !== 'bank_transfer') return null; // COD has no badge

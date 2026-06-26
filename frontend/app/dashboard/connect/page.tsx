@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { toast } from 'sonner';
-import { API_URL } from '@/hooks/_shared';
+import { PUBLIC_API_URL } from '@/hooks/_shared';
 import { useAppStore } from '@/lib/store';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -158,7 +158,7 @@ export default function ConnectPage() {
   const [disconnecting, setDisconnecting] = useState(false);
 
   // Webhook URL (read from env or derive)
-  const webhookUrl = `${API_URL}/api/whatsapp/webhook`;
+  const webhookUrl = `${PUBLIC_API_URL}/api/whatsapp/webhook`;
 
   // ── Load status on mount ──
   useEffect(() => {
