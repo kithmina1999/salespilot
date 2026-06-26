@@ -99,6 +99,8 @@ export interface AppPricing {
   promo_ends_at: string;
   trial_days_remaining: number | null;
   days_remaining: number | null;
+  grace_period: boolean;
+  grace_ends_at: string | null;
 }
 
 export interface PlatformNotice {
@@ -285,6 +287,8 @@ export const useAppStore = create<AppState>()(
                 promo_ends_at: b.promo_ends_at ?? '',
                 trial_days_remaining: b.trial_days_remaining ?? null,
                 days_remaining: b.days_remaining ?? null,
+                grace_period: b.grace_period ?? false,
+                grace_ends_at: b.grace_ends_at ?? null,
               },
               // Also update business plan from billing (most authoritative source)
               business: get().business

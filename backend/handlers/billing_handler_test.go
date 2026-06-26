@@ -27,9 +27,32 @@ func TestGetBillingTimeRemainingUsesHoursAndMinutesBeforeExpiry(t *testing.T) {
 	}
 }
 
-func TestGetBillingTimeRemainingExpiredPaidPlanFallsBackToFree(t *testing.T) {
+func TestGetBillingTimeRemainingExpiredPaidPlanUsesGracePeriod(t *testing.T) {
 	now := time.Date(2026, 5, 3, 12, 0, 0, 0, time.UTC)
 	expiresAt := now.Add(-time.Minute)
+
+	remaining := getBillingTimeRemaining(models.Business{
+		Plan:          models.PlanPro,
+		PlanExpiresAt: &expiresAt,
+	}, now)
+
+	if remaining.Status != "paid_grace" {
+		t.Fatalf("Status = %q, want paid_grace", remaining.Status)
+	}
+	if remaining.EffectivePlan != models.PlanPro {
+		t.Fatalf("EffectivePlan = %q, want pro", remaining.EffectivePlan)
+	}
+	if remaining.TotalSeconds <= 0 {
+		t.Fatalf("TotalSeconds = %d, want positive grace duration", remaining.TotalSeconds)
+	}
+	if remaining.Days != 2 || remaining.Hours != 23 {
+		t.Fatalf("remaining = %dd %dh %dm, want 2d 23h remaining in grace", remaining.Days, remaining.Hours, remaining.Minutes)
+	}
+}
+
+func TestGetBillingTimeRemainingExpiredPaidPlanFallsBackToFreeAfterGrace(t *testing.T) {
+	now := time.Date(2026, 5, 3, 12, 0, 0, 0, time.UTC)
+	expiresAt := now.Add(-(3*24*time.Hour + time.Minute))
 
 	remaining := getBillingTimeRemaining(models.Business{
 		Plan:          models.PlanPro,

@@ -124,10 +124,37 @@ func TestGetUsageEntitlementsFreeTrialUsesTrialLimits(t *testing.T) {
 	}
 }
 
-func TestGetUsageEntitlementsExpiredPaidPlanFallsBackToFreeLimits(t *testing.T) {
+func TestGetUsageEntitlementsExpiredPaidPlanUsesGraceLimits(t *testing.T) {
 	setupUsageCatalog(t)
 	now := time.Date(2026, 5, 3, 12, 0, 0, 0, time.UTC)
 	expiredAt := now.Add(-time.Minute)
+
+	ent, err := GetUsageEntitlements(models.Business{
+		Plan:          models.PlanPro,
+		PlanExpiresAt: &expiredAt,
+	}, now)
+	if err != nil {
+		t.Fatalf("GetUsageEntitlements: %v", err)
+	}
+
+	if ent.ActiveTrial {
+		t.Fatalf("paid grace should not be treated as active trial")
+	}
+	if ent.MaxAIMessages != models.ProAILimit {
+		t.Fatalf("MaxAIMessages = %d, want pro limit %d", ent.MaxAIMessages, models.ProAILimit)
+	}
+	if ent.MaxProducts != -1 {
+		t.Fatalf("MaxProducts = %d, want unlimited", ent.MaxProducts)
+	}
+	if !ent.CanUploadCloudinary {
+		t.Fatalf("paid grace should keep paid upload access")
+	}
+}
+
+func TestGetUsageEntitlementsExpiredPaidPlanFallsBackToFreeLimitsAfterGrace(t *testing.T) {
+	setupUsageCatalog(t)
+	now := time.Date(2026, 5, 3, 12, 0, 0, 0, time.UTC)
+	expiredAt := now.Add(-(3*24*time.Hour + time.Minute))
 
 	ent, err := GetUsageEntitlements(models.Business{
 		Plan:          models.PlanPro,

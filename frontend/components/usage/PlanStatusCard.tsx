@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowRight, CheckCircle2, Clock } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, Clock } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 
 interface Props {
@@ -98,14 +98,14 @@ function formatRemaining(seconds: number | undefined): string | null {
   if (seconds >= 86400) {
     const days = Math.floor(seconds / 86400);
     const hours = Math.floor((seconds % 86400) / 3600);
-    return `${days}d ${hours}h left`;
+    return `${days}d ${hours}h`;
   }
   if (seconds >= 3600) {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    return `${hours}h ${minutes}m left`;
+    return `${hours}h ${minutes}m`;
   }
-  return `${Math.max(1, Math.floor(seconds / 60))}m left`;
+  return `${Math.max(1, Math.floor(seconds / 60))}m`;
 }
 
 export default function PlanStatusCard({ onUpgrade }: Props) {
@@ -118,8 +118,11 @@ export default function PlanStatusCard({ onUpgrade }: Props) {
   const isPaid = plan === 'starter' || plan === 'pro';
   const billingStatus = pricing?.status ?? (isPaid ? 'paid_active' : 'free');
   const returnedToFree = billingStatus === 'expired_to_free' || billingStatus === 'trial_expired_to_free';
+  const isGrace = billingStatus === 'paid_grace' || pricing?.grace_period === true;
   const isOnTrial = billingStatus === 'trial_active' || usage?.active_trial === true;
-  const expiresAt = pricing?.expires_at ?? usage?.trial_expires_at ?? null;
+  const expiresAt = isGrace
+    ? pricing?.grace_ends_at ?? pricing?.expires_at ?? null
+    : pricing?.expires_at ?? usage?.trial_expires_at ?? null;
   const secondsRemaining = pricing?.seconds_remaining ?? (expiresAt ? Math.max(0, Math.floor((new Date(expiresAt).getTime() - now) / 1000)) : 0);
   const timeLabel = formatRemaining(secondsRemaining);
   const planExpiry = usage?.plan_expires_at ?? null;
@@ -129,6 +132,10 @@ export default function PlanStatusCard({ onUpgrade }: Props) {
 
   const planLabel = returnedToFree
     ? 'Free'
+    : isGrace && plan === 'pro'
+    ? 'Pro'
+    : isGrace && plan === 'starter'
+    ? 'Starter'
     : isOnTrial
     ? 'Free Trial'
     : plan === 'pro'
@@ -141,6 +148,7 @@ export default function PlanStatusCard({ onUpgrade }: Props) {
 
   return (
     <div className={`rounded-2xl border p-6 transition-all duration-300 ${
+      isGrace ? 'bg-amber-500/5 border-amber-500/25' :
       isPaid && !returnedToFree ? 'bg-emerald-500/5 border-emerald-500/20' :
       isOnTrial ? 'bg-amber-500/5 border-amber-500/20' :
       'bg-card border-border'
@@ -151,7 +159,11 @@ export default function PlanStatusCard({ onUpgrade }: Props) {
             <TrialRing expiresAt={expiresAt} />
           )}
 
-          {isPaid && !returnedToFree && (
+          {isGrace ? (
+            <div className="shrink-0 w-[52px] h-[52px] rounded-xl bg-amber-500/15 flex items-center justify-center">
+              <AlertTriangle className="w-6 h-6 text-amber-400" />
+            </div>
+          ) : isPaid && !returnedToFree && (
             <div className="shrink-0 w-[52px] h-[52px] rounded-xl bg-emerald-500/15 flex items-center justify-center">
               <CheckCircle2 className="w-6 h-6 text-emerald-400" />
             </div>
@@ -163,7 +175,12 @@ export default function PlanStatusCard({ onUpgrade }: Props) {
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-2xl font-black text-foreground">{planLabel}</h2>
-              {isPaid && !returnedToFree && (
+              {isGrace && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  Grace period
+                </span>
+              )}
+              {isPaid && !returnedToFree && !isGrace && (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                   Active
                 </span>
@@ -184,10 +201,18 @@ export default function PlanStatusCard({ onUpgrade }: Props) {
               )}
             </div>
 
-            {isPaid && !returnedToFree && expiryLabel && (
+            {isGrace && (
+              <p className="text-sm text-amber-300 mt-1.5 flex items-center gap-1.5 leading-snug">
+                <Clock size={12} className="text-amber-400/70 shrink-0" />
+                {expiryLabel ? `Plan expired on ${expiryLabel}. ` : 'Plan expired. '}
+                AI access ends{timeLabel ? ` in ${timeLabel}` : ' soon'}.
+              </p>
+            )}
+
+            {isPaid && !returnedToFree && !isGrace && expiryLabel && (
               <p className="text-sm text-muted-foreground mt-1.5 flex items-center gap-1.5">
                 <Clock size={12} className="text-emerald-500/60 shrink-0" />
-                {timeLabel ?? 'Active'} - Renews {expiryLabel}
+                {timeLabel ? `Renews in ${timeLabel}` : 'Active'} ({expiryLabel})
               </p>
             )}
 
@@ -213,12 +238,12 @@ export default function PlanStatusCard({ onUpgrade }: Props) {
           </div>
         </div>
 
-        {(!isPaid || returnedToFree) && (
+        {(!isPaid || returnedToFree || isGrace) && (
           <button
             onClick={onUpgrade}
             className="shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-sm font-black transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
           >
-            Upgrade <ArrowRight size={14} />
+            {isGrace ? 'Renew' : 'Upgrade'} <ArrowRight size={14} />
           </button>
         )}
       </div>

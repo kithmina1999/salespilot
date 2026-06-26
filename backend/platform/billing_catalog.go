@@ -15,6 +15,10 @@ import (
 const (
 	CycleMonthly = models.BillingMonthly
 	CycleAnnual  = models.BillingAnnual
+
+	// BillingGracePeriod keeps paid access alive briefly after expiry so merchants
+	// are not cut off while arranging renewal.
+	BillingGracePeriod = 3 * 24 * time.Hour
 )
 
 type UsageEntitlements struct {
@@ -317,9 +321,13 @@ func GetBusinessEntitlements(db *gorm.DB, biz models.Business, now time.Time) (U
 	planKey := models.PlanFree
 	activeTrial := false
 	paidPlanActive := biz.Plan != models.PlanFree && (biz.PlanExpiresAt == nil || biz.PlanExpiresAt.After(now))
+	paidPlanInGrace := biz.Plan != models.PlanFree &&
+		biz.PlanExpiresAt != nil &&
+		!biz.PlanExpiresAt.After(now) &&
+		now.Sub(*biz.PlanExpiresAt) <= BillingGracePeriod
 
 	switch {
-	case paidPlanActive:
+	case paidPlanActive || paidPlanInGrace:
 		planKey = biz.Plan
 	case biz.TrialExpiresAt != nil && biz.TrialExpiresAt.After(now):
 		planKey = settings.TrialPlanKey

@@ -51,6 +51,20 @@ func getBillingTimeRemaining(biz models.Business, now time.Time) billingTimeRema
 	remaining := expiresAt.Sub(now)
 	if remaining <= 0 {
 		if status == "paid_active" {
+			graceEndsAt := expiresAt.Add(platform.BillingGracePeriod)
+			graceRemaining := graceEndsAt.Sub(now)
+			if graceRemaining > 0 {
+				totalSeconds := int64(graceRemaining.Seconds())
+				return billingTimeRemaining{
+					Status:        "paid_grace",
+					EffectivePlan: biz.Plan,
+					ExpiresAt:     &graceEndsAt,
+					TotalSeconds:  totalSeconds,
+					Days:          int(totalSeconds / 86400),
+					Hours:         int((totalSeconds % 86400) / 3600),
+					Minutes:       int((totalSeconds % 3600) / 60),
+				}
+			}
 			status = "expired_to_free"
 		} else {
 			status = "trial_expired_to_free"
@@ -122,16 +136,10 @@ func BillingStatus(c *gin.Context) {
 	}
 
 	// Grace period: 3 days after plan expiry — bot still runs but merchant gets a warning banner
-	const gp = 3 * 24 * time.Hour
-	gracePeriodActive := false
+	gracePeriodActive := remaining.Status == "paid_grace"
 	var graceEndsAt *time.Time
-	if biz.Plan != models.PlanFree && biz.PlanExpiresAt != nil {
-		sinceExpiry := time.Since(*biz.PlanExpiresAt)
-		if sinceExpiry > 0 && sinceExpiry <= gp {
-			gracePeriodActive = true
-			t := biz.PlanExpiresAt.Add(gp)
-			graceEndsAt = &t
-		}
+	if gracePeriodActive {
+		graceEndsAt = remaining.ExpiresAt
 	}
 
 	// Fetch active platform notice

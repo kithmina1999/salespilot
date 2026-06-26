@@ -113,6 +113,7 @@ export default function PlanCompareTable({ onUpgrade }: Props) {
   const business = useAppStore((s) => s.business);
 
   const plan = business?.plan ?? 'free';
+  const isGrace = pricing?.status === 'paid_grace' || pricing?.grace_period === true;
   const isStarter = plan === 'starter';
   const isPro = plan === 'pro';
 
@@ -222,18 +223,18 @@ export default function PlanCompareTable({ onUpgrade }: Props) {
       <div className="grid grid-cols-[2fr_1fr_1.5fr_1.5fr] mt-5 gap-3">
         <div /><div />
         <PlanCTA
-          label={isStarter ? 'Current Plan' : isPro ? 'Included' : 'Get Starter'}
+          label={isStarter && isGrace ? 'Renew Starter' : isStarter ? 'Current Plan' : isPro ? 'Included' : 'Get Starter'}
           onClick={() => onUpgrade('starter')}
           variant="emerald"
-          disabled={isStarter || isPro}
-          current={isStarter}
+          disabled={(isStarter && !isGrace) || isPro}
+          current={isStarter && !isGrace}
         />
         <PlanCTA
-          label={isPro ? 'Current Plan' : 'Get Pro'}
+          label={isPro && isGrace ? 'Renew Pro' : isPro ? 'Current Plan' : 'Get Pro'}
           onClick={() => onUpgrade('pro')}
           variant="purple"
-          disabled={isPro}
-          current={isPro}
+          disabled={isPro && !isGrace}
+          current={isPro && !isGrace}
         />
       </div>
 
