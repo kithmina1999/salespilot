@@ -49,6 +49,12 @@ func (p *Pipeline) handleContextBridge(business *models.Business, from, fromRaw 
 	if strings.Contains(lastBotMsg.Content, "?") {
 		nudge := "Just to confirm — " + lastBotMsg.Content
 		log.Printf("🔄 [%s] Context bridge — re-prompting %s with last question", business.Name, from)
+		if isSandboxPhone(from) {
+			if err := persistSandboxBotMessage(business, from, nudge); err != nil {
+				log.Printf("[%s] Context bridge sandbox persist failed: %v", business.Name, err)
+			}
+			return
+		}
 		accessToken, err := whatsappAccessTokenForBusiness(business)
 		if err != nil {
 			log.Printf("failed to decrypt context bridge WhatsApp token: %v", err)
@@ -87,7 +93,7 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 		return
 	}
 
-	isSandbox := from == "99900000000"
+	isSandbox := isSandboxPhone(from)
 
 	var pLog *models.PipelineLog
 	var routerCtx CommerceRoutingContext
@@ -161,10 +167,12 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 	// ── Layer B: Proactive delivery check (deferred goroutine) ──────────────
 	// Fired AFTER HandleIncomingMessage returns so the main reply lands first.
 	// Only sends a button if customer has a shipped order >1 day old and hasn't been asked.
-	defer func() {
-		bizCopy := *business
-		go ScheduleDeliveryCheck(&bizCopy, from, fromRaw)
-	}()
+	if !isSandbox {
+		defer func() {
+			bizCopy := *business
+			go ScheduleDeliveryCheck(&bizCopy, from, fromRaw)
+		}()
+	}
 
 	// --- SUSPENSION CHECK ---
 	if business.SuspendedAt != nil {
@@ -624,7 +632,7 @@ func (p *Pipeline) HandleIncomingMessage(business *models.Business, msg Incoming
 
 	// --- LAYER 6.5: Native Commerce Catalog (if catalog linked and product intent detected) ---
 	// Do this BEFORE Gemini to save AI tokens on simple product browsing requests.
-	if business.MetaCatalogID != "" && detectCatalogIntent(text) {
+	if !isSandbox && business.MetaCatalogID != "" && detectCatalogIntent(text) {
 		if err := tryNativeCatalog(business, fromRaw, text); err != nil {
 			log.Printf("⚠️ [%s] Catalog message failed: %v — falling through to Gemini", business.Name, err)
 		} else {

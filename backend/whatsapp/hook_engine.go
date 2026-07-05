@@ -49,6 +49,17 @@ func enrichAndSend(
 		result.Text += "\n\n⚡ _Powered by SalesPilot.lk - Get your own AI bot free_"
 	}
 
+	if isSandboxPhone(phone) {
+		content := result.Text
+		if len(result.Buttons) > 0 {
+			content = "[Buttons] " + content
+		}
+		if err := persistSandboxBotMessage(business, phone, content); err != nil {
+			log.Printf("[HookEngine] Sandbox persist failed for %s: %v", phone, err)
+		}
+		return
+	}
+
 	var sendErr error
 	if len(result.Buttons) > 0 {
 		// botSendButtons logs to DB internally — no extra Create needed

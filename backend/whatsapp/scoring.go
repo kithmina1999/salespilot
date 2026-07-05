@@ -433,6 +433,10 @@ func GetDeterministicSignals(businessID uint, cleanMsg string) []MatchSignal {
 
 // GetSemanticSignals runs the semantic embedding matcher against the reducedMsg.
 func GetSemanticSignals(businessID uint, reducedMsg string) []MatchSignal {
+	if strings.TrimSpace(reducedMsg) == "" {
+		return nil
+	}
+
 	rules := Cache.GetRules(businessID)
 	embedded := make([]CachedRule, 0, len(rules))
 	for _, cr := range rules {

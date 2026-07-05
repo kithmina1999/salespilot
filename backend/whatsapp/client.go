@@ -24,7 +24,7 @@ func SendText(phoneNumberID, accessToken, to, text string) error {
 }
 
 func SendTextContext(ctx context.Context, phoneNumberID, accessToken, to, text string) error {
-	if to == "99900000000" {
+	if isSandboxPhone(to) {
 		log.Println("[SANDBOX] SendText skipped")
 		return nil
 	}

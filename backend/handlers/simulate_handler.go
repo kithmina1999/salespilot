@@ -11,7 +11,7 @@ import (
 	"github.com/kithmina1999/salespilot/whatsapp"
 )
 
-const sandboxSimulatorPhone = "99900000000"
+const sandboxSimulatorPhone = whatsapp.SandboxSimulatorPhone
 
 // SimulateMessage allows a merchant to test their bot logic without using WhatsApp.
 func SimulateMessage(c *gin.Context) {

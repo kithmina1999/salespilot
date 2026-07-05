@@ -42,6 +42,10 @@ var errCartAlreadyPlaced = errors.New("cart already placed")
 // ─── DB Tracking Wrappers ───────────────────────────────────────────────────────
 
 func botSendText(business *models.Business, phone, body string) error {
+	if isSandboxPhone(phone) {
+		return persistSandboxBotMessage(business, phone, body)
+	}
+
 	accessToken, err := whatsappAccessTokenForBusiness(business)
 	if err != nil {
 		return err
@@ -54,6 +58,13 @@ func botSendText(business *models.Business, phone, body string) error {
 }
 
 func botSendButtons(business *models.Business, phone, body string, buttons []Button) error {
+	if isSandboxPhone(phone) {
+		if len(buttons) == 0 {
+			return fmt.Errorf("botSendButtons: at least one button is required")
+		}
+		return persistSandboxBotMessage(business, phone, "[Buttons] "+body)
+	}
+
 	accessToken, err := whatsappAccessTokenForBusiness(business)
 	if err != nil {
 		return err
@@ -66,6 +77,13 @@ func botSendButtons(business *models.Business, phone, body string, buttons []But
 }
 
 func botSendList(business *models.Business, phone, body, label string, sections []ListSection) error {
+	if isSandboxPhone(phone) {
+		if len(sections) == 0 {
+			return fmt.Errorf("botSendList: at least one section with rows is required")
+		}
+		return persistSandboxBotMessage(business, phone, "[List] "+body)
+	}
+
 	accessToken, err := whatsappAccessTokenForBusiness(business)
 	if err != nil {
 		return err

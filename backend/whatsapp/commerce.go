@@ -118,7 +118,7 @@ type ProductSection struct {
 // sendInteractive is a low-level helper that POSTs to the WA messages endpoint.
 func sendInteractive(phoneNumberID, accessToken string, payload map[string]interface{}) error {
 	// Simulator bypass
-	if to, ok := payload["to"].(string); ok && to == "99900000000" {
+	if to, ok := payload["to"].(string); ok && isSandboxPhone(to) {
 		log.Printf("🏖️ [SANDBOX] sendInteractive to %s: type=%v", to, payload["type"])
 		return nil
 	}
