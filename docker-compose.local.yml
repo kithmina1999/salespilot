@@ -245,6 +245,28 @@ services:
     logging: *default-logging
     networks:
       - salespilot-local
+      
+  sinhala-nlp:
+    build:
+      context: ./sinhala-nlp
+      dockerfile: Dockerfile
+    container_name: salespilot-sinhala-nlp
+    restart: unless-stopped
+    environment:
+      - PORT=8000
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - REDIS_URL=redis://redis:6379/1
+    networks:
+      - salespilot-local
+    deploy:
+      resources:
+        limits:
+          memory: 350M
+          cpus: '0.5'
+    depends_on:
+      redis:
+        condition: service_healthy
+
 
 networks:
   salespilot-local:
